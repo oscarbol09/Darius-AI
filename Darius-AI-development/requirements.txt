@@ -1,0 +1,17 @@
+# Módulos de Interfaz Gráfica
+customtkinter
+
+# Módulos de Audio y Reconocimiento de Voz
+SpeechRecognition
+PyAudio
+numpy
+
+# Módulos de Inteligencia Artificial
+google-genai
+
+# Módulos del Sistema Operativo Windows
+pywin32
+pycaw
+
+# Módulo de Wake Word (Palabra de activación)
+pvporcupine

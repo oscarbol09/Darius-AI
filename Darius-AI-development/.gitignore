@@ -1,0 +1,39 @@
+# =========================
+# Entornos y Dependencias
+# =========================
+.venv/
+env/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# =========================
+# Secretos y Credenciales
+# =========================
+.env
+
+# =========================
+# Archivos Dinámicos de DARIUS
+# =========================
+darius.log
+chat_history.txt
+apps_cache.json
+
+# =========================
+# Compilación y Empaquetado (PyInstaller)
+# =========================
+build/
+dist/
+*.spec
+
+# =========================
+# Binarios y Ejecutables
+# =========================
+nircmd.exe
+*.exe
+
+# =========================
+# Configuración del Editor
+# =========================
+.vscode/
