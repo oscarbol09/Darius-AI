@@ -1,30 +1,22 @@
 """
 DARIUS AI - Asistente de escritorio con voz para Windows
 =========================================================
-Mejoras v3:
-  - Wake word offline con pvporcupine (fallback: escucha continua)
-  - Animación de ondas con nivel de audio real del micrófono
-  - Comando de voz "nueva conversación" / "olvida todo"
-  - Mutex de instancia única (named mutex de Windows)
-  - Cierre limpio: drena la cola TTS antes de destruir la ventana
-  - Campo de texto para entrada manual (teclado)
-
-Mejoras v4:
-  - Módulo windows_commands.py — diccionario maestro de paneles del SO
-  - _open_app resuelve ms-settings:, .msc, .cpl, navegadores, carpetas especiales
-  - Fuzzy matching semántico con normalización de tildes
-
-Mejoras v5:
-  - SYSTEM_ACTIONS — subprocesos reales del sistema operativo:
-      · Diagnóstico de red, ver IP, IP pública, limpiar DNS, renovar IP
-      · Ver RAM, CPU, temperatura, espacio en disco, procesos, uptime
-      · Vaciar papelera, limpiar temporales, ver archivos grandes
-      · Firewall (activar/desactivar/estado), ping, netstat
-      · Hibernar, suspender, bloquear pantalla, cerrar sesión
-      · Resumen técnico completo del equipo
-  - Flujo de confirmación de voz para acciones destructivas/sensibles
-  - Salidas de subproceso leídas en voz alta por DARIUS (return_output=True)
-  - Ventanas CMD/PS visibles para salidas largas (open_window=True)
+Mejoras v3:  Wake word, animación de ondas, memoria, mutex, TTS worker, campo de texto
+Mejoras v4:  windows_commands.py — paneles del SO, fuzzy matching semántico
+Mejoras v5:  SYSTEM_ACTIONS — subprocesos reales, confirmación de voz, salidas TTS
+Mejoras v6:
+  - MODO DE ACTIVACIÓN CONFIGURABLE (3 modos, seleccionable en la UI):
+      · PTT (Push-to-Talk): mantén presionada la tecla CTRL DERECHO para hablar.
+        DARIUS solo escucha mientras la tecla está pulsada. Modo más privado.
+      · NOMBRE (Wake-word por software): DARIUS escucha continuamente pero
+        SOLO procesa el comando si contiene "darius" al principio.
+        El ruido de fondo o conversaciones ajenas son descartadas.
+      · AUTO (comportamiento anterior): escucha y procesa todo.
+        Útil cuando estás solo y quieres máxima comodidad.
+  - Indicador visual del modo activo en la barra de estado
+  - La tecla PTT se puede cambiar en LISTEN_KEY (ver configuración)
+  - Filtro de longitud mínima: frases < 3 palabras sin nombre son descartadas
+    en modo NOMBRE para reducir falsos positivos de ruido corto
 """
 
 import speech_recognition as sr
@@ -55,9 +47,9 @@ from google.genai import types
 
 # ── Módulo de inteligencia del SO ─────────────────────────────────────────────
 from windows_commands import (
-    resolve_and_launch  as wincmd_launch,
-    resolve_action      as wincmd_resolve_action,
-    run_action          as wincmd_run_action,
+    resolve_and_launch as wincmd_launch,
+    resolve_action     as wincmd_resolve_action,
+    run_action         as wincmd_run_action,
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -89,6 +81,26 @@ MIC_LISTEN_TIMEOUT   = 5
 MIC_PHRASE_LIMIT     = 10
 APP_CACHE_HOURS      = 6
 SPEAKING_TAIL_SECS   = 0.4
+
+# ── Modos de activación disponibles ──────────────────────────────────────────
+LISTEN_MODE_PTT   = "PTT"    # Solo escucha mientras se mantiene LISTEN_KEY
+LISTEN_MODE_NAME  = "NOMBRE" # Escucha siempre, pero exige "darius" al inicio
+LISTEN_MODE_AUTO  = "AUTO"   # Escucha y procesa todo (comportamiento anterior)
+
+# Tecla para Push-to-Talk. Usa nombres de tecla de keyboard:
+#   "right ctrl"  → CTRL derecho   (recomendado, no interfiere con atajos)
+#   "right alt"   → ALT derecho
+#   "scroll lock" → Scroll Lock
+LISTEN_KEY           = "right ctrl"
+DEFAULT_LISTEN_MODE  = LISTEN_MODE_NAME  # ← Cambia aquí el modo por defecto
+
+# Umbral de similitud para aceptar variantes del nombre del asistente
+#   ("dario", "mario", "darío" → pueden parecerse a "darius")
+NAME_SIMILARITY_CUTOFF = 0.60
+
+# Longitud mínima de frase (en palabras) para procesar SIN nombre en modo NOMBRE
+# Protege contra ruido corto que Google interpreta como palabras sueltas
+MIN_WORDS_WITHOUT_NAME = 99  # efectivamente desactiva comandos sin nombre en modo NOMBRE
 
 BASE_DIR  = Path(__file__).parent
 LOG_FILE  = BASE_DIR / "darius.log"
@@ -137,7 +149,7 @@ try:
 except Exception:
     _volume_ctrl    = None
     PYCAW_AVAILABLE = False
-    log.warning("pycaw no disponible — usando nircmd.")
+    log.warning("pycaw no disponible — nircmd.")
 
 def volume_up():
     if PYCAW_AVAILABLE:
@@ -160,7 +172,7 @@ def volume_mute():
         os.system("nircmd.exe mutesysvolume 1")
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  WAKE WORD
+#  WAKE WORD (pvporcupine opcional)
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
@@ -169,7 +181,19 @@ try:
     log.info("pvporcupine disponible.")
 except ImportError:
     PORCUPINE_AVAILABLE = False
-    log.warning("pvporcupine no instalado — escucha continua.")
+    log.warning("pvporcupine no instalado.")
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  LIBRERÍA DE TECLADO (para PTT)
+# ─────────────────────────────────────────────────────────────────────────────
+
+try:
+    import keyboard
+    KEYBOARD_AVAILABLE = True
+    log.info("keyboard disponible — modo PTT activo.")
+except ImportError:
+    KEYBOARD_AVAILABLE = False
+    log.warning("'keyboard' no instalado — instala con: pip install keyboard")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -181,7 +205,7 @@ class DariusFinal(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("DARIUS AI - SISTEMA OPERATIVO")
-        self.geometry("520x860")
+        self.geometry("520x920")  # un poco más alto para el nuevo control de modo
         self.configure(fg_color="#0f0f0f")
         self.protocol("WM_DELETE_WINDOW", self.kill_process)
 
@@ -192,10 +216,11 @@ class DariusFinal(ctk.CTk):
         self.is_muted             = False
         self.installed_apps       = {}
         self._current_audio_level = 0.0
-
-        # Estado de confirmación pendiente
-        # Cuando DARIUS pide confirmación, guarda aquí la acción a ejecutar
         self._pending_action: dict | None = None
+        self._ptt_active          = False  # True mientras la tecla PTT está pulsada
+
+        # Modo de activación activo
+        self.listen_mode = DEFAULT_LISTEN_MODE
 
         self.conversation_history: list[dict] = []
         self.tts_queue = queue.Queue()
@@ -233,7 +258,7 @@ class DariusFinal(ctk.CTk):
         try:
             with sr.Microphone() as source:
                 self.listener.adjust_for_ambient_noise(source, duration=1)
-            log.info("Calibración de micrófono completada.")
+            log.info("Calibración completada.")
         except Exception as e:
             log.warning(f"No se pudo calibrar el micrófono: {e}")
 
@@ -291,8 +316,16 @@ class DariusFinal(ctk.CTk):
 
         self.status_label = ctk.CTkLabel(self, text="SISTEMA LISTO",
                                          font=("Arial", 12), text_color="gray")
-        self.status_label.pack(pady=5)
+        self.status_label.pack(pady=3)
 
+        # ── Indicador de modo de activación ──────────────────────────────────
+        self.mode_label = ctk.CTkLabel(
+            self, text=self._mode_label_text(),
+            font=("Consolas", 11), text_color="#555555"
+        )
+        self.mode_label.pack(pady=0)
+
+        # Canvas de ondas
         self.canvas = tk.Canvas(self, width=350, height=100,
                                 bg="#0f0f0f", highlightthickness=0)
         self.canvas.pack(pady=10)
@@ -303,13 +336,13 @@ class DariusFinal(ctk.CTk):
         ]
 
         self.chat_display = ctk.CTkTextbox(
-            self, width=470, height=330, font=("Consolas", 12),
+            self, width=470, height=310, font=("Consolas", 12),
             state="disabled", fg_color="#111111",
             border_color="#00fbff", border_width=1,
             scrollbar_button_color="#00fbff",
             scrollbar_button_hover_color="#00aacc"
         )
-        self.chat_display.pack(pady=10)
+        self.chat_display.pack(pady=8)
         tb = self.chat_display._textbox
         tb.tag_config("oscar",       foreground="#00ff88", font=("Consolas", 12, "bold"))
         tb.tag_config("darius",      foreground="#00fbff", font=("Consolas", 12, "bold"))
@@ -318,6 +351,7 @@ class DariusFinal(ctk.CTk):
         tb.tag_config("timestamp",   foreground="#555555", font=("Consolas", 10))
         tb.tag_config("warn",        foreground="#ffaa00", font=("Consolas", 12, "bold"))
 
+        # ── Entrada de texto manual ───────────────────────────────────────────
         input_frame = ctk.CTkFrame(self, fg_color="transparent")
         input_frame.pack(pady=5, padx=20, fill="x")
 
@@ -335,6 +369,7 @@ class DariusFinal(ctk.CTk):
             command=self._on_text_submit
         ).pack(side="right")
 
+        # ── Botones de control principal ──────────────────────────────────────
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(pady=5)
 
@@ -343,19 +378,89 @@ class DariusFinal(ctk.CTk):
             text_color="black", font=("Arial", 13, "bold"),
             command=self.start_system
         )
-        self.start_btn.pack(side="left", padx=6)
+        self.start_btn.pack(side="left", padx=5)
 
         self.mute_btn = ctk.CTkButton(
             btn_frame, text="🔇 SILENCIO", fg_color="#ff5555",
             state="disabled", font=("Arial", 13), command=self.toggle_mute
         )
-        self.mute_btn.pack(side="left", padx=6)
+        self.mute_btn.pack(side="left", padx=5)
 
         self.clear_btn = ctk.CTkButton(
             btn_frame, text="🗑 NUEVA CONV.", fg_color="#555555",
             font=("Arial", 13), command=self.reset_conversation
         )
-        self.clear_btn.pack(side="left", padx=6)
+        self.clear_btn.pack(side="left", padx=5)
+
+        # ── Selector de modo de activación ───────────────────────────────────
+        mode_frame = ctk.CTkFrame(self, fg_color="#111111", corner_radius=8)
+        mode_frame.pack(pady=8, padx=20, fill="x")
+
+        ctk.CTkLabel(
+            mode_frame, text="MODO DE ACTIVACIÓN",
+            font=("Consolas", 10, "bold"), text_color="#555555"
+        ).pack(pady=(6, 2))
+
+        btn_mode_row = ctk.CTkFrame(mode_frame, fg_color="transparent")
+        btn_mode_row.pack(pady=(0, 8))
+
+        self._mode_btns = {}
+        modes = [
+            (LISTEN_MODE_PTT,  f"🎙 PTT ({LISTEN_KEY.upper()})", "#ff8800"),
+            (LISTEN_MODE_NAME, "🔤 NOMBRE",                       "#00fbff"),
+            (LISTEN_MODE_AUTO, "🔄 AUTO",                          "#888888"),
+        ]
+        for mode_id, label, color in modes:
+            btn = ctk.CTkButton(
+                btn_mode_row, text=label, width=130,
+                fg_color=color if mode_id == self.listen_mode else "#2a2a2a",
+                text_color="black" if mode_id == self.listen_mode else "#aaaaaa",
+                font=("Arial", 12, "bold"),
+                command=lambda m=mode_id: self._set_listen_mode(m)
+            )
+            btn.pack(side="left", padx=4)
+            self._mode_btns[mode_id] = (btn, color)
+
+        # Nota informativa del modo PTT
+        self.ptt_hint = ctk.CTkLabel(
+            mode_frame,
+            text=f"💡 Modo PTT: mantén presionado [{LISTEN_KEY.upper()}] mientras hablas",
+            font=("Arial", 10), text_color="#444444"
+        )
+        if self.listen_mode == LISTEN_MODE_PTT:
+            self.ptt_hint.pack(pady=(0, 6))
+
+    def _mode_label_text(self) -> str:
+        icons = {
+            LISTEN_MODE_PTT:  f"🎙 PTT — tecla: [{LISTEN_KEY.upper()}]",
+            LISTEN_MODE_NAME: f"🔤 NOMBRE — solo responde a «{ASSISTANT_NAME}»",
+            LISTEN_MODE_AUTO: "🔄 AUTO — escucha todo",
+        }
+        return icons.get(self.listen_mode, "")
+
+    def _set_listen_mode(self, mode: str):
+        self.listen_mode = mode
+        # Actualizar botones
+        for mode_id, (btn, color) in self._mode_btns.items():
+            if mode_id == mode:
+                btn.configure(fg_color=color, text_color="black")
+            else:
+                btn.configure(fg_color="#2a2a2a", text_color="#aaaaaa")
+        # Actualizar etiqueta
+        self.mode_label.configure(text=self._mode_label_text())
+        # Mostrar/ocultar hint de PTT
+        if mode == LISTEN_MODE_PTT:
+            self.ptt_hint.pack(pady=(0, 6))
+            if not KEYBOARD_AVAILABLE:
+                self.talk("Advertencia: la librería keyboard no está instalada. "
+                          "Ejecuta: pip install keyboard")
+        else:
+            try:
+                self.ptt_hint.pack_forget()
+            except Exception:
+                pass
+        log.info(f"Modo de activación cambiado a: {mode}")
+        self.set_status(self._mode_label_text(), "#00fbff")
 
     def _on_text_submit(self, event=None):
         text = self.text_input.get().strip()
@@ -399,8 +504,7 @@ class DariusFinal(ctk.CTk):
             energy = self._current_audio_level
             base_h = np.clip(energy / 4000 * 70, 4, 75)
             for bar in self.wave_bars:
-                jitter = np.random.uniform(0.5, 1.5)
-                h = np.clip(base_h * jitter, 4, 75)
+                h = np.clip(base_h * np.random.uniform(0.5, 1.5), 4, 75)
                 x0, _, x1, _ = self.canvas.coords(bar)
                 self.canvas.coords(bar, x0, 50 - h/2, x1, 50 + h/2)
             self.after(80, self.animate_logic)
@@ -514,7 +618,6 @@ class DariusFinal(ctk.CTk):
                 key.Close()
             except OSError:
                 continue
-
         for folder in [
             Path(os.environ.get("PROGRAMFILES",      r"C:\Program Files")),
             Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")),
@@ -529,7 +632,6 @@ class DariusFinal(ctk.CTk):
                         apps[stem] = str(exe)
             except PermissionError:
                 continue
-
         self.installed_apps = apps
         log.info(f"Apps detectadas: {len(apps)}")
         try:
@@ -551,28 +653,163 @@ class DariusFinal(ctk.CTk):
         return self.installed_apps[matches[0]] if matches else None
 
     # =========================================================================
-    #  ARRANQUE Y LOOPS
+    #  ARRANQUE Y LOOPS DE ESCUCHA
     # =========================================================================
 
     def start_system(self):
         self.start_btn.configure(state="disabled", text="NÚCLEO ONLINE")
         self.mute_btn.configure(state="normal")
-        self.talk(
-            f"Darius en línea. Esperando órdenes, {USER_NAME}. "
-            "Nota: IA limitada a 20 consultas diarias por cuota gratuita."
-        )
+
+        mode_desc = {
+            LISTEN_MODE_PTT:  f"Modo P.T.T. activo. Mantén presionado {LISTEN_KEY} para hablar.",
+            LISTEN_MODE_NAME: f"Modo nombre activo. Dí {ASSISTANT_NAME} para activarme.",
+            LISTEN_MODE_AUTO: "Modo automático activo. Escucho todo.",
+        }
+        self.talk(f"Darius en línea. Esperando órdenes, {USER_NAME}. "
+                  + mode_desc.get(self.listen_mode, ""))
+
         self._start_audio_level_monitor()
-        if PORCUPINE_AVAILABLE:
+
+        if self.listen_mode == LISTEN_MODE_PTT:
+            threading.Thread(target=self._ptt_loop, daemon=True, name="ptt-loop").start()
+        elif PORCUPINE_AVAILABLE and os.getenv("PORCUPINE_ACCESS_KEY"):
             threading.Thread(target=self._porcupine_loop, daemon=True, name="wake-word").start()
         else:
             threading.Thread(target=self.main_loop, daemon=True, name="main-loop").start()
 
+    # ── Loop principal (modos NOMBRE y AUTO) ─────────────────────────────────
+
     def main_loop(self):
+        """Escucha continua para modos NOMBRE y AUTO."""
         while self.running:
             if self.is_muted or self.is_speaking.is_set():
                 time.sleep(0.05)
                 continue
+            # En modo PTT este loop no corre, tiene su propio loop
+            if self.listen_mode == LISTEN_MODE_PTT:
+                time.sleep(0.1)
+                continue
             self.listen_and_process()
+
+    # ── Loop Push-to-Talk ─────────────────────────────────────────────────────
+
+    def _ptt_loop(self):
+        """
+        Espera a que se pulse LISTEN_KEY, escucha mientras está pulsada,
+        y procesa el audio al soltar.
+        """
+        if not KEYBOARD_AVAILABLE:
+            log.warning("keyboard no disponible — fallback a modo NOMBRE.")
+            self.listen_mode = LISTEN_MODE_NAME
+            self.after(0, self._set_listen_mode, LISTEN_MODE_NAME)
+            self.main_loop()
+            return
+
+        log.info(f"[PTT] Loop iniciado. Tecla: [{LISTEN_KEY}]")
+        key_was_down = False
+
+        while self.running:
+            if self.is_muted:
+                time.sleep(0.1)
+                continue
+
+            key_down = keyboard.is_pressed(LISTEN_KEY)
+
+            # Flanco de bajada → comenzar a escuchar
+            if key_down and not key_was_down and not self.is_speaking.is_set():
+                key_was_down = True
+                self._ptt_active = True
+                log.info("[PTT] Tecla pulsada — comenzando escucha")
+                self.set_status(f"🎙 HABLANDO… (suelta {LISTEN_KEY} al terminar)", "#00ff88")
+                self.is_listening = True
+                self.after(0, self.animate_logic)
+
+            # Flanco de subida → procesar lo grabado
+            elif not key_down and key_was_down:
+                key_was_down     = False
+                self._ptt_active = False
+                self.is_listening = False
+                log.info("[PTT] Tecla soltada — procesando audio")
+                self.set_status("PROCESANDO…", "#ffaa00")
+                # El procesamiento real lo hace listen_and_process_ptt en hilo aparte
+                threading.Thread(target=self._ptt_capture_and_process,
+                                 daemon=True, name="ptt-capture").start()
+
+            time.sleep(0.02)  # polling a 50 Hz — suficiente para respuesta fluida
+
+    def _ptt_capture_and_process(self):
+        """
+        Captura audio mientras la tecla esté pulsada y lo procesa al soltar.
+        Se ejecuta en un hilo aparte para no bloquear el _ptt_loop.
+        """
+        import audioop, pyaudio, wave, io
+
+        RATE       = 16000
+        CHUNK      = 512
+        FORMAT     = pyaudio.paInt16
+        CHANNELS   = 1
+
+        pa     = pyaudio.PyAudio()
+        frames = []
+
+        try:
+            stream = pa.open(format=FORMAT, channels=CHANNELS,
+                             rate=RATE, input=True, frames_per_buffer=CHUNK)
+
+            # Graba mientras la tecla esté pulsada
+            while KEYBOARD_AVAILABLE and keyboard.is_pressed(LISTEN_KEY) and self.running:
+                data = stream.read(CHUNK, exception_on_overflow=False)
+                frames.append(data)
+                self._current_audio_level = float(audioop.rms(data, 2))
+
+            stream.stop_stream()
+            stream.close()
+        except Exception as e:
+            log.error(f"[PTT] Error de grabación: {e}")
+            pa.terminate()
+            self.set_status("LISTO", "gray")
+            return
+        finally:
+            pa.terminate()
+
+        if not frames:
+            self.set_status("LISTO", "gray")
+            return
+
+        # Construye un objeto AudioData de SpeechRecognition desde los frames
+        raw = b"".join(frames)
+
+        # Crear WAV en memoria para pasarlo a SpeechRecognition
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, "wb") as wf:
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(2)  # paInt16 = 2 bytes
+            wf.setframerate(RATE)
+            wf.writeframes(raw)
+        wav_buffer.seek(0)
+
+        try:
+            with sr.AudioFile(wav_buffer) as source:
+                audio = self.listener.record(source)
+            text = self.listener.recognize_google(audio, language="es-ES").lower()
+            log.info(f"[PTT] Reconocido: '{text}'")
+            # En PTT no se exige el nombre — el usuario ya decidió hablar
+            self.add_to_chat(USER_NAME, text)
+            self._append_chat_file(USER_NAME.upper(), text)
+            # Limpia el nombre si aparece, pero no lo exige
+            clean = text.replace(ASSISTANT_NAME, "").strip() or text
+            self.execute_command(clean)
+        except sr.UnknownValueError:
+            log.debug("[PTT] Audio no reconocido.")
+            self.set_status("LISTO", "gray")
+        except sr.RequestError as e:
+            log.error(f"[PTT] Error STT: {e}")
+            self.talk("Error de conexión con el servicio de voz.")
+        except Exception as e:
+            log.error(f"[PTT] Error: {e}", exc_info=True)
+            self.set_status("LISTO", "gray")
+
+    # ── Loop pvporcupine (cuando está disponible) ─────────────────────────────
 
     def _porcupine_loop(self):
         import pvporcupine, pyaudio, struct
@@ -595,11 +832,11 @@ class DariusFinal(ctk.CTk):
             stream.stop_stream(); stream.close()
             pa.terminate(); porcupine.delete()
         except Exception as e:
-            log.error(f"Porcupine error: {e} — fallback.")
+            log.error(f"Porcupine error: {e}")
             self.main_loop()
 
     # =========================================================================
-    #  RECONOCIMIENTO DE VOZ
+    #  RECONOCIMIENTO DE VOZ (modos NOMBRE y AUTO)
     # =========================================================================
 
     def listen_and_process(self):
@@ -634,47 +871,102 @@ class DariusFinal(ctk.CTk):
             self.set_status("LISTO", "gray")
 
     def process_recognized_text(self, text: str):
-        name_detected = ASSISTANT_NAME in text
-        if not name_detected and text.split():
-            name_detected = SequenceMatcher(None, ASSISTANT_NAME, text.split()[0]).ratio() > 0.45
-        clean = text.replace(ASSISTANT_NAME, "").strip() if name_detected else text
+        """
+        Filtra el texto reconocido según el modo de activación:
+
+        AUTO   → procesa todo sin restricciones.
+        NOMBRE → SOLO procesa si el nombre del asistente está presente
+                 (o una variante similar). Descarta el resto silenciosamente.
+        PTT    → este método no se llama en modo PTT (_ptt_capture_and_process
+                 maneja directamente ese flujo).
+        """
+        words      = text.split()
+        name_found = False
+        clean_text = text
+
+        if self.listen_mode == LISTEN_MODE_AUTO:
+            # Modo AUTO: acepta todo, solo limpia el nombre si aparece
+            if ASSISTANT_NAME in text:
+                name_found = True
+                clean_text = text.replace(ASSISTANT_NAME, "").strip()
+            elif words and SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio() > NAME_SIMILARITY_CUTOFF:
+                name_found = True
+                clean_text = " ".join(words[1:]).strip()
+
+        elif self.listen_mode == LISTEN_MODE_NAME:
+            # Modo NOMBRE: filtra estrictamente
+            name_found, clean_text = self._check_name_in_text(text)
+
+            if not name_found:
+                log.debug(f"[NOMBRE] Descartado (sin nombre): '{text}'")
+                # No hace nada — el ruido o conversaciones ajenas se ignoran
+                return
+
+        # Si llegamos aquí, hay un comando válido que procesar
         self.add_to_chat(USER_NAME, text)
         self._append_chat_file(USER_NAME.upper(), text)
-        self.execute_command(clean or text)
+        self.execute_command(clean_text or text)
+
+    def _check_name_in_text(self, text: str) -> tuple[bool, str]:
+        """
+        Verifica si el texto contiene el nombre del asistente.
+        Acepta el nombre en cualquier posición (inicio, medio, fin).
+        Retorna (encontrado: bool, texto_limpio: str).
+
+        También acepta variantes fonéticas comunes:
+          "dario", "mario", "darío", "varios" → similitud ≥ NAME_SIMILARITY_CUTOFF
+        """
+        words = text.split()
+
+        # 1. Nombre exacto en cualquier posición
+        if ASSISTANT_NAME in text:
+            clean = text.replace(ASSISTANT_NAME, "").strip()
+            return True, clean
+
+        # 2. Primera palabra similar al nombre (variante fonética / mala transcripción)
+        if words:
+            first_word = words[0]
+            similarity = SequenceMatcher(None, ASSISTANT_NAME, first_word).ratio()
+            if similarity >= NAME_SIMILARITY_CUTOFF:
+                log.debug(f"[NOMBRE] Variante aceptada: '{first_word}' ({similarity:.2f})")
+                clean = " ".join(words[1:]).strip()
+                return True, clean
+
+        return False, text
 
     # =========================================================================
-    #  PARSEO DE COMANDOS
+    #  PARSEO Y EJECUCIÓN DE COMANDOS
     # =========================================================================
 
     _CMD_PATTERNS = [
-        (re.compile(r"\b(qué hora|hora exacta)\b"),                           "_cmd_hora"),
-        (re.compile(r"\b(qué fecha|fecha de hoy|día de hoy)\b"),              "_cmd_fecha"),
+        (re.compile(r"\b(qué hora|hora exacta)\b"),                              "_cmd_hora"),
+        (re.compile(r"\b(qué fecha|fecha de hoy|día de hoy)\b"),                 "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
-        (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),     "_cmd_youtube"),
-        (re.compile(r"\b(busca|buscar|googlea)\b"),                           "_cmd_buscar"),
-        (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),        "_cmd_abrir"),
-        (re.compile(r"\bsubir\s+volumen\b"),                                  "_cmd_vol_up"),
-        (re.compile(r"\bbajar\s+volumen\b"),                                  "_cmd_vol_down"),
-        (re.compile(r"\bsilenciar\b"),                                        "_cmd_vol_mute"),
-        (re.compile(r"\b(cómo estás|estado del sistema|status)\b"),           "_cmd_estado"),
-        (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"),     "_cmd_cerrar"),
-        (re.compile(r"\bapagar\s+el\s+equipo\b"),                             "_cmd_apagar_pc"),
-        (re.compile(r"\breiniciar\s+el\s+equipo\b"),                          "_cmd_reiniciar_pc"),
-        # ── NUEVO: captura intenciones de acción del SO ───────────────────────
+        (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "_cmd_youtube"),
+        (re.compile(r"\b(busca|buscar|googlea)\b"),                              "_cmd_buscar"),
+        (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),           "_cmd_abrir"),
+        (re.compile(r"\bsubir\s+volumen\b"),                                     "_cmd_vol_up"),
+        (re.compile(r"\bbajar\s+volumen\b"),                                     "_cmd_vol_down"),
+        (re.compile(r"\bsilenciar\b"),                                           "_cmd_vol_mute"),
+        (re.compile(r"\b(cómo estás|estado del sistema|status)\b"),              "_cmd_estado"),
+        (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"),        "_cmd_cerrar"),
+        (re.compile(r"\bapagar\s+el\s+equipo\b"),                                "_cmd_apagar_pc"),
+        (re.compile(r"\breiniciar\s+el\s+equipo\b"),                             "_cmd_reiniciar_pc"),
         (re.compile(
-            r"\b(ver|muéstrame|consulta|ejecuta|corre|haz|limpia|vacía|"
-            r"vaciar|limpiar|diagnostica|diagnosticar|renueva|renovar|"
-            r"resetea|resetear|desconecta|desconectar|activa|desactiva|"
-            r"bloquea|suspende|hiberna|cierra\s+sesion|resumen|"
-            r"cuanto|cuanta|cual es|hay internet|cuánto|cuánta|cuál es)\b"
+            r"\b(ver|muéstrame|consulta|corre|haz|limpia|vacía|vaciar|limpiar|"
+            r"diagnostica|diagnosticar|renueva|renovar|resetea|resetear|"
+            r"desconecta|desconectar|activa|desactiva|bloquea|suspende|hiberna|"
+            r"cierra\s+sesion|resumen|cuanto|cuanta|cual es|hay internet|"
+            r"cuánto|cuánta|cuál es)\b"
         ), "_cmd_accion"),
     ]
 
     def execute_command(self, cmd: str):
         cmd = cmd.strip()
-        log.info(f"Comando: '{cmd}'")
+        if not cmd:
+            return
+        log.info(f"Ejecutando: '{cmd}'")
 
-        # ── ¿Hay una confirmación pendiente? ──────────────────────────────────
         if self._pending_action is not None:
             self._handle_confirmation(cmd)
             return
@@ -684,13 +976,10 @@ class DariusFinal(ctk.CTk):
                 getattr(self, handler)(cmd)
                 return
 
-        # Fallback a Gemini
         threading.Thread(target=self.ask_gemini, args=(cmd,),
                          daemon=True, name="gemini").start()
 
-    # =========================================================================
-    #  HANDLERS
-    # =========================================================================
+    # ── Handlers ──────────────────────────────────────────────────────────────
 
     def _cmd_hora(self, _):
         self.talk(f"Son las {datetime.datetime.now().strftime('%H:%M')}.")
@@ -735,9 +1024,10 @@ class DariusFinal(ctk.CTk):
         volume_mute(); self.talk("Audio silenciado.")
 
     def _cmd_estado(self, _):
+        mode_names = {LISTEN_MODE_PTT: "P.T.T.", LISTEN_MODE_NAME: "nombre", LISTEN_MODE_AUTO: "automático"}
         self.talk(
-            f"Sistema operativo. {len(self.installed_apps)} aplicaciones "
-            "en base de datos. Todos los módulos activos."
+            f"Sistema operativo. {len(self.installed_apps)} aplicaciones en base de datos. "
+            f"Modo de activación: {mode_names.get(self.listen_mode, self.listen_mode)}."
         )
 
     def _cmd_cerrar(self, _):
@@ -752,131 +1042,72 @@ class DariusFinal(ctk.CTk):
         self.talk("Reiniciando el equipo en 10 segundos.")
         os.system("shutdown /r /t 10")
 
-    # ─────────────────────────────────────────────────────────────────────────
-    #  NUEVO: HANDLER DE ACCIONES DEL SISTEMA OPERATIVO
-    # ─────────────────────────────────────────────────────────────────────────
-
     def _cmd_accion(self, cmd: str):
-        """
-        Resuelve si el comando corresponde a un subproceso del SO (SYSTEM_ACTIONS).
-        Si la acción requiere confirmación, la solicita antes de ejecutar.
-        Si no hay match en SYSTEM_ACTIONS, intenta _open_app o Gemini.
-        """
         entry = wincmd_resolve_action(cmd)
-
         if entry is None:
-            # No es una acción conocida — intenta abrir ventana o Gemini
-            # Primero prueba como "abrir algo"
             desc = wincmd_launch(cmd)
             if desc:
                 self.talk(f"Abriendo {desc}.")
                 return
-            # Si tampoco es un panel, va a Gemini
             threading.Thread(target=self.ask_gemini, args=(cmd,),
                              daemon=True, name="gemini").start()
             return
 
-        needs_confirm = entry.get("confirm", False)
-        desc          = entry["desc"]
-
-        if needs_confirm:
-            # Guarda la acción y pide confirmación verbal
+        if entry.get("confirm", False):
             self._pending_action = entry
-            self.talk(
-                f"Estás a punto de ejecutar: {desc}. "
-                "Di 'confirmar' para proceder o 'cancelar' para abortar."
-            )
+            self.talk(f"Estás a punto de ejecutar: {entry['desc']}. "
+                      "Di confirmar para proceder o cancelar para abortar.")
             self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
-            log.info(f"[Acción] Pendiente de confirmación: '{desc}'")
         else:
-            # Ejecuta directamente
             self._execute_action(entry)
 
     def _handle_confirmation(self, text: str):
-        """Procesa la respuesta de confirmación del usuario."""
-        text_lower = text.lower().strip()
-
-        positive = any(w in text_lower for w in
-                       ["confirmar", "confirma", "sí", "si", "adelante",
-                        "procede", "hazlo", "ejecuta", "ok", "correcto"])
-        negative = any(w in text_lower for w in
-                       ["cancelar", "cancela", "no", "abortar", "aborta",
-                        "detener", "detén", "para"])
-
-        if positive:
+        t = text.lower().strip()
+        if any(w in t for w in ["confirmar", "confirma", "sí", "si", "adelante",
+                                 "procede", "hazlo", "ok", "correcto"]):
             entry               = self._pending_action
             self._pending_action = None
             self.set_status("LISTO", "gray")
             self.talk(f"Ejecutando: {entry['desc']}.")
             self._execute_action(entry)
-
-        elif negative:
+        elif any(w in t for w in ["cancelar", "cancela", "no", "abortar", "detener"]):
             desc                = self._pending_action["desc"]
             self._pending_action = None
             self.set_status("LISTO", "gray")
             self.talk(f"Acción cancelada: {desc}.")
-            log.info(f"[Acción] Cancelada por usuario: '{desc}'")
-
         else:
-            # No fue una respuesta clara — vuelve a preguntar
-            self.talk("No entendí. Di 'confirmar' para proceder o 'cancelar' para abortar.")
+            self.talk("No entendí. Di confirmar o cancelar.")
 
     def _execute_action(self, entry: dict):
-        """Ejecuta el subproceso y maneja la salida."""
         def run():
             desc = entry["desc"]
-            log.info(f"[Acción] Ejecutando: '{desc}'")
             self.set_status(f"⚙ {desc.upper()[:30]}…", "#aa00ff")
             success, output = wincmd_run_action(entry)
-
             if not success:
                 self.talk(f"Error al ejecutar {desc}. {output}")
             elif output:
-                # Hay salida para leer: formatearla de forma natural
-                clean_output = self._format_output_for_tts(output, desc)
-                self.talk(clean_output)
+                self.talk(self._format_output_for_tts(output, desc))
             else:
                 self.talk(f"Listo. {desc} ejecutado correctamente.")
-
             self.set_status("LISTO", "gray")
-
         threading.Thread(target=run, daemon=True, name="action").start()
 
     def _format_output_for_tts(self, raw: str, desc: str) -> str:
-        """
-        Convierte la salida técnica de PowerShell/CMD en texto natural para TTS.
-        Elimina líneas vacías, bordes de tabla, y acorta si es muy largo.
-        """
         lines = [l.strip() for l in raw.splitlines()
                  if l.strip() and not set(l.strip()) <= set("-= |+")]
         if not lines:
             return f"{desc} completado."
-
-        # Si es una sola línea con datos (IP, versión, etc.)
         if len(lines) == 1:
             return f"{desc}: {lines[0]}"
-
-        # Si son pocas líneas, las une con comas
         if len(lines) <= 4:
             return f"{desc}. {'. '.join(lines[:4])}"
-
-        # Si es muy largo, resume
         return f"{desc}. {'. '.join(lines[:3])}. Y más información en pantalla."
 
-    # ─────────────────────────────────────────────────────────────────────────
-
     def _open_app(self, app_name: str):
-        """
-        Resolución en 3 niveles:
-          1. windows_commands — paneles del SO, navegadores, herramientas
-          2. Registro/Program Files — apps instaladas
-          3. Error informativo
-        """
         desc = wincmd_launch(app_name)
         if desc:
             self.talk(f"Abriendo {desc}.")
             return
-
         path = self.find_app(app_name)
         if path:
             try:
@@ -887,8 +1118,6 @@ class DariusFinal(ctk.CTk):
                 log.error(f"Error al abrir '{app_name}': {e}")
                 self.talk(f"Encontré {app_name} pero no pude ejecutarlo.")
                 return
-
-        log.warning(f"[_open_app] Sin match para: '{app_name}'")
         self.talk(f"No encontré {app_name}. Verifica el nombre o dame más detalles.")
 
     # =========================================================================
@@ -924,10 +1153,9 @@ class DariusFinal(ctk.CTk):
             max_msgs = GEMINI_HISTORY_TURNS * 2
             if len(self.conversation_history) > max_msgs:
                 self.conversation_history = self.conversation_history[-max_msgs:]
-
             config = types.GenerateContentConfig(
                 system_instruction=(
-                    f"Eres Darius, asistente de IA avanzado con personalidad futurista y directa. "
+                    f"Eres Darius, asistente de IA con personalidad futurista y directa. "
                     f"El usuario se llama {USER_NAME}. "
                     "Responde en español, conciso (máximo 3 oraciones), "
                     "sin markdown, sin asteriscos, sin bullets. Solo texto plano."
@@ -940,22 +1168,16 @@ class DariusFinal(ctk.CTk):
                 contents=self.conversation_history,
                 config=config
             )
-            if hasattr(response, "text") and response.text:
-                answer = response.text
-            elif hasattr(response, "candidates") and response.candidates:
-                answer = response.candidates[0].content.parts[0].text
-            else:
-                answer = str(response)
-
+            answer = (response.text if hasattr(response, "text") and response.text
+                      else response.candidates[0].content.parts[0].text)
             answer = re.sub(r"[*_`#>]", "", answer).strip()
             self.conversation_history.append({"role": "model", "parts": [{"text": answer}]})
             self.talk(answer)
-
         except Exception as e:
             err = str(e)
             log.error(f"Gemini error: {err}")
             if any(k in err for k in ["429", "RESOURCE_EXHAUSTED", "quota"]):
-                self.talk("He alcanzado el límite diario de consultas. Los comandos locales siguen activos.")
+                self.talk("Límite diario de consultas alcanzado. Comandos locales activos.")
             elif any(k in err for k in ["API_KEY", "authentication", "UNAUTHENTICATED"]):
                 self.talk("Error de autenticación con el servicio de IA.")
             elif any(k in err.lower() for k in ["network", "connection"]):
@@ -972,10 +1194,9 @@ class DariusFinal(ctk.CTk):
     def kill_process(self):
         log.info("Iniciando cierre limpio…")
         self.running = False
-        if not self.tts_queue.empty() or self.is_speaking.is_set():
-            deadline = time.time() + 5
-            while (not self.tts_queue.empty() or self.is_speaking.is_set()) and time.time() < deadline:
-                time.sleep(0.1)
+        deadline = time.time() + 5
+        while (not self.tts_queue.empty() or self.is_speaking.is_set()) and time.time() < deadline:
+            time.sleep(0.1)
         self.tts_queue.put(None)
         time.sleep(0.2)
         try: self.destroy()
