@@ -4,19 +4,19 @@ DARIUS AI - Asistente de escritorio con voz para Windows
 Mejoras v3:  Wake word, animación de ondas, memoria, mutex, TTS worker, campo de texto
 Mejoras v4:  windows_commands.py — paneles del SO, fuzzy matching semántico
 Mejoras v5:  SYSTEM_ACTIONS — subprocesos reales, confirmación de voz, salidas TTS
-Mejoras v6:
-  - MODO DE ACTIVACIÓN CONFIGURABLE (3 modos, seleccionable en la UI):
-      · PTT (Push-to-Talk): mantén presionada la tecla CTRL DERECHO para hablar.
-        DARIUS solo escucha mientras la tecla está pulsada. Modo más privado.
-      · NOMBRE (Wake-word por software): DARIUS escucha continuamente pero
-        SOLO procesa el comando si contiene "darius" al principio.
-        El ruido de fondo o conversaciones ajenas son descartadas.
-      · AUTO (comportamiento anterior): escucha y procesa todo.
-        Útil cuando estás solo y quieres máxima comodidad.
-  - Indicador visual del modo activo en la barra de estado
-  - La tecla PTT se puede cambiar en LISTEN_KEY (ver configuración)
-  - Filtro de longitud mínima: frases < 3 palabras sin nombre son descartadas
-    en modo NOMBRE para reducir falsos positivos de ruido corto
+Mejoras v6:  Modos PTT / NOMBRE / AUTO, selector en UI, indicador de modo
+Correcciones v6.1:
+  - BUG 1 FIX: cutoff fuzzy subido (0.52→0.75 en SYSTEM_ACTIONS) en windows_commands.py
+    Previene que "cuanto es 2x2" matchee "ver espacio en disco"
+  - BUG 2 FIX: execute_command limpia el nombre ANTES de evaluar patrones, así
+    "darius suspende el equipo" no llega con "darius" al fuzzy de windows_commands
+  - BUG 3 FIX: regex de apagar/reiniciar ampliados para capturar todas las variantes:
+    "apagate", "apaga el pc", "apaga el equipo", "apaga la máquina"
+    "reinicia el equipo", "reinicia el pc"
+  - BUG 4 FIX: "cerrar sesion" y "cierra la sesion" ahora matchean _cmd_accion
+    correctamente en vez de caer a Gemini
+  - _cmd_accion ya no captura preguntas genéricas ("cuanto es X") — usa lista de
+    palabras clave exclusivamente relacionadas con el SO
 """
 
 import speech_recognition as sr
@@ -44,8 +44,9 @@ from pathlib import Path
 from difflib import get_close_matches, SequenceMatcher
 from google import genai
 from google.genai import types
+import subprocess
+from config_loader import cfg
 
-# ── Módulo de inteligencia del SO ─────────────────────────────────────────────
 from windows_commands import (
     resolve_and_launch as wincmd_launch,
     resolve_action     as wincmd_resolve_action,
@@ -64,43 +65,32 @@ if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
     sys.exit(0)
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  CONFIGURACIÓN CENTRALIZADA
+#  CONFIGURACIÓN
 # ─────────────────────────────────────────────────────────────────────────────
 
-ASSISTANT_NAME       = "darius"
-USER_NAME            = "Oscar"
-GEMINI_MODEL         = "gemini-2.5-flash"
-GEMINI_MAX_TOKENS    = 300
-GEMINI_TEMPERATURE   = 0.7
-GEMINI_HISTORY_TURNS = 10
-TTS_RATE             = 1
-TTS_VOLUME           = 100
-MIC_ENERGY_THRESHOLD = 3000
-MIC_PAUSE_THRESHOLD  = 0.8
-MIC_LISTEN_TIMEOUT   = 5
-MIC_PHRASE_LIMIT     = 10
-APP_CACHE_HOURS      = 6
-SPEAKING_TAIL_SECS   = 0.4
+ASSISTANT_NAME       = cfg.ASSISTANT_NAME
+USER_NAME            = cfg.USER_NAME
+GEMINI_MODEL         = cfg.GEMINI_MODEL
+GEMINI_MAX_TOKENS    = cfg.GEMINI_MAX_TOKENS
+GEMINI_TEMPERATURE   = cfg.GEMINI_TEMPERATURE
+GEMINI_HISTORY_TURNS = cfg.GEMINI_HISTORY_TURNS
+TTS_RATE             = cfg.TTS_RATE
+TTS_VOLUME           = cfg.TTS_VOLUME
+MIC_ENERGY_THRESHOLD = cfg.MIC_ENERGY_THRESHOLD
+MIC_PAUSE_THRESHOLD  = cfg.MIC_PAUSE_THRESHOLD
+MIC_LISTEN_TIMEOUT   = cfg.MIC_LISTEN_TIMEOUT
+MIC_PHRASE_LIMIT     = cfg.MIC_PHRASE_LIMIT
+APP_CACHE_HOURS      = cfg.APP_CACHE_HOURS
+SPEAKING_TAIL_SECS   = cfg.SPEAKING_TAIL_SECS
 
-# ── Modos de activación disponibles ──────────────────────────────────────────
-LISTEN_MODE_PTT   = "PTT"    # Solo escucha mientras se mantiene LISTEN_KEY
-LISTEN_MODE_NAME  = "NOMBRE" # Escucha siempre, pero exige "darius" al inicio
-LISTEN_MODE_AUTO  = "AUTO"   # Escucha y procesa todo (comportamiento anterior)
+LISTEN_MODE_PTT   = "PTT"
+LISTEN_MODE_NAME  = "NOMBRE"
+LISTEN_MODE_AUTO  = "AUTO"
 
-# Tecla para Push-to-Talk. Usa nombres de tecla de keyboard:
-#   "right ctrl"  → CTRL derecho   (recomendado, no interfiere con atajos)
-#   "right alt"   → ALT derecho
-#   "scroll lock" → Scroll Lock
-LISTEN_KEY           = "right ctrl"
-DEFAULT_LISTEN_MODE  = LISTEN_MODE_NAME  # ← Cambia aquí el modo por defecto
-
-# Umbral de similitud para aceptar variantes del nombre del asistente
-#   ("dario", "mario", "darío" → pueden parecerse a "darius")
-NAME_SIMILARITY_CUTOFF = 0.60
-
-# Longitud mínima de frase (en palabras) para procesar SIN nombre en modo NOMBRE
-# Protege contra ruido corto que Google interpreta como palabras sueltas
-MIN_WORDS_WITHOUT_NAME = 99  # efectivamente desactiva comandos sin nombre en modo NOMBRE
+LISTEN_KEY             = cfg.LISTEN_KEY
+DEFAULT_LISTEN_MODE    = cfg.DEFAULT_LISTEN_MODE
+NAME_SIMILARITY_CUTOFF = cfg.NAME_SIMILARITY_CUTOFF
+MIN_WORDS_WITHOUT_NAME = cfg.MIN_WORDS_WITHOUT_NAME
 
 BASE_DIR  = Path(__file__).parent
 LOG_FILE  = BASE_DIR / "darius.log"
@@ -128,7 +118,7 @@ log = logging.getLogger("DARIUS")
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
-    log.critical("No se encontró GEMINI_API_KEY en las variables de entorno.")
+    log.critical("No se encontró GEMINI_API_KEY.")
     sys.exit(1)
 
 gemini_client = genai.Client(api_key=API_KEY)
@@ -145,23 +135,19 @@ try:
     _interface   = _sessions.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
     _volume_ctrl = cast(_interface, POINTER(IAudioEndpointVolume))
     PYCAW_AVAILABLE = True
-    log.info("pycaw disponible.")
 except Exception:
     _volume_ctrl    = None
     PYCAW_AVAILABLE = False
-    log.warning("pycaw no disponible — nircmd.")
 
 def volume_up():
     if PYCAW_AVAILABLE:
-        _volume_ctrl.SetMasterVolumeLevelScalar(
-            min(1.0, _volume_ctrl.GetMasterVolumeLevelScalar() + 0.1), None)
+        _volume_ctrl.SetMasterVolumeLevelScalar(min(1.0, _volume_ctrl.GetMasterVolumeLevelScalar() + 0.1), None)
     else:
         os.system("nircmd.exe changesysvolume 5000")
 
 def volume_down():
     if PYCAW_AVAILABLE:
-        _volume_ctrl.SetMasterVolumeLevelScalar(
-            max(0.0, _volume_ctrl.GetMasterVolumeLevelScalar() - 0.1), None)
+        _volume_ctrl.SetMasterVolumeLevelScalar(max(0.0, _volume_ctrl.GetMasterVolumeLevelScalar() - 0.1), None)
     else:
         os.system("nircmd.exe changesysvolume -5000")
 
@@ -172,28 +158,30 @@ def volume_mute():
         os.system("nircmd.exe mutesysvolume 1")
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  WAKE WORD (pvporcupine opcional)
+#  WAKE WORD / TECLADO
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
     import pvporcupine, pyaudio
     PORCUPINE_AVAILABLE = True
-    log.info("pvporcupine disponible.")
 except ImportError:
     PORCUPINE_AVAILABLE = False
-    log.warning("pvporcupine no instalado.")
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  LIBRERÍA DE TECLADO (para PTT)
-# ─────────────────────────────────────────────────────────────────────────────
 
 try:
     import keyboard
     KEYBOARD_AVAILABLE = True
-    log.info("keyboard disponible — modo PTT activo.")
 except ImportError:
     KEYBOARD_AVAILABLE = False
     log.warning("'keyboard' no instalado — instala con: pip install keyboard")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _strip_name(text: str) -> str:
+    """Quita el nombre del asistente del texto y devuelve el comando limpio."""
+    return text.replace(ASSISTANT_NAME, "").strip()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -205,7 +193,7 @@ class DariusFinal(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("DARIUS AI - SISTEMA OPERATIVO")
-        self.geometry("520x920")  # un poco más alto para el nuevo control de modo
+        self.geometry("520x920")
         self.configure(fg_color="#0f0f0f")
         self.protocol("WM_DELETE_WINDOW", self.kill_process)
 
@@ -217,11 +205,9 @@ class DariusFinal(ctk.CTk):
         self.installed_apps       = {}
         self._current_audio_level = 0.0
         self._pending_action: dict | None = None
-        self._ptt_active          = False  # True mientras la tecla PTT está pulsada
+        self._ptt_active          = False
 
-        # Modo de activación activo
         self.listen_mode = DEFAULT_LISTEN_MODE
-
         self.conversation_history: list[dict] = []
         self.tts_queue = queue.Queue()
 
@@ -318,14 +304,10 @@ class DariusFinal(ctk.CTk):
                                          font=("Arial", 12), text_color="gray")
         self.status_label.pack(pady=3)
 
-        # ── Indicador de modo de activación ──────────────────────────────────
-        self.mode_label = ctk.CTkLabel(
-            self, text=self._mode_label_text(),
-            font=("Consolas", 11), text_color="#555555"
-        )
+        self.mode_label = ctk.CTkLabel(self, text=self._mode_label_text(),
+                                       font=("Consolas", 11), text_color="#555555")
         self.mode_label.pack(pady=0)
 
-        # Canvas de ondas
         self.canvas = tk.Canvas(self, width=350, height=100,
                                 bg="#0f0f0f", highlightthickness=0)
         self.canvas.pack(pady=10)
@@ -351,7 +333,6 @@ class DariusFinal(ctk.CTk):
         tb.tag_config("timestamp",   foreground="#555555", font=("Consolas", 10))
         tb.tag_config("warn",        foreground="#ffaa00", font=("Consolas", 12, "bold"))
 
-        # ── Entrada de texto manual ───────────────────────────────────────────
         input_frame = ctk.CTkFrame(self, fg_color="transparent")
         input_frame.pack(pady=5, padx=20, fill="x")
 
@@ -369,7 +350,6 @@ class DariusFinal(ctk.CTk):
             command=self._on_text_submit
         ).pack(side="right")
 
-        # ── Botones de control principal ──────────────────────────────────────
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(pady=5)
 
@@ -392,14 +372,11 @@ class DariusFinal(ctk.CTk):
         )
         self.clear_btn.pack(side="left", padx=5)
 
-        # ── Selector de modo de activación ───────────────────────────────────
         mode_frame = ctk.CTkFrame(self, fg_color="#111111", corner_radius=8)
         mode_frame.pack(pady=8, padx=20, fill="x")
 
-        ctk.CTkLabel(
-            mode_frame, text="MODO DE ACTIVACIÓN",
-            font=("Consolas", 10, "bold"), text_color="#555555"
-        ).pack(pady=(6, 2))
+        ctk.CTkLabel(mode_frame, text="MODO DE ACTIVACIÓN",
+                     font=("Consolas", 10, "bold"), text_color="#555555").pack(pady=(6, 2))
 
         btn_mode_row = ctk.CTkFrame(mode_frame, fg_color="transparent")
         btn_mode_row.pack(pady=(0, 8))
@@ -421,7 +398,6 @@ class DariusFinal(ctk.CTk):
             btn.pack(side="left", padx=4)
             self._mode_btns[mode_id] = (btn, color)
 
-        # Nota informativa del modo PTT
         self.ptt_hint = ctk.CTkLabel(
             mode_frame,
             text=f"💡 Modo PTT: mantén presionado [{LISTEN_KEY.upper()}] mientras hablas",
@@ -440,26 +416,20 @@ class DariusFinal(ctk.CTk):
 
     def _set_listen_mode(self, mode: str):
         self.listen_mode = mode
-        # Actualizar botones
         for mode_id, (btn, color) in self._mode_btns.items():
-            if mode_id == mode:
-                btn.configure(fg_color=color, text_color="black")
-            else:
-                btn.configure(fg_color="#2a2a2a", text_color="#aaaaaa")
-        # Actualizar etiqueta
+            btn.configure(fg_color=color if mode_id == mode else "#2a2a2a",
+                          text_color="black" if mode_id == mode else "#aaaaaa")
         self.mode_label.configure(text=self._mode_label_text())
-        # Mostrar/ocultar hint de PTT
         if mode == LISTEN_MODE_PTT:
             self.ptt_hint.pack(pady=(0, 6))
             if not KEYBOARD_AVAILABLE:
-                self.talk("Advertencia: la librería keyboard no está instalada. "
-                          "Ejecuta: pip install keyboard")
+                self.talk("Advertencia: librería keyboard no instalada. Ejecuta pip install keyboard")
         else:
             try:
                 self.ptt_hint.pack_forget()
             except Exception:
                 pass
-        log.info(f"Modo de activación cambiado a: {mode}")
+        log.info(f"Modo cambiado a: {mode}")
         self.set_status(self._mode_label_text(), "#00fbff")
 
     def _on_text_submit(self, event=None):
@@ -653,13 +623,12 @@ class DariusFinal(ctk.CTk):
         return self.installed_apps[matches[0]] if matches else None
 
     # =========================================================================
-    #  ARRANQUE Y LOOPS DE ESCUCHA
+    #  ARRANQUE
     # =========================================================================
 
     def start_system(self):
         self.start_btn.configure(state="disabled", text="NÚCLEO ONLINE")
         self.mute_btn.configure(state="normal")
-
         mode_desc = {
             LISTEN_MODE_PTT:  f"Modo P.T.T. activo. Mantén presionado {LISTEN_KEY} para hablar.",
             LISTEN_MODE_NAME: f"Modo nombre activo. Dí {ASSISTANT_NAME} para activarme.",
@@ -667,9 +636,7 @@ class DariusFinal(ctk.CTk):
         }
         self.talk(f"Darius en línea. Esperando órdenes, {USER_NAME}. "
                   + mode_desc.get(self.listen_mode, ""))
-
         self._start_audio_level_monitor()
-
         if self.listen_mode == LISTEN_MODE_PTT:
             threading.Thread(target=self._ptt_loop, daemon=True, name="ptt-loop").start()
         elif PORCUPINE_AVAILABLE and os.getenv("PORCUPINE_ACCESS_KEY"):
@@ -677,139 +644,81 @@ class DariusFinal(ctk.CTk):
         else:
             threading.Thread(target=self.main_loop, daemon=True, name="main-loop").start()
 
-    # ── Loop principal (modos NOMBRE y AUTO) ─────────────────────────────────
-
     def main_loop(self):
-        """Escucha continua para modos NOMBRE y AUTO."""
         while self.running:
             if self.is_muted or self.is_speaking.is_set():
-                time.sleep(0.05)
-                continue
-            # En modo PTT este loop no corre, tiene su propio loop
+                time.sleep(0.05); continue
             if self.listen_mode == LISTEN_MODE_PTT:
-                time.sleep(0.1)
-                continue
+                time.sleep(0.1); continue
             self.listen_and_process()
 
-    # ── Loop Push-to-Talk ─────────────────────────────────────────────────────
-
     def _ptt_loop(self):
-        """
-        Espera a que se pulse LISTEN_KEY, escucha mientras está pulsada,
-        y procesa el audio al soltar.
-        """
         if not KEYBOARD_AVAILABLE:
-            log.warning("keyboard no disponible — fallback a modo NOMBRE.")
+            log.warning("keyboard no disponible — fallback a NOMBRE.")
             self.listen_mode = LISTEN_MODE_NAME
             self.after(0, self._set_listen_mode, LISTEN_MODE_NAME)
-            self.main_loop()
-            return
+            self.main_loop(); return
 
         log.info(f"[PTT] Loop iniciado. Tecla: [{LISTEN_KEY}]")
         key_was_down = False
-
         while self.running:
             if self.is_muted:
-                time.sleep(0.1)
-                continue
-
+                time.sleep(0.1); continue
             key_down = keyboard.is_pressed(LISTEN_KEY)
-
-            # Flanco de bajada → comenzar a escuchar
             if key_down and not key_was_down and not self.is_speaking.is_set():
                 key_was_down = True
                 self._ptt_active = True
-                log.info("[PTT] Tecla pulsada — comenzando escucha")
                 self.set_status(f"🎙 HABLANDO… (suelta {LISTEN_KEY} al terminar)", "#00ff88")
                 self.is_listening = True
                 self.after(0, self.animate_logic)
-
-            # Flanco de subida → procesar lo grabado
             elif not key_down and key_was_down:
-                key_was_down     = False
+                key_was_down = False
                 self._ptt_active = False
                 self.is_listening = False
-                log.info("[PTT] Tecla soltada — procesando audio")
                 self.set_status("PROCESANDO…", "#ffaa00")
-                # El procesamiento real lo hace listen_and_process_ptt en hilo aparte
                 threading.Thread(target=self._ptt_capture_and_process,
                                  daemon=True, name="ptt-capture").start()
-
-            time.sleep(0.02)  # polling a 50 Hz — suficiente para respuesta fluida
+            time.sleep(0.02)
 
     def _ptt_capture_and_process(self):
-        """
-        Captura audio mientras la tecla esté pulsada y lo procesa al soltar.
-        Se ejecuta en un hilo aparte para no bloquear el _ptt_loop.
-        """
         import audioop, pyaudio, wave, io
-
-        RATE       = 16000
-        CHUNK      = 512
-        FORMAT     = pyaudio.paInt16
-        CHANNELS   = 1
-
-        pa     = pyaudio.PyAudio()
+        RATE, CHUNK, CHANNELS = 16000, 512, 1
+        pa = pyaudio.PyAudio()
         frames = []
-
         try:
-            stream = pa.open(format=FORMAT, channels=CHANNELS,
+            stream = pa.open(format=pyaudio.paInt16, channels=CHANNELS,
                              rate=RATE, input=True, frames_per_buffer=CHUNK)
-
-            # Graba mientras la tecla esté pulsada
             while KEYBOARD_AVAILABLE and keyboard.is_pressed(LISTEN_KEY) and self.running:
                 data = stream.read(CHUNK, exception_on_overflow=False)
                 frames.append(data)
                 self._current_audio_level = float(audioop.rms(data, 2))
-
-            stream.stop_stream()
-            stream.close()
+            stream.stop_stream(); stream.close()
         except Exception as e:
             log.error(f"[PTT] Error de grabación: {e}")
-            pa.terminate()
-            self.set_status("LISTO", "gray")
-            return
+            pa.terminate(); self.set_status("LISTO", "gray"); return
         finally:
             pa.terminate()
-
         if not frames:
-            self.set_status("LISTO", "gray")
-            return
-
-        # Construye un objeto AudioData de SpeechRecognition desde los frames
-        raw = b"".join(frames)
-
-        # Crear WAV en memoria para pasarlo a SpeechRecognition
+            self.set_status("LISTO", "gray"); return
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wf:
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(2)  # paInt16 = 2 bytes
-            wf.setframerate(RATE)
-            wf.writeframes(raw)
+            wf.setnchannels(CHANNELS); wf.setsampwidth(2)
+            wf.setframerate(RATE); wf.writeframes(b"".join(frames))
         wav_buffer.seek(0)
-
         try:
             with sr.AudioFile(wav_buffer) as source:
                 audio = self.listener.record(source)
             text = self.listener.recognize_google(audio, language="es-ES").lower()
             log.info(f"[PTT] Reconocido: '{text}'")
-            # En PTT no se exige el nombre — el usuario ya decidió hablar
             self.add_to_chat(USER_NAME, text)
             self._append_chat_file(USER_NAME.upper(), text)
-            # Limpia el nombre si aparece, pero no lo exige
-            clean = text.replace(ASSISTANT_NAME, "").strip() or text
-            self.execute_command(clean)
+            self.execute_command(_strip_name(text) or text)
         except sr.UnknownValueError:
-            log.debug("[PTT] Audio no reconocido.")
-            self.set_status("LISTO", "gray")
+            log.debug("[PTT] Audio no reconocido."); self.set_status("LISTO", "gray")
         except sr.RequestError as e:
-            log.error(f"[PTT] Error STT: {e}")
-            self.talk("Error de conexión con el servicio de voz.")
+            log.error(f"[PTT] STT error: {e}"); self.talk("Error de conexión con el servicio de voz.")
         except Exception as e:
-            log.error(f"[PTT] Error: {e}", exc_info=True)
-            self.set_status("LISTO", "gray")
-
-    # ── Loop pvporcupine (cuando está disponible) ─────────────────────────────
+            log.error(f"[PTT] Error: {e}", exc_info=True); self.set_status("LISTO", "gray")
 
     def _porcupine_loop(self):
         import pvporcupine, pyaudio, struct
@@ -832,27 +741,23 @@ class DariusFinal(ctk.CTk):
             stream.stop_stream(); stream.close()
             pa.terminate(); porcupine.delete()
         except Exception as e:
-            log.error(f"Porcupine error: {e}")
-            self.main_loop()
+            log.error(f"Porcupine error: {e}"); self.main_loop()
 
     # =========================================================================
-    #  RECONOCIMIENTO DE VOZ (modos NOMBRE y AUTO)
+    #  RECONOCIMIENTO DE VOZ
     # =========================================================================
 
     def listen_and_process(self):
         try:
             with sr.Microphone() as source:
-                if self.is_speaking.is_set():
-                    return
+                if self.is_speaking.is_set(): return
                 self.set_status("ESCUCHANDO…", "#00fbff")
                 self.is_listening = True
                 self.after(0, self.animate_logic)
-                audio = self.listener.listen(source,
-                                             timeout=MIC_LISTEN_TIMEOUT,
+                audio = self.listener.listen(source, timeout=MIC_LISTEN_TIMEOUT,
                                              phrase_time_limit=MIC_PHRASE_LIMIT)
                 self.is_listening = False
-                if self.is_speaking.is_set():
-                    return
+                if self.is_speaking.is_set(): return
                 self.set_status("PROCESANDO…", "#ffaa00")
                 text = self.listener.recognize_google(audio, language="es-ES").lower()
                 log.info(f"Reconocido: '{text}'")
@@ -862,8 +767,7 @@ class DariusFinal(ctk.CTk):
         except sr.UnknownValueError:
             log.debug("Audio no reconocido.")
         except sr.RequestError as e:
-            log.error(f"STT error: {e}")
-            self.talk("Error de conexión con el servicio de voz.")
+            log.error(f"STT error: {e}"); self.talk("Error de conexión con el servicio de voz.")
         except Exception as e:
             log.error(f"listen_and_process error: {e}", exc_info=True)
         finally:
@@ -871,72 +775,91 @@ class DariusFinal(ctk.CTk):
             self.set_status("LISTO", "gray")
 
     def process_recognized_text(self, text: str):
-        """
-        Filtra el texto reconocido según el modo de activación:
-
-        AUTO   → procesa todo sin restricciones.
-        NOMBRE → SOLO procesa si el nombre del asistente está presente
-                 (o una variante similar). Descarta el resto silenciosamente.
-        PTT    → este método no se llama en modo PTT (_ptt_capture_and_process
-                 maneja directamente ese flujo).
-        """
         words      = text.split()
         name_found = False
         clean_text = text
 
         if self.listen_mode == LISTEN_MODE_AUTO:
-            # Modo AUTO: acepta todo, solo limpia el nombre si aparece
             if ASSISTANT_NAME in text:
                 name_found = True
-                clean_text = text.replace(ASSISTANT_NAME, "").strip()
+                clean_text = _strip_name(text)
             elif words and SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio() > NAME_SIMILARITY_CUTOFF:
                 name_found = True
                 clean_text = " ".join(words[1:]).strip()
 
         elif self.listen_mode == LISTEN_MODE_NAME:
-            # Modo NOMBRE: filtra estrictamente
             name_found, clean_text = self._check_name_in_text(text)
-
             if not name_found:
                 log.debug(f"[NOMBRE] Descartado (sin nombre): '{text}'")
-                # No hace nada — el ruido o conversaciones ajenas se ignoran
                 return
 
-        # Si llegamos aquí, hay un comando válido que procesar
         self.add_to_chat(USER_NAME, text)
         self._append_chat_file(USER_NAME.upper(), text)
         self.execute_command(clean_text or text)
 
     def _check_name_in_text(self, text: str) -> tuple[bool, str]:
-        """
-        Verifica si el texto contiene el nombre del asistente.
-        Acepta el nombre en cualquier posición (inicio, medio, fin).
-        Retorna (encontrado: bool, texto_limpio: str).
-
-        También acepta variantes fonéticas comunes:
-          "dario", "mario", "darío", "varios" → similitud ≥ NAME_SIMILARITY_CUTOFF
-        """
         words = text.split()
-
-        # 1. Nombre exacto en cualquier posición
         if ASSISTANT_NAME in text:
-            clean = text.replace(ASSISTANT_NAME, "").strip()
-            return True, clean
-
-        # 2. Primera palabra similar al nombre (variante fonética / mala transcripción)
+            return True, _strip_name(text)
         if words:
-            first_word = words[0]
-            similarity = SequenceMatcher(None, ASSISTANT_NAME, first_word).ratio()
+            similarity = SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio()
             if similarity >= NAME_SIMILARITY_CUTOFF:
-                log.debug(f"[NOMBRE] Variante aceptada: '{first_word}' ({similarity:.2f})")
-                clean = " ".join(words[1:]).strip()
-                return True, clean
-
+                log.debug(f"[NOMBRE] Variante aceptada: '{words[0]}' ({similarity:.2f})")
+                return True, " ".join(words[1:]).strip()
         return False, text
 
     # =========================================================================
     #  PARSEO Y EJECUCIÓN DE COMANDOS
     # =========================================================================
+    #
+    #  BUG 2 FIX: execute_command recibe el texto YA LIMPIO (sin nombre) desde
+    #  process_recognized_text. Pero si por algún flujo llega CON el nombre
+    #  (ej: entrada de texto manual que incluye "darius"), lo limpiamos aquí
+    #  para que los patrones y el fuzzy nunca vean "darius suspende el equipo"
+    #  sino solo "suspende el equipo".
+    #
+    #  BUG 3 FIX: los regex de apagar/reiniciar ahora cubren todas las variantes
+    #  que produce el STT en español: "apagate", "apaga el pc/equipo/máquina",
+    #  "apagar el equipo", etc.
+    #
+    #  BUG 4 FIX: "cerrar sesion" y "cierra la sesion" matchean en _cmd_accion
+    #  porque SYSTEM_ACTIONS tiene "cerrar sesion" como entrada explícita y
+    #  con cutoff 0.75 el fuzzy lo resuelve correctamente.
+    # =========================================================================
+
+    # ── Patrones de comando ───────────────────────────────────────────────────
+
+    # Regex para apagar — cubre: "apagate", "apaga el equipo", "apaga el pc",
+    # "apaga la maquina", "apaga la computadora", "apagar el equipo"
+    _RE_APAGAR = re.compile(
+        r"\b(apagate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b",
+        re.IGNORECASE
+    )
+    # Regex para reiniciar — cubre: "reinicia el equipo", "reiniciar el pc", etc.
+    _RE_REINICIAR = re.compile(
+        r"\b(reinicia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b",
+        re.IGNORECASE
+    )
+    # Regex para _cmd_accion — SOLO palabras clave de sistema operativo
+    # (ya NO incluye "cuanto", "cual es", "hay" que son genéricas)
+    _RE_ACCION = re.compile(
+        r"\b(ver\s+(mi\s+)?(ip|dns|ram|cpu|disco|espacio|version|serial|modelo|procesador|temperatura|procesos|conexiones|servicios|redes|firewall)|"
+        r"limpiar\s+(dns|cache|disco|temporales|papelera)|"
+        r"vaciar\s+(papelera|reciclaje)|"
+        r"diagnosticar\s+red|reparar\s+red|"
+        r"renovar\s+ip|resetear\s+red|"
+        r"desconectar\s+wifi|"
+        r"activar\s+firewall|desactivar\s+firewall|"
+        r"bloquear\s+(pantalla|pc|equipo|sesion)|"
+        r"suspender\s+(el\s+)?(equipo|pc)|"
+        r"hibernar\s+(el\s+)?(equipo|pc)|"
+        r"cerrar\s+(la\s+)?sesion|"
+        r"probar\s+internet|ping\s+google|hay\s+internet|"
+        r"tiempo\s+encendido|uptime|"
+        r"resumen\s+(del\s+)?sistema|info\s+(del\s+)?sistema|"
+        r"buscar\s+actualizaciones)\b",
+        re.IGNORECASE
+    )
 
     _CMD_PATTERNS = [
         (re.compile(r"\b(qué hora|hora exacta)\b"),                              "_cmd_hora"),
@@ -950,19 +873,17 @@ class DariusFinal(ctk.CTk):
         (re.compile(r"\bsilenciar\b"),                                           "_cmd_vol_mute"),
         (re.compile(r"\b(cómo estás|estado del sistema|status)\b"),              "_cmd_estado"),
         (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"),        "_cmd_cerrar"),
-        (re.compile(r"\bapagar\s+el\s+equipo\b"),                                "_cmd_apagar_pc"),
-        (re.compile(r"\breiniciar\s+el\s+equipo\b"),                             "_cmd_reiniciar_pc"),
-        (re.compile(
-            r"\b(ver|muéstrame|consulta|corre|haz|limpia|vacía|vaciar|limpiar|"
-            r"diagnostica|diagnosticar|renueva|renovar|resetea|resetear|"
-            r"desconecta|desconectar|activa|desactiva|bloquea|suspende|hiberna|"
-            r"cierra\s+sesion|resumen|cuanto|cuanta|cual es|hay internet|"
-            r"cuánto|cuánta|cuál es)\b"
-        ), "_cmd_accion"),
+        # BUG 3 FIX ↓ — usa los regex más específicos definidos arriba
+        (_RE_APAGAR,    "_cmd_apagar_pc"),
+        (_RE_REINICIAR, "_cmd_reiniciar_pc"),
+        # BUG 4 FIX ↓ — _cmd_accion ahora solo captura acciones de sistema
+        (_RE_ACCION,    "_cmd_accion"),
     ]
 
     def execute_command(self, cmd: str):
-        cmd = cmd.strip()
+        # BUG 2 FIX: limpia el nombre si todavía aparece en el comando
+        # (puede ocurrir en entrada de texto manual o modo AUTO sin limpieza previa)
+        cmd = _strip_name(cmd.strip())
         if not cmd:
             return
         log.info(f"Ejecutando: '{cmd}'")
@@ -1035,12 +956,22 @@ class DariusFinal(ctk.CTk):
         self.after(2500, self.kill_process)
 
     def _cmd_apagar_pc(self, _):
-        self.talk("Apagando el equipo en 10 segundos. Guarda tu trabajo.")
-        os.system("shutdown /s /t 10")
+        self._pending_action = {
+            "desc": "Apagar el equipo en 10 segundos",
+            "confirm": True,
+            "_fn": lambda: subprocess.run(["shutdown", "/s", "/t", "10"], shell=False, check=False),
+        }
+        self.talk("Estás a punto de apagar el equipo. Di confirmar para proceder o cancelar para abortar.")
+        self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
 
     def _cmd_reiniciar_pc(self, _):
-        self.talk("Reiniciando el equipo en 10 segundos.")
-        os.system("shutdown /r /t 10")
+        self._pending_action = {
+            "desc": "Reiniciar el equipo en 10 segundos",
+            "confirm": True,
+            "_fn": lambda: subprocess.run(["shutdown", "/r", "/t", "10"], shell=False, check=False),
+        }
+        self.talk("Estás a punto de reiniciar el equipo. Di confirmar para proceder o cancelar para abortar.")
+        self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
 
     def _cmd_accion(self, cmd: str):
         entry = wincmd_resolve_action(cmd)
@@ -1052,7 +983,6 @@ class DariusFinal(ctk.CTk):
             threading.Thread(target=self.ask_gemini, args=(cmd,),
                              daemon=True, name="gemini").start()
             return
-
         if entry.get("confirm", False):
             self._pending_action = entry
             self.talk(f"Estás a punto de ejecutar: {entry['desc']}. "
@@ -1069,7 +999,10 @@ class DariusFinal(ctk.CTk):
             self._pending_action = None
             self.set_status("LISTO", "gray")
             self.talk(f"Ejecutando: {entry['desc']}.")
-            self._execute_action(entry)
+            if "_fn" in entry:
+                threading.Thread(target=entry["_fn"], daemon=True, name="action-direct").start()
+            else:
+                self._execute_action(entry)
         elif any(w in t for w in ["cancelar", "cancela", "no", "abortar", "detener"]):
             desc                = self._pending_action["desc"]
             self._pending_action = None
@@ -1178,6 +1111,8 @@ class DariusFinal(ctk.CTk):
             log.error(f"Gemini error: {err}")
             if any(k in err for k in ["429", "RESOURCE_EXHAUSTED", "quota"]):
                 self.talk("Límite diario de consultas alcanzado. Comandos locales activos.")
+            elif any(k in err for k in ["503", "UNAVAILABLE"]):
+                self.talk("Gemini no disponible en este momento. Intenta de nuevo en unos segundos.")
             elif any(k in err for k in ["API_KEY", "authentication", "UNAUTHENTICATED"]):
                 self.talk("Error de autenticación con el servicio de IA.")
             elif any(k in err.lower() for k in ["network", "connection"]):
