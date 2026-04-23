@@ -1,0 +1,39 @@
+# ══════════════════════════════════════════════════════════════════════════════
+#  DARIUS AI — Dependencias para desarrollo local en Windows
+#  Instalar con: pip install -r requirements-windows.txt
+#
+#  Este archivo es SOLO para el entorno de desarrollo en Windows (main.py).
+#  Para Azure App Service (Linux) usa: requirements.txt
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── IA principal ──────────────────────────────────────────────────────────────
+google-genai>=1.0.0
+
+# ── Fallback HTTP ─────────────────────────────────────────────────────────────
+requests>=2.31.0
+
+# ── Variables de entorno ──────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+
+# ── Interfaz gráfica (escritorio) ─────────────────────────────────────────────
+customtkinter>=5.2.0
+
+# ── Voz y audio ───────────────────────────────────────────────────────────────
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.14
+
+# ── APIs de Windows (win32com, win32event, win32api, winerror) ────────────────
+pywin32>=306
+
+# ── Control de volumen por hardware ──────────────────────────────────────────
+comtypes>=1.2.0
+pycaw>=20181226
+
+# ── Push-to-Talk (detección de teclas) ───────────────────────────────────────
+keyboard>=0.13.5
+
+# ── Cálculo numérico ──────────────────────────────────────────────────────────
+numpy>=1.24.0
+
+# ── Interfaz web Streamlit (para probar app.py localmente) ───────────────────
+streamlit>=1.35.0
