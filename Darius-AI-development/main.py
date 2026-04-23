@@ -19,6 +19,10 @@ Correcciones v6.1:
     palabras clave exclusivamente relacionadas con el SO
 """
 
+# ── Carga de .env ANTES de cualquier otro import que use os.getenv ──────────
+from dotenv import load_dotenv
+load_dotenv()   # busca .env en el directorio del script (BASE_DIR)
+
 import speech_recognition as sr
 import win32com.client
 import win32event
@@ -40,6 +44,7 @@ import webbrowser
 import winreg
 import urllib.parse
 import urllib.request
+import random
 from pathlib import Path
 from difflib import get_close_matches, SequenceMatcher
 from google import genai
@@ -118,10 +123,90 @@ log = logging.getLogger("DARIUS")
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 if not API_KEY:
-    log.critical("No se encontró GEMINI_API_KEY.")
+    log.critical("No se encontró GEMINI_API_KEY en las variables de entorno ni en .env")
     sys.exit(1)
 
 gemini_client = genai.Client(api_key=API_KEY)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  OPENROUTER FALLBACK
+# ─────────────────────────────────────────────────────────────────────────────
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# Lista de modelos gratuitos y estables de OpenRouter (orden = preferencia)
+# Se selecciona uno aleatoriamente en cada intento de fallback para distribuir carga
+_OPENROUTER_MODELS = [
+    "nvidia/nemotron-3-super:free",
+    "meta-llama/llama-3-8b-instruct:free",
+    "mistralai/mistral-7b-instruct:free",
+    "arcee-ai/arcee-trinity:free",
+    "google/gemma-3-4b-it:free",
+    "microsoft/phi-3-mini-128k-instruct:free",
+    "qwen/qwen3-8b:free",
+]
+
+_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+
+def _ask_openrouter(prompt: str, system_instruction: str) -> str:
+    """
+    Llama a la API de OpenRouter con un modelo gratuito seleccionado al azar.
+    Itera sobre la lista si el primer intento falla, garantizando la mayor
+    disponibilidad posible.
+
+    Args:
+        prompt:             Mensaje del usuario.
+        system_instruction: Instrucción de sistema (personalidad de Darius).
+
+    Returns:
+        Texto de respuesta del modelo.
+
+    Raises:
+        RuntimeError: Si todos los modelos de la lista fallan.
+    """
+    if not OPENROUTER_API_KEY:
+        raise RuntimeError("OPENROUTER_API_KEY no configurada")
+
+    import json as _json
+    import urllib.request as _req
+
+    # Barajar la lista para evitar que siempre se martille el mismo modelo
+    models = _OPENROUTER_MODELS.copy()
+    random.shuffle(models)
+
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "https://darius-ai.local",   # identificador del proyecto
+        "X-Title": "Darius AI Assistant",
+    }
+
+    last_error: Exception | None = None
+    for model in models:
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user",   "content": prompt},
+            ],
+            "max_tokens": GEMINI_MAX_TOKENS,
+            "temperature": GEMINI_TEMPERATURE,
+        }
+        try:
+            data    = _json.dumps(payload).encode("utf-8")
+            request = _req.Request(_OPENROUTER_URL, data=data, headers=headers, method="POST")
+            with _req.urlopen(request, timeout=15) as resp:
+                body    = _json.loads(resp.read().decode("utf-8"))
+                content = body["choices"][0]["message"]["content"]
+                log.info(f"[OpenRouter] Respuesta de modelo '{model}' obtenida.")
+                return content.strip()
+        except Exception as exc:
+            log.warning(f"[OpenRouter] Modelo '{model}' falló: {exc}")
+            last_error = exc
+            continue
+
+    raise RuntimeError(f"Todos los modelos de OpenRouter fallaron. Último error: {last_error}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONTROL DE VOLUMEN
@@ -1076,51 +1161,112 @@ class DariusFinal(ctk.CTk):
             self.talk(f"Buscando {song} en YouTube.")
 
     # =========================================================================
-    #  GEMINI
+    #  GEMINI  (con fallback automático a OpenRouter)
     # =========================================================================
 
+    # Instrucción de sistema compartida por Gemini y el fallback OpenRouter
+    def _build_system_instruction(self) -> str:
+        return (
+            f"Eres Darius, asistente de IA con personalidad futurista y directa. "
+            f"El usuario se llama {USER_NAME}. "
+            "Responde en español, conciso (máximo 3 oraciones), "
+            "sin markdown, sin asteriscos, sin bullets. Solo texto plano."
+        )
+
+    # Errores de Gemini que activan el fallback (cuota, servicio caído, timeout)
+    _GEMINI_FALLBACK_ERRORS = (
+        "429", "RESOURCE_EXHAUSTED", "quota",
+        "503", "UNAVAILABLE", "timeout", "Deadline",
+    )
+
     def ask_gemini(self, prompt: str):
+        """
+        Consulta a la IA con lógica de fallback en dos niveles:
+          1. Intenta Gemini (modelo principal, alta calidad).
+          2. Si Gemini falla por cuota/disponibilidad, escala a OpenRouter
+             (modelo gratuito seleccionado aleatoriamente de la lista).
+          3. Si OpenRouter también falla, informa al usuario y mantiene
+             las capacidades de comandos locales activas.
+        """
+        self.set_status("⚡ PROCESANDO IA…", "#aa00ff")
+        self.conversation_history.append({"role": "user", "parts": [{"text": prompt}]})
+        max_msgs = GEMINI_HISTORY_TURNS * 2
+        if len(self.conversation_history) > max_msgs:
+            self.conversation_history = self.conversation_history[-max_msgs:]
+
+        system_instruction = self._build_system_instruction()
+        answer: str | None = None
+
+        # ── Intento 1: Gemini ─────────────────────────────────────────────────
         try:
-            self.set_status("⚡ PROCESANDO IA…", "#aa00ff")
-            self.conversation_history.append({"role": "user", "parts": [{"text": prompt}]})
-            max_msgs = GEMINI_HISTORY_TURNS * 2
-            if len(self.conversation_history) > max_msgs:
-                self.conversation_history = self.conversation_history[-max_msgs:]
             config = types.GenerateContentConfig(
-                system_instruction=(
-                    f"Eres Darius, asistente de IA con personalidad futurista y directa. "
-                    f"El usuario se llama {USER_NAME}. "
-                    "Responde en español, conciso (máximo 3 oraciones), "
-                    "sin markdown, sin asteriscos, sin bullets. Solo texto plano."
-                ),
+                system_instruction=system_instruction,
                 temperature=GEMINI_TEMPERATURE,
                 max_output_tokens=GEMINI_MAX_TOKENS,
             )
             response = gemini_client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=self.conversation_history,
-                config=config
+                config=config,
             )
-            answer = (response.text if hasattr(response, "text") and response.text
-                      else response.candidates[0].content.parts[0].text)
+            answer = (
+                response.text
+                if hasattr(response, "text") and response.text
+                else response.candidates[0].content.parts[0].text
+            )
+            log.info("[Gemini] Respuesta obtenida correctamente.")
+
+        except Exception as gemini_err:
+            err_str = str(gemini_err)
+            log.warning(f"[Gemini] Error: {err_str}")
+
+            # Decidir si este error amerita un fallback o es un error de config
+            is_fallback_worthy = any(k in err_str for k in self._GEMINI_FALLBACK_ERRORS)
+            is_auth_error      = any(k in err_str for k in ["API_KEY", "authentication", "UNAUTHENTICATED"])
+            is_network_error   = any(k in err_str.lower() for k in ["network", "connection", "unreachable"])
+
+            if is_auth_error:
+                self.talk("Error de autenticación con Gemini. Verifica tu API key.")
+                self.set_status("LISTO", "gray")
+                return
+
+            if is_network_error:
+                self.talk("Sin conexión a internet. Los comandos locales siguen activos.")
+                self.set_status("LISTO", "gray")
+                return
+
+            if is_fallback_worthy or True:   # intenta OpenRouter en cualquier error no crítico
+                # ── Intento 2: OpenRouter (fallback) ─────────────────────────
+                log.info("[Fallback] Activando sistema de respaldo OpenRouter…")
+                self.set_status("⚡ MODO FALLBACK (OpenRouter)…", "#ff8800")
+                try:
+                    answer = _ask_openrouter(prompt, system_instruction)
+                    log.info("[Fallback] Respuesta de OpenRouter obtenida.")
+                except Exception as or_err:
+                    log.error(f"[Fallback] OpenRouter también falló: {or_err}")
+                    # Informar de forma diferenciada según el error original de Gemini
+                    if is_fallback_worthy and "quota" in err_str.lower():
+                        self.talk(
+                            "Límite de Gemini alcanzado y el sistema de respaldo tampoco respondió. "
+                            "Comandos locales activos."
+                        )
+                    else:
+                        self.talk(
+                            "Los motores de IA no están disponibles en este momento. "
+                            "Comandos locales activos."
+                        )
+                    self.set_status("LISTO", "gray")
+                    return
+
+        # ── Procesar y hablar la respuesta ────────────────────────────────────
+        if answer:
             answer = re.sub(r"[*_`#>]", "", answer).strip()
             self.conversation_history.append({"role": "model", "parts": [{"text": answer}]})
             self.talk(answer)
-        except Exception as e:
-            err = str(e)
-            log.error(f"Gemini error: {err}")
-            if any(k in err for k in ["429", "RESOURCE_EXHAUSTED", "quota"]):
-                self.talk("Límite diario de consultas alcanzado. Comandos locales activos.")
-            elif any(k in err for k in ["503", "UNAVAILABLE"]):
-                self.talk("Gemini no disponible en este momento. Intenta de nuevo en unos segundos.")
-            elif any(k in err for k in ["API_KEY", "authentication", "UNAUTHENTICATED"]):
-                self.talk("Error de autenticación con el servicio de IA.")
-            elif any(k in err.lower() for k in ["network", "connection"]):
-                self.talk("Sin conexión a internet.")
-            else:
-                self.talk("Error de enlace con el núcleo Gemini.")
-        finally:
-            self.set_status("LISTO", "gray")
+        else:
+            self.talk("No obtuve respuesta del motor de IA.")
+
+        self.set_status("LISTO", "gray")
 
     # =========================================================================
     #  CIERRE LIMPIO

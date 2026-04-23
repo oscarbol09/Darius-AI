@@ -12,6 +12,7 @@ __pycache__/
 # Secretos y Credenciales
 # =========================
 .env
+# .env.example NO está aquí para que sí se suba como plantilla (sin valores reales)
 
 # =========================
 # Archivos Dinámicos de DARIUS

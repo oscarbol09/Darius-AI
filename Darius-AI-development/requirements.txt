@@ -1,47 +1,24 @@
 # ══════════════════════════════════════════════════════════════════════════════
-#  DARIUS AI — Dependencias completas
+#  DARIUS AI — requirements.txt (Azure App Service · Linux)
 #  Instalar con: pip install -r requirements.txt
 #
-#  Secciones:
-#    [core]      → Obligatorias para arrancar
-#    [windows]   → Solo en Windows (algunas son parte de pywin32)
-#    [optional]  → Mejoran funcionalidad, no bloquean el arranque
-#    [dev]       → Solo para testing y desarrollo
-#    [mcp]       → Integración con servidores MCP (nueva arquitectura)
+#  NOTA: Las dependencias exclusivas de Windows (pywin32, customtkinter,
+#        SpeechRecognition, PyAudio, keyboard, etc.) NO se incluyen aquí
+#        porque Azure corre en Linux y esas librerías fallarían la instalación.
+#        El archivo main.py (escritorio Windows) conserva sus propias deps.
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── [core] ────────────────────────────────────────────────────────────────────
-SpeechRecognition>=3.10.0
-PyAudio>=0.2.14
-customtkinter>=5.2.0
-numpy>=1.24.0
+# ── Interfaz web ──────────────────────────────────────────────────────────────
+streamlit>=1.35.0
+
+# ── IA principal: Google Gemini ───────────────────────────────────────────────
 google-genai>=1.0.0
 
-# ── [windows] ─────────────────────────────────────────────────────────────────
-# pywin32 cubre: win32com.client, win32event, win32api, winerror
-pywin32>=306
+# ── Fallback: OpenRouter (cliente HTTP) ──────────────────────────────────────
+requests>=2.31.0
 
-# ── [optional] ────────────────────────────────────────────────────────────────
-# Control preciso de volumen por hardware (fallback a nircmd.exe si no está)
-comtypes>=1.2.0
-pycaw>=20181226
+# ── Variables de entorno ──────────────────────────────────────────────────────
+python-dotenv>=1.0.0
 
-# Push-to-Talk: detección de teclas en tiempo real
-keyboard>=0.13.5
-
-# Wake word por hardware (requiere PORCUPINE_ACCESS_KEY en variables de entorno)
-# pvporcupine>=3.0.0
-
-# ── [mcp] ─────────────────────────────────────────────────────────────────────
-# SDK de Model Context Protocol para integrar herramientas externas en Gemini
-mcp>=1.0.0
-
-# ── [dev] ─────────────────────────────────────────────────────────────────────
-# Herramientas de pruebas (no necesarias en producción)
-# pytest>=7.0.0
-# pytest-mock>=3.10.0
-
-# ── NOTA: dependencias eliminadas ─────────────────────────────────────────────
-# pyttsx3: declarada antes pero nunca importada en el código.
-#          El TTS real usa SAPI vía win32com.client (más integración nativa
-#          con voces instaladas en Windows). Se eliminó para evitar confusión.
+# ── Utilidades estándar (ya vienen en Python, pero declaradas por claridad) ───
+# pathlib, json, logging, os → stdlib, sin pip
