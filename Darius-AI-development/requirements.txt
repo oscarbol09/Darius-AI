@@ -1,0 +1,24 @@
+# ══════════════════════════════════════════════════════════════════════════════
+#  DARIUS AI — requirements.txt (Azure App Service · Linux)
+#  Instalar con: pip install -r requirements.txt
+#
+#  NOTA: Las dependencias exclusivas de Windows (pywin32, customtkinter,
+#        SpeechRecognition, PyAudio, keyboard, etc.) NO se incluyen aquí
+#        porque Azure corre en Linux y esas librerías fallarían la instalación.
+#        El archivo main.py (escritorio Windows) conserva sus propias deps.
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Interfaz web ──────────────────────────────────────────────────────────────
+streamlit>=1.35.0
+
+# ── IA principal: Google Gemini ───────────────────────────────────────────────
+google-genai>=1.0.0
+
+# ── Fallback: OpenRouter (cliente HTTP) ──────────────────────────────────────
+requests>=2.31.0
+
+# ── Variables de entorno ──────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+
+# ── Utilidades estándar (ya vienen en Python, pero declaradas por claridad) ───
+# pathlib, json, logging, os → stdlib, sin pip
