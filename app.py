@@ -1,27 +1,31 @@
 """
 app.py — Darius AI · Interfaz web con Streamlit
 ================================================
-Punto de entrada para Azure App Service (Linux).
+Punto de entrada para Railway (contenedor Linux).
 Conecta con Gemini (google-genai) y hace fallback automático
 a OpenRouter si Gemini falla o no está disponible.
+
+Comparte datos con main.py (escritorio) vía Supabase: historial de chat
+(tabla chat_history) y configuración (tabla config). Ver supabase_client.py.
 
 Arranque local:
     streamlit run app.py
 
-Arranque en Azure (startup command):
-    python -m streamlit run app.py --server.port 8000 --server.address 0.0.0.0
+Arranque en Railway (start command):
+    python -m streamlit run app.py --server.port $PORT --server.address 0.0.0.0
 """
 
 from __future__ import annotations
 
-import os
-import json
 import logging
+import os
+
 import requests
-from pathlib import Path
+import streamlit as st
 from dotenv import load_dotenv
 
-import streamlit as st
+from config_loader import cfg
+from supabase_client import get_supabase
 
 # ── Carga de variables de entorno ─────────────────────────────────────────────
 load_dotenv()
@@ -29,36 +33,15 @@ load_dotenv()
 GEMINI_API_KEY   = os.getenv("GEMINI_API_KEY", "")
 OPENROUTER_KEY   = os.getenv("OPENROUTER_API_KEY", "")
 
-# ── Configuración base (lee config.json si existe, si no usa defaults) ─────────
-_BASE_DIR    = Path(__file__).parent
-_CONFIG_FILE = _BASE_DIR / "config.json"
-
-_DEFAULTS = {
-    "assistant": {"name": "Darius", "user_name": "Usuario"},
-    "gemini": {
-        "model": "gemini-2.5-flash",
-        "max_tokens": 512,
-        "temperature": 0.7,
-        "history_turns": 10,
-    },
-}
-
-def _load_config() -> dict:
-    if _CONFIG_FILE.exists():
-        try:
-            return json.loads(_CONFIG_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    return _DEFAULTS
-
-_cfg = _load_config()
-
-ASSISTANT_NAME   = _cfg.get("assistant", {}).get("name", "Darius")
-USER_NAME        = _cfg.get("assistant", {}).get("user_name", "Usuario")
-GEMINI_MODEL     = _cfg.get("gemini", {}).get("model", "gemini-2.5-flash")
-MAX_TOKENS       = int(_cfg.get("gemini", {}).get("max_tokens", 512))
-TEMPERATURE      = float(_cfg.get("gemini", {}).get("temperature", 0.7))
-HISTORY_TURNS    = int(_cfg.get("gemini", {}).get("history_turns", 10))
+# ── Configuración base ─────────────────────────────────────────────────────────
+# Importada desde config_loader.py, que comparte defaults con main.py.
+# Prioridad: Supabase (tabla `config`) > config.json local > defaults.
+ASSISTANT_NAME   = cfg.ASSISTANT_NAME
+USER_NAME        = cfg.USER_NAME
+GEMINI_MODEL     = cfg.GEMINI_MODEL
+MAX_TOKENS       = cfg.GEMINI_MAX_TOKENS
+TEMPERATURE      = cfg.GEMINI_TEMPERATURE
+HISTORY_TURNS    = cfg.GEMINI_HISTORY_TURNS
 
 OPENROUTER_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 OPENROUTER_URL   = "https://openrouter.ai/api/v1/chat/completions"
@@ -123,7 +106,7 @@ def call_openrouter(user_text: str, history: list[dict]) -> str:
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://darius-ai.azurewebsites.net",
+        "HTTP-Referer": "https://darius-ai.local",
         "X-Title": "Darius AI",
     }
     payload = {
@@ -236,10 +219,61 @@ def setup_page():
     )
 
 
+def _row_to_role(speaker: str) -> str:
+    """Mapea el campo `speaker` de chat_history (texto libre) a role user/assistant."""
+    return "assistant" if speaker.strip().lower() in (
+        ASSISTANT_NAME.lower(), "assistant", "darius", "sistema"
+    ) else "user"
+
+
+def _load_shared_history(limit: int = 100) -> list[dict]:
+    """
+    Carga el historial compartido (desktop + web) desde Supabase, más reciente
+    al final, para que la web muestre la misma conversación que main.py.
+    Devuelve [] si Supabase no está disponible (modo local, como antes).
+    """
+    sb = get_supabase()
+    if not sb:
+        return []
+    try:
+        resp = (
+            sb.table("chat_history")
+            .select("speaker, message, created_at")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        rows = list(reversed(resp.data or []))
+        return [
+            {"role": _row_to_role(r["speaker"]), "content": r["message"]}
+            for r in rows
+        ]
+    except Exception as exc:
+        log.warning("No se pudo cargar historial compartido desde Supabase: %s", exc)
+        return []
+
+
+def _push_message_to_supabase(role: str, content: str):
+    """Inserta un mensaje en chat_history (source='web'). Best-effort."""
+    sb = get_supabase()
+    if not sb:
+        return
+    speaker = ASSISTANT_NAME if role == "assistant" else USER_NAME
+    try:
+        sb.table("chat_history").insert({
+            "source":  "web",
+            "speaker": speaker,
+            "message": content,
+        }).execute()
+    except Exception as exc:
+        log.warning("No se pudo sincronizar mensaje web con Supabase: %s", exc)
+
+
 def init_session():
-    """Inicializa el estado de la sesión si no existe."""
+    """Inicializa el estado de la sesión. Si es la primera carga y Supabase
+    está disponible, precarga el historial compartido con main.py."""
     if "messages" not in st.session_state:
-        st.session_state.messages = []
+        st.session_state.messages = _load_shared_history()
     if "thinking" not in st.session_state:
         st.session_state.thinking = False
 
@@ -310,8 +344,9 @@ def handle_send(user_input: str):
     if not user_input.strip():
         return
 
-    # Guardamos el mensaje del usuario
+    # Guardamos el mensaje del usuario (local + Supabase, source='web')
     st.session_state.messages.append({"role": "user", "content": user_input.strip()})
+    _push_message_to_supabase("user", user_input.strip())
 
     # Historial previo (sin el último mensaje que acabamos de agregar)
     previous_history = st.session_state.messages[:-1]
@@ -319,10 +354,11 @@ def handle_send(user_input: str):
     with st.spinner("Darius está pensando…"):
         response_text, provider = get_ai_response(user_input.strip(), previous_history)
 
-    # Guardamos la respuesta del asistente
+    # Guardamos la respuesta del asistente (local + Supabase, source='web')
     st.session_state.messages.append(
         {"role": "assistant", "content": response_text, "provider": provider}
     )
+    _push_message_to_supabase("assistant", response_text)
 
     # Forzamos re-render para mostrar el nuevo mensaje
     st.rerun()

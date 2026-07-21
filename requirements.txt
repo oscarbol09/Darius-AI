@@ -1,11 +1,12 @@
 # ══════════════════════════════════════════════════════════════════════════════
-#  DARIUS AI — requirements.txt (Azure App Service · Linux)
+#  DARIUS AI — requirements.txt (Railway · Linux)
 #  Instalar con: pip install -r requirements.txt
 #
 #  NOTA: Las dependencias exclusivas de Windows (pywin32, customtkinter,
 #        SpeechRecognition, PyAudio, keyboard, etc.) NO se incluyen aquí
-#        porque Azure corre en Linux y esas librerías fallarían la instalación.
-#        El archivo main.py (escritorio Windows) conserva sus propias deps.
+#        porque Railway corre en Linux y esas librerías fallarían la instalación.
+#        El archivo main.py (escritorio Windows) conserva sus propias deps
+#        en requirements-windows.txt.
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── Interfaz web ──────────────────────────────────────────────────────────────
@@ -19,6 +20,9 @@ requests>=2.31.0
 
 # ── Variables de entorno ──────────────────────────────────────────────────────
 python-dotenv>=1.0.0
+
+# ── Persistencia y datos compartidos con main.py (chat_history, config) ──────
+supabase>=2.9.0
 
 # ── Utilidades estándar (ya vienen en Python, pero declaradas por claridad) ───
 # pathlib, json, logging, os → stdlib, sin pip

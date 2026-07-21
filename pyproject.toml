@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "darius-ai"
+version = "6.0.0"
+description = "Asistente de inteligencia artificial con interfaz de voz y web"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "S", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"test_*.py" = ["S101"]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["."]
+python_files = ["test_*.py"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["."]
+omit = ["test_*.py", ".venv/*", "antenv/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

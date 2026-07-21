@@ -35,6 +35,11 @@ nircmd.exe
 *.exe
 
 # =========================
+# Supabase CLI temporales
+# =========================
+supabase/.temp/
+
+# =========================
 # Configuración del Editor
 # =========================
 .vscode/

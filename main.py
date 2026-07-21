@@ -21,41 +21,45 @@ Correcciones v6.1:
 
 # ── Carga de .env ANTES de cualquier otro import que use os.getenv ──────────
 from dotenv import load_dotenv
+
 load_dotenv()   # busca .env en el directorio del script (BASE_DIR)
 
-import speech_recognition as sr
-import win32com.client
-import win32event
-import win32api
-import winerror
-import os
 import datetime
-import customtkinter as ctk
-import threading
-import numpy as np
-import tkinter as tk
-import time
-import sys
-import re
 import json
-import queue
 import logging
-import webbrowser
-import winreg
+import os
+import re
+import subprocess
+import sys
+import threading
+import time
+import tkinter as tk
 import urllib.parse
 import urllib.request
-import random
+import webbrowser
+import winreg
+from difflib import SequenceMatcher, get_close_matches
 from pathlib import Path
-from difflib import get_close_matches, SequenceMatcher
-from google import genai
-from google.genai import types
-import subprocess
-from config_loader import cfg
 
+import customtkinter as ctk
+import numpy as np
+import speech_recognition as sr
+import win32api
+import win32com.client
+import win32event
+import winerror
+
+from config_loader import cfg
+from supabase_client import get_supabase
+from tts_worker import TTSWorker
+from windows_commands import (
+    resolve_action as wincmd_resolve_action,
+)
 from windows_commands import (
     resolve_and_launch as wincmd_launch,
-    resolve_action     as wincmd_resolve_action,
-    run_action         as wincmd_run_action,
+)
+from windows_commands import (
+    run_action as wincmd_run_action,
 )
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -99,8 +103,9 @@ MIN_WORDS_WITHOUT_NAME = cfg.MIN_WORDS_WITHOUT_NAME
 
 BASE_DIR  = Path(__file__).parent
 LOG_FILE  = BASE_DIR / "darius.log"
-CHAT_FILE = BASE_DIR / "chat_history.txt"
-APP_CACHE = BASE_DIR / "apps_cache.json"
+CHAT_FILE       = BASE_DIR / "chat_history.txt"
+APP_CACHE       = BASE_DIR / "apps_cache.json"
+MAX_CHAT_LINES  = 10000
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  LOGGING
@@ -117,115 +122,16 @@ logging.basicConfig(
 )
 log = logging.getLogger("DARIUS")
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  GEMINI CLIENT
-# ─────────────────────────────────────────────────────────────────────────────
-
-API_KEY = os.getenv("GEMINI_API_KEY")
-if not API_KEY:
-    log.critical("No se encontró GEMINI_API_KEY en las variables de entorno ni en .env")
-    sys.exit(1)
-
-gemini_client = genai.Client(api_key=API_KEY)
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  OPENROUTER FALLBACK
-# ─────────────────────────────────────────────────────────────────────────────
-
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# Lista de modelos gratuitos y estables de OpenRouter (orden = preferencia)
-# Se selecciona uno aleatoriamente en cada intento de fallback para distribuir carga
-_OPENROUTER_MODELS = [
-    "nvidia/nemotron-3-super:free",
-    "meta-llama/llama-3-8b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "arcee-ai/arcee-trinity:free",
-    "google/gemma-3-4b-it:free",
-    "microsoft/phi-3-mini-128k-instruct:free",
-    "qwen/qwen3-8b:free",
-]
-
-_OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-
-def _ask_openrouter(prompt: str, system_instruction: str) -> str:
-    """
-    Llama a la API de OpenRouter con un modelo gratuito seleccionado al azar.
-    Itera sobre la lista si el primer intento falla, garantizando la mayor
-    disponibilidad posible.
-
-    Args:
-        prompt:             Mensaje del usuario.
-        system_instruction: Instrucción de sistema (personalidad de Darius).
-
-    Returns:
-        Texto de respuesta del modelo.
-
-    Raises:
-        RuntimeError: Si todos los modelos de la lista fallan.
-    """
-    if not OPENROUTER_API_KEY:
-        raise RuntimeError("OPENROUTER_API_KEY no configurada")
-
-    import json as _json
-    import urllib.request as _req
-
-    # Barajar la lista para evitar que siempre se martille el mismo modelo
-    models = _OPENROUTER_MODELS.copy()
-    random.shuffle(models)
-
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "HTTP-Referer": "https://darius-ai.local",   # identificador del proyecto
-        "X-Title": "Darius AI Assistant",
-    }
-
-    last_error: Exception | None = None
-    for model in models:
-        payload = {
-            "model": model,
-            "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user",   "content": prompt},
-            ],
-            "max_tokens": GEMINI_MAX_TOKENS,
-            "temperature": GEMINI_TEMPERATURE,
-        }
-        try:
-            data    = _json.dumps(payload).encode("utf-8")
-            request = _req.Request(_OPENROUTER_URL, data=data, headers=headers, method="POST")
-            with _req.urlopen(request, timeout=20) as resp:
-                body = _json.loads(resp.read().decode("utf-8"))
-                # Validar estructura antes de acceder
-                choices = body.get("choices", [])
-                if not choices:
-                    raise ValueError(f"OpenRouter devolvió choices vacío para modelo '{model}'")
-                message = choices[0].get("message", {})
-                content = message.get("content", "")
-                if not content or not content.strip():
-                    finish = choices[0].get("finish_reason", "unknown")
-                    raise ValueError(f"Respuesta vacía de '{model}' (finish_reason={finish})")
-                log.info(f"[OpenRouter] Respuesta de modelo '{model}' obtenida.")
-                return content.strip()
-        except TimeoutError as exc:
-            log.warning(f"[OpenRouter] Timeout en modelo '{model}': {exc}")
-            last_error = exc
-            continue
-        except Exception as exc:
-            log.warning(f"[OpenRouter] Modelo '{model}' falló: {exc}")
-            last_error = exc
-            continue
-
-    raise RuntimeError(f"Todos los modelos de OpenRouter fallaron. Último error: {last_error}")
+# ── Módulos extraídos ──────────────────────────────────────────────────────────
+from ai_client import get_ai_response
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONTROL DE VOLUMEN
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
-    from ctypes import cast, POINTER
+    from ctypes import POINTER, cast
+
     from comtypes import CLSCTX_ALL
     from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
     _sessions    = AudioUtilities.GetSpeakers()
@@ -240,26 +146,27 @@ def volume_up():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMasterVolumeLevelScalar(min(1.0, _volume_ctrl.GetMasterVolumeLevelScalar() + 0.1), None)
     else:
-        os.system("nircmd.exe changesysvolume 5000")
+        subprocess.run(["nircmd.exe", "changesysvolume", "5000"], shell=False)
 
 def volume_down():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMasterVolumeLevelScalar(max(0.0, _volume_ctrl.GetMasterVolumeLevelScalar() - 0.1), None)
     else:
-        os.system("nircmd.exe changesysvolume -5000")
+        subprocess.run(["nircmd.exe", "changesysvolume", "-5000"], shell=False)
 
 def volume_mute():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMute(1, None)
     else:
-        os.system("nircmd.exe mutesysvolume 1")
+        subprocess.run(["nircmd.exe", "mutesysvolume", "1"], shell=False)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  WAKE WORD / TECLADO
 # ─────────────────────────────────────────────────────────────────────────────
 
 try:
-    import pvporcupine, pyaudio
+    import pvporcupine  # noqa: F401 — availability check
+    import pyaudio  # noqa: F401 — availability check
     PORCUPINE_AVAILABLE = True
 except ImportError:
     PORCUPINE_AVAILABLE = False
@@ -296,23 +203,23 @@ class DariusFinal(ctk.CTk):
 
         self.running              = True
         self.is_listening         = False
-        self.is_speaking          = threading.Event()
         self.waiting_for_command  = False
         self.is_muted             = False
         self.installed_apps       = {}
         self._current_audio_level = 0.0
         self._pending_action: dict | None = None
+        self._pending_lock = threading.RLock()
         self._ptt_active          = False
 
         self.listen_mode = DEFAULT_LISTEN_MODE
         self.conversation_history: list[dict] = []
-        self.tts_queue = queue.Queue()
 
         self.setup_tts_config()
+        self.tts_worker = TTSWorker(voice_token=self.tts_voice_token)
+        self.tts_worker.start()
         self.listener = sr.Recognizer()
         self.configure_listener()
         self.setup_ui()
-        self._start_tts_worker()
         self.scan_apps_async()
 
     # =========================================================================
@@ -345,37 +252,12 @@ class DariusFinal(ctk.CTk):
         except Exception as e:
             log.warning(f"No se pudo calibrar el micrófono: {e}")
 
-    def _start_tts_worker(self):
-        def worker():
-            import pythoncom
-            pythoncom.CoInitialize()
-            speaker = win32com.client.Dispatch("SAPI.SpVoice")
-            if self.tts_voice_token:
-                speaker.Voice = self.tts_voice_token
-            speaker.Rate   = TTS_RATE
-            speaker.Volume = TTS_VOLUME
-            while True:
-                text = self.tts_queue.get()
-                if text is None:
-                    break
-                try:
-                    self.is_speaking.set()
-                    speaker.Speak(text)
-                except Exception as e:
-                    log.error(f"TTS error: {e}")
-                finally:
-                    self.is_speaking.clear()
-                    time.sleep(SPEAKING_TAIL_SECS)
-                    self.tts_queue.task_done()
-            pythoncom.CoUninitialize()
-        threading.Thread(target=worker, daemon=True, name="tts-worker").start()
-
     def talk(self, text: str):
         log.info(f"DARIUS: {text}")
         self.after(0, self._insert_message, "Darius", text)
         self._append_chat_file("DARIUS", text)
         if not self.is_muted:
-            self.tts_queue.put(text)
+            self.tts_worker.speak(text)
 
     # =========================================================================
     #  HISTORIAL
@@ -386,8 +268,36 @@ class DariusFinal(ctk.CTk):
             ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             with open(CHAT_FILE, "a", encoding="utf-8") as f:
                 f.write(f"[{ts}] {speaker}: {text}\n")
+            self._trim_chat_file()
         except Exception as e:
-            log.warning(f"No se pudo escribir historial: {e}")
+            log.warning(f"No se pudo escribir historial local: {e}")
+        self._push_chat_to_supabase(speaker, text)
+
+    def _trim_chat_file(self):
+        try:
+            with open(CHAT_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            if len(lines) > MAX_CHAT_LINES:
+                with open(CHAT_FILE, "w", encoding="utf-8") as f:
+                    f.writelines(lines[-int(MAX_CHAT_LINES * 0.8):])
+        except Exception as e:
+            log.warning(f"No se pudo rotar historial: {e}")
+
+    def _push_chat_to_supabase(self, speaker: str, text: str):
+        """Inserta el mensaje en la tabla chat_history de Supabase (source='desktop').
+        Best-effort: si Supabase no está disponible, el historial local .txt
+        sigue funcionando igual que antes de esta migración."""
+        sb = get_supabase()
+        if not sb:
+            return
+        try:
+            sb.table("chat_history").insert({
+                "source":  "desktop",
+                "speaker": speaker,
+                "message": text,
+            }).execute()
+        except Exception as e:
+            log.warning(f"No se pudo sincronizar mensaje con Supabase: {e}")
 
     # =========================================================================
     #  UI
@@ -575,7 +485,7 @@ class DariusFinal(ctk.CTk):
                 x0, _, x1, _ = self.canvas.coords(bar)
                 self.canvas.coords(bar, x0, 50 - h/2, x1, 50 + h/2)
             self.after(80, self.animate_logic)
-        elif self.is_speaking.is_set():
+        elif self.tts_worker.is_speaking.is_set():
             for bar in self.wave_bars:
                 h = np.random.randint(8, 45)
                 x0, _, x1, _ = self.canvas.coords(bar)
@@ -588,7 +498,9 @@ class DariusFinal(ctk.CTk):
 
     def _start_audio_level_monitor(self):
         def monitor():
-            import audioop, pyaudio
+            import audioop
+
+            import pyaudio
             pa = pyaudio.PyAudio()
             try:
                 stream = pa.open(format=pyaudio.paInt16, channels=1,
@@ -622,7 +534,8 @@ class DariusFinal(ctk.CTk):
 
     def reset_conversation(self):
         self.conversation_history.clear()
-        self._pending_action = None
+        with self._pending_lock:
+            self._pending_action = None
         self.chat_display.configure(state="normal")
         self.chat_display._textbox.delete("1.0", "end")
         self.chat_display.configure(state="disabled")
@@ -637,14 +550,27 @@ class DariusFinal(ctk.CTk):
         threading.Thread(target=self._load_or_scan_apps, daemon=True, name="app-scanner").start()
 
     def _load_or_scan_apps(self):
+        # 1) Intentar Supabase primero (fuente compartida entre máquinas/instancias)
+        remote_apps = self._load_apps_from_supabase()
+        if remote_apps is not None:
+            self.installed_apps = remote_apps
+            log.info(f"Apps desde Supabase: {len(self.installed_apps)}")
+            self.after(0, self.status_label.configure,
+                       {"text": f"BASE DE DATOS: {len(self.installed_apps)} APPS",
+                        "text_color": "#00ff88"})
+            return
+
+        # 2) Fallback: caché local (offline o Supabase no configurada)
         if APP_CACHE.exists():
             try:
                 data     = json.loads(APP_CACHE.read_text(encoding="utf-8"))
                 saved_at = datetime.datetime.fromisoformat(data["saved_at"])
-                age_h    = (datetime.datetime.now() - saved_at).total_seconds() / 3600
+                if saved_at.tzinfo is None:
+                    saved_at = saved_at.replace(tzinfo=datetime.timezone.utc)
+                age_h = (datetime.datetime.now(datetime.timezone.utc) - saved_at).total_seconds() / 3600
                 if age_h < APP_CACHE_HOURS:
                     self.installed_apps = data["apps"]
-                    log.info(f"Apps desde caché: {len(self.installed_apps)}")
+                    log.info(f"Apps desde caché local: {len(self.installed_apps)}")
                     self.after(0, self.status_label.configure,
                                {"text": f"BASE DE DATOS: {len(self.installed_apps)} APPS",
                                 "text_color": "#00ff88"})
@@ -652,6 +578,33 @@ class DariusFinal(ctk.CTk):
             except Exception as e:
                 log.warning(f"Caché inválida: {e}")
         self._scan_applications()
+
+    def _load_apps_from_supabase(self) -> dict | None:
+        """
+        Devuelve el dict {app_name: exe_path} desde Supabase si el último
+        escaneo completo (apps_cache_meta.last_full_scan) sigue vigente
+        según APP_CACHE_HOURS. Devuelve None si Supabase no está disponible,
+        no hay datos, o el caché remoto expiró (en cuyo caso hay que reescanear).
+        """
+        sb = get_supabase()
+        if not sb:
+            return None
+        try:
+            meta_resp = sb.table("apps_cache_meta").select("last_full_scan").eq("id", 1).execute()
+            if not meta_resp.data:
+                return None
+            last_scan = datetime.datetime.fromisoformat(meta_resp.data[0]["last_full_scan"].replace("Z", "+00:00"))
+            now       = datetime.datetime.now(last_scan.tzinfo)
+            age_h     = (now - last_scan).total_seconds() / 3600
+            if age_h >= APP_CACHE_HOURS:
+                return None
+            apps_resp = sb.table("apps_cache").select("app_name, exe_path").execute()
+            if not apps_resp.data:
+                return None
+            return {row["app_name"]: row["exe_path"] for row in apps_resp.data}
+        except Exception as e:
+            log.warning(f"No se pudo leer apps_cache desde Supabase: {e}")
+            return None
 
     def _scan_applications(self):
         apps: dict[str, str] = {
@@ -685,6 +638,8 @@ class DariusFinal(ctk.CTk):
                 key.Close()
             except OSError:
                 continue
+        self.set_status("ESCANEANDO APLICACIONES...", "#ffaa00")
+        scanned_dirs = []
         for folder in [
             Path(os.environ.get("PROGRAMFILES",      r"C:\Program Files")),
             Path(os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")),
@@ -692,8 +647,11 @@ class DariusFinal(ctk.CTk):
         ]:
             if not folder.exists():
                 continue
+            scanned_dirs.append(folder)
             try:
-                for exe in folder.rglob("*.exe"):
+                for i, exe in enumerate(folder.rglob("*.exe")):
+                    if i % 100 == 0 and i > 0:
+                        self.set_status(f"ESCANEANDO: {i} EXES EN {folder.name}...", "#ffaa00")
                     stem = exe.stem.lower().replace("-", " ").replace("_", " ")
                     if stem not in apps:
                         apps[stem] = str(exe)
@@ -703,14 +661,39 @@ class DariusFinal(ctk.CTk):
         log.info(f"Apps detectadas: {len(apps)}")
         try:
             APP_CACHE.write_text(
-                json.dumps({"saved_at": datetime.datetime.now().isoformat(), "apps": apps},
+                json.dumps({"saved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "apps": apps},
                            ensure_ascii=False, indent=2),
                 encoding="utf-8"
             )
         except Exception as e:
-            log.warning(f"No se pudo guardar caché: {e}")
+            log.warning(f"No se pudo guardar caché local: {e}")
+        self._push_apps_to_supabase(apps)
         self.after(0, self.status_label.configure,
                    {"text": f"BASE DE DATOS: {len(apps)} APPS", "text_color": "#00ff88"})
+
+    def _push_apps_to_supabase(self, apps: dict[str, str]):
+        """
+        Sube el resultado del escaneo completo a Supabase: upsert masivo de
+        apps_cache y actualización de apps_cache_meta.last_full_scan (fila
+        única id=1), que es lo que consulta _load_apps_from_supabase() para
+        decidir si el caché remoto sigue vigente.
+        """
+        sb = get_supabase()
+        if not sb:
+            return
+        try:
+            rows = [{"app_name": name, "exe_path": path} for name, path in apps.items()]
+            # Supabase/PostgREST recomienda lotes moderados para upserts grandes
+            batch_size = 500
+            for i in range(0, len(rows), batch_size):
+                sb.table("apps_cache").upsert(rows[i:i + batch_size]).execute()
+            sb.table("apps_cache_meta").upsert({
+                "id": 1,
+                "last_full_scan": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }).execute()
+            log.info(f"Apps sincronizadas con Supabase: {len(rows)}")
+        except Exception as e:
+            log.warning(f"No se pudo sincronizar apps_cache con Supabase: {e}")
 
     def find_app(self, query: str) -> str | None:
         q = query.lower().strip()
@@ -743,7 +726,7 @@ class DariusFinal(ctk.CTk):
 
     def main_loop(self):
         while self.running:
-            if self.is_muted or self.is_speaking.is_set():
+            if self.is_muted or self.tts_worker.is_speaking.is_set():
                 time.sleep(0.05); continue
             if self.listen_mode == LISTEN_MODE_PTT:
                 time.sleep(0.1); continue
@@ -762,7 +745,7 @@ class DariusFinal(ctk.CTk):
             if self.is_muted:
                 time.sleep(0.1); continue
             key_down = keyboard.is_pressed(LISTEN_KEY)
-            if key_down and not key_was_down and not self.is_speaking.is_set():
+            if key_down and not key_was_down and not self.tts_worker.is_speaking.is_set():
                 key_was_down = True
                 self._ptt_active = True
                 self.set_status(f"🎙 HABLANDO… (suelta {LISTEN_KEY} al terminar)", "#00ff88")
@@ -778,7 +761,11 @@ class DariusFinal(ctk.CTk):
             time.sleep(0.02)
 
     def _ptt_capture_and_process(self):
-        import audioop, pyaudio, wave, io
+        import audioop
+        import io
+        import wave
+
+        import pyaudio
         RATE, CHUNK, CHANNELS = 16000, 512, 1
         pa = pyaudio.PyAudio()
         frames = []
@@ -818,7 +805,10 @@ class DariusFinal(ctk.CTk):
             log.error(f"[PTT] Error: {e}", exc_info=True); self.set_status("LISTO", "gray")
 
     def _porcupine_loop(self):
-        import pvporcupine, pyaudio, struct
+        import struct
+
+        import pvporcupine
+        import pyaudio
         access_key = os.getenv("PORCUPINE_ACCESS_KEY", "")
         if not access_key:
             self.main_loop(); return
@@ -829,7 +819,7 @@ class DariusFinal(ctk.CTk):
                                 format=pyaudio.paInt16, input=True,
                                 frames_per_buffer=porcupine.frame_length)
             while self.running:
-                if self.is_muted or self.is_speaking.is_set():
+                if self.is_muted or self.tts_worker.is_speaking.is_set():
                     time.sleep(0.05); continue
                 pcm   = stream.read(porcupine.frame_length, exception_on_overflow=False)
                 pcm   = struct.unpack_from("h" * porcupine.frame_length, pcm)
@@ -847,14 +837,14 @@ class DariusFinal(ctk.CTk):
     def listen_and_process(self):
         try:
             with sr.Microphone() as source:
-                if self.is_speaking.is_set(): return
+                if self.tts_worker.is_speaking.is_set(): return
                 self.set_status("ESCUCHANDO…", "#00fbff")
                 self.is_listening = True
                 self.after(0, self.animate_logic)
                 audio = self.listener.listen(source, timeout=MIC_LISTEN_TIMEOUT,
                                              phrase_time_limit=MIC_PHRASE_LIMIT)
                 self.is_listening = False
-                if self.is_speaking.is_set(): return
+                if self.tts_worker.is_speaking.is_set(): return
                 self.set_status("PROCESANDO…", "#ffaa00")
                 text = self.listener.recognize_google(audio, language="es-ES").lower()
                 log.info(f"Reconocido: '{text}'")
@@ -985,9 +975,10 @@ class DariusFinal(ctk.CTk):
             return
         log.info(f"Ejecutando: '{cmd}'")
 
-        if self._pending_action is not None:
-            self._handle_confirmation(cmd)
-            return
+        with self._pending_lock:
+            if self._pending_action is not None:
+                self._handle_confirmation(cmd)
+                return
 
         for pattern, handler in self._CMD_PATTERNS:
             if pattern.search(cmd):
@@ -1053,20 +1044,22 @@ class DariusFinal(ctk.CTk):
         self.after(2500, self.kill_process)
 
     def _cmd_apagar_pc(self, _):
-        self._pending_action = {
-            "desc": "Apagar el equipo en 10 segundos",
-            "confirm": True,
-            "_fn": lambda: subprocess.run(["shutdown", "/s", "/t", "10"], shell=False, check=False),
-        }
+        with self._pending_lock:
+            self._pending_action = {
+                "desc": "Apagar el equipo en 10 segundos",
+                "confirm": True,
+                "_fn": lambda: subprocess.run(["shutdown", "/s", "/t", "10"], shell=False, check=False),
+            }
         self.talk("Estás a punto de apagar el equipo. Di confirmar para proceder o cancelar para abortar.")
         self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
 
     def _cmd_reiniciar_pc(self, _):
-        self._pending_action = {
-            "desc": "Reiniciar el equipo en 10 segundos",
-            "confirm": True,
-            "_fn": lambda: subprocess.run(["shutdown", "/r", "/t", "10"], shell=False, check=False),
-        }
+        with self._pending_lock:
+            self._pending_action = {
+                "desc": "Reiniciar el equipo en 10 segundos",
+                "confirm": True,
+                "_fn": lambda: subprocess.run(["shutdown", "/r", "/t", "10"], shell=False, check=False),
+            }
         self.talk("Estás a punto de reiniciar el equipo. Di confirmar para proceder o cancelar para abortar.")
         self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
 
@@ -1081,7 +1074,8 @@ class DariusFinal(ctk.CTk):
                              daemon=True, name="gemini").start()
             return
         if entry.get("confirm", False):
-            self._pending_action = entry
+            with self._pending_lock:
+                self._pending_action = entry
             self.talk(f"Estás a punto de ejecutar: {entry['desc']}. "
                       "Di confirmar para proceder o cancelar para abortar.")
             self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
@@ -1092,8 +1086,9 @@ class DariusFinal(ctk.CTk):
         t = text.lower().strip()
         if any(w in t for w in ["confirmar", "confirma", "sí", "si", "adelante",
                                  "procede", "hazlo", "ok", "correcto"]):
-            entry               = self._pending_action
-            self._pending_action = None
+            with self._pending_lock:
+                entry               = self._pending_action
+                self._pending_action = None
             self.set_status("LISTO", "gray")
             self.talk(f"Ejecutando: {entry['desc']}.")
             if "_fn" in entry:
@@ -1101,8 +1096,9 @@ class DariusFinal(ctk.CTk):
             else:
                 self._execute_action(entry)
         elif any(w in t for w in ["cancelar", "cancela", "no", "abortar", "detener"]):
-            desc                = self._pending_action["desc"]
-            self._pending_action = None
+            with self._pending_lock:
+                desc                = self._pending_action["desc"]
+                self._pending_action = None
             self.set_status("LISTO", "gray")
             self.talk(f"Acción cancelada: {desc}.")
         else:
@@ -1173,118 +1169,35 @@ class DariusFinal(ctk.CTk):
             self.talk(f"Buscando {song} en YouTube.")
 
     # =========================================================================
-    #  GEMINI  (con fallback automático a OpenRouter)
+    #  IA PRINCIPAL (Gemini + OpenRouter fallback)
     # =========================================================================
-
-    # Instrucción de sistema compartida por Gemini y el fallback OpenRouter
-    def _build_system_instruction(self) -> str:
-        return (
-            f"Eres Darius, asistente de IA con personalidad futurista y directa. "
-            f"El usuario se llama {USER_NAME}. "
-            "Responde en español, conciso (máximo 3 oraciones), "
-            "sin markdown, sin asteriscos, sin bullets. Solo texto plano."
-        )
-
-    # Errores de Gemini que activan el fallback (cuota, servicio caído, timeout)
-    _GEMINI_FALLBACK_ERRORS = (
-        "429", "RESOURCE_EXHAUSTED", "quota",
-        "503", "UNAVAILABLE", "timeout", "Deadline",
-    )
 
     def ask_gemini(self, prompt: str):
         """
         Consulta a la IA con lógica de fallback en dos niveles:
           1. Intenta Gemini (modelo principal, alta calidad).
-          2. Si Gemini falla por cuota/disponibilidad, escala a OpenRouter
-             (modelo gratuito seleccionado aleatoriamente de la lista).
-          3. Si OpenRouter también falla, informa al usuario y mantiene
-             las capacidades de comandos locales activas.
+          2. Si Gemini falla, escala a OpenRouter.
+          3. Si ambos fallan, informa al usuario.
         """
         self.set_status("⚡ PROCESANDO IA…", "#aa00ff")
-        self.conversation_history.append({"role": "user", "parts": [{"text": prompt}]})
+        self.conversation_history.append({"role": "user", "content": prompt})
         max_msgs = GEMINI_HISTORY_TURNS * 2
         if len(self.conversation_history) > max_msgs:
             self.conversation_history = self.conversation_history[-max_msgs:]
 
-        system_instruction = self._build_system_instruction()
-        answer: str | None = None
-
-        # ── Intento 1: Gemini ─────────────────────────────────────────────────
         try:
-            config = types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=GEMINI_TEMPERATURE,
-                max_output_tokens=GEMINI_MAX_TOKENS,
-            )
-            response = gemini_client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=self.conversation_history,
-                config=config,
-            )
-            # Extraer texto con fallback progresivo para evitar respuestas truncadas
-            answer = None
-            if hasattr(response, "text") and response.text and response.text.strip():
-                answer = response.text.strip()
-            elif hasattr(response, "candidates") and response.candidates:
-                candidate = response.candidates[0]
-                finish_reason = getattr(candidate, "finish_reason", None)
-                if finish_reason and str(finish_reason) not in ("STOP", "1", "FinishReason.STOP"):
-                    log.warning(f"[Gemini] finish_reason inesperado: {finish_reason}")
-                try:
-                    answer = candidate.content.parts[0].text.strip()
-                except (AttributeError, IndexError) as parse_err:
-                    log.warning(f"[Gemini] No se pudo extraer texto del candidato: {parse_err}")
-            if not answer:
-                raise ValueError("Gemini devolvió respuesta vacía o sin texto legible")
-            log.info("[Gemini] Respuesta obtenida correctamente.")
+            answer_text, provider = get_ai_response(prompt, self.conversation_history[:-1])
+        except Exception as exc:
+            log.error(f"[IA] Error inesperado: {exc}")
+            self.talk("Ocurrió un error al consultar la IA. Comandos locales activos.")
+            self.set_status("LISTO", "gray")
+            return
 
-        except Exception as gemini_err:
-            err_str = str(gemini_err)
-            log.warning(f"[Gemini] Error: {err_str}")
-
-            # Decidir si este error amerita un fallback o es un error de config
-            is_fallback_worthy = any(k in err_str for k in self._GEMINI_FALLBACK_ERRORS)
-            is_auth_error      = any(k in err_str for k in ["API_KEY", "authentication", "UNAUTHENTICATED"])
-            is_network_error   = any(k in err_str.lower() for k in ["network", "connection", "unreachable"])
-
-            if is_auth_error:
-                self.talk("Error de autenticación con Gemini. Verifica tu API key.")
-                self.set_status("LISTO", "gray")
-                return
-
-            if is_network_error:
-                self.talk("Sin conexión a internet. Los comandos locales siguen activos.")
-                self.set_status("LISTO", "gray")
-                return
-
-            if is_fallback_worthy or True:   # intenta OpenRouter en cualquier error no crítico
-                # ── Intento 2: OpenRouter (fallback) ─────────────────────────
-                log.info("[Fallback] Activando sistema de respaldo OpenRouter…")
-                self.set_status("⚡ MODO FALLBACK (OpenRouter)…", "#ff8800")
-                try:
-                    answer = _ask_openrouter(prompt, system_instruction)
-                    log.info("[Fallback] Respuesta de OpenRouter obtenida.")
-                except Exception as or_err:
-                    log.error(f"[Fallback] OpenRouter también falló: {or_err}")
-                    # Informar de forma diferenciada según el error original de Gemini
-                    if is_fallback_worthy and "quota" in err_str.lower():
-                        self.talk(
-                            "Límite de Gemini alcanzado y el sistema de respaldo tampoco respondió. "
-                            "Comandos locales activos."
-                        )
-                    else:
-                        self.talk(
-                            "Los motores de IA no están disponibles en este momento. "
-                            "Comandos locales activos."
-                        )
-                    self.set_status("LISTO", "gray")
-                    return
-
-        # ── Procesar y hablar la respuesta ────────────────────────────────────
-        if answer:
-            answer = re.sub(r"[*_`#>]", "", answer).strip()
-            self.conversation_history.append({"role": "model", "parts": [{"text": answer}]})
-            self.talk(answer)
+        if answer_text and answer_text.strip():
+            clean = re.sub(r"[*_`#>]", "", answer_text).strip()
+            self.conversation_history.append({"role": "model", "content": clean})
+            log.info(f"[IA] Respuesta via {provider} ({len(clean)} chars)")
+            self.talk(clean)
         else:
             self.talk("No obtuve respuesta del motor de IA.")
 
@@ -1297,10 +1210,8 @@ class DariusFinal(ctk.CTk):
     def kill_process(self):
         log.info("Iniciando cierre limpio…")
         self.running = False
-        deadline = time.time() + 5
-        while (not self.tts_queue.empty() or self.is_speaking.is_set()) and time.time() < deadline:
-            time.sleep(0.1)
-        self.tts_queue.put(None)
+        self.tts_worker.wait_until_done(timeout=5.0)
+        self.tts_worker.stop()
         time.sleep(0.2)
         try: self.destroy()
         except Exception: pass

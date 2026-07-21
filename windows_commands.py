@@ -6,11 +6,10 @@ Esto evita que "cuanto es 2x2" (score 0.59) matchee "ver espacio en disco".
 WINDOWS_COMMANDS mantiene 0.65 porque sus aliases son más cortos y específicos.
 """
 
+import logging
 import os
 import re
 import subprocess
-import logging
-import ctypes
 from difflib import SequenceMatcher
 from typing import Optional
 
@@ -487,7 +486,7 @@ SYSTEM_ACTIONS: dict[str, dict] = {
     "probar internet": {
         "action": {"type": "cmd", "run": "ping google.com -n 4"},
         "aliases": ["hacer ping a google", "probar conexion a internet", "test de conexion internet",
-                    "hay conexion a internet", "verificar internet", "ping google"],
+                    "hay conexion a internet", "hay internet", "verificar internet", "ping google"],
         "desc": "Ping a Google (prueba de conexión)",
         "return_output": True,
         "open_window": True
@@ -813,7 +812,7 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                 subprocess.Popen(["powershell", "-NoExit", "-Command", run],
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
             else:
-                subprocess.Popen(f'cmd /k "{run}"', shell=True,
+                subprocess.Popen(["cmd", "/k", run],
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
             return True, ""
 
@@ -826,7 +825,7 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                 )
             else:
                 result = subprocess.run(
-                    run, shell=True, capture_output=True,
+                    ["cmd", "/c", run], capture_output=True,
                     text=True, timeout=15, encoding="utf-8", errors="replace"
                 )
             output = (result.stdout or result.stderr or "Sin salida").strip()
@@ -842,7 +841,7 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
-                subprocess.Popen(run, shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.Popen(["cmd", "/c", run], creationflags=subprocess.CREATE_NO_WINDOW)
             return True, ""
 
     except subprocess.TimeoutExpired:
@@ -881,12 +880,12 @@ def _launch(cmd: str, fallback_cmd: Optional[str] = None) -> bool:
         #    Se usa shell=True para que Windows los localice en PATH igual que
         #    si el usuario los escribiera en Ejecutar (Win+R). DETACHED evita
         #    que el proceso herede la consola de Darius.
-        subprocess.Popen(cmd, shell=True, creationflags=DETACHED)
+        subprocess.Popen(["cmd", "/c", cmd], creationflags=DETACHED)
         return True
     except FileNotFoundError:
         if fallback_cmd:
             try:
-                subprocess.Popen(fallback_cmd, shell=True, creationflags=DETACHED)
+                subprocess.Popen(["cmd", "/c", fallback_cmd], creationflags=DETACHED)
                 return True
             except Exception:
                 pass

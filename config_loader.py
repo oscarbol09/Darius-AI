@@ -16,11 +16,23 @@ Uso en main.py:
 
     # Cambio en tiempo de ejecución (se persiste en config.json):
     cfg.set("Miguel", "assistant", "user_name")
+
+Sincronización con Supabase (tabla `config`, una fila por sección top-level):
+    - Al cargar: si SUPABASE_URL/SUPABASE_KEY están configuradas, se lee la
+      tabla `config` y esos valores tienen prioridad sobre config.json local
+      (Supabase es la fuente de verdad compartida entre main.py y app.py).
+      El resultado combinado se vuelve a escribir en config.json como caché
+      offline, para que Darius arranque igual sin conexión.
+    - Al hacer cfg.set(): se persiste en config.json Y se hace upsert de la
+      sección correspondiente en Supabase. Si Supabase no está disponible,
+      el cambio local igual se guarda (no bloquea el arranque ni el uso).
 """
 
 import json
 import logging
 from pathlib import Path
+
+from supabase_client import get_supabase
 
 log = logging.getLogger("DARIUS.Config")
 
@@ -85,7 +97,8 @@ class _Config:
 
     def set(self, value, *keys):
         """
-        Actualiza un valor en la config en runtime y lo persiste en config.json.
+        Actualiza un valor en la config en runtime, lo persiste en config.json
+        y lo sincroniza con Supabase (tabla `config`, fila = keys[0]).
         Ejemplo: cfg.set("Miguel", "assistant", "user_name")
         """
         if not keys:
@@ -95,6 +108,7 @@ class _Config:
             node = node.setdefault(k, {})
         node[keys[-1]] = value
         self._save()
+        self._push_section_to_supabase(keys[0])
 
     def _save(self):
         """Persiste el estado actual en config.json."""
@@ -108,6 +122,20 @@ class _Config:
             log.info("config.json actualizado.")
         except Exception as e:
             log.warning(f"No se pudo guardar config.json: {e}")
+
+    def _push_section_to_supabase(self, top_key: str):
+        """Sube la sección top-level modificada a la tabla `config` de Supabase."""
+        sb = get_supabase()
+        if not sb:
+            return
+        try:
+            sb.table("config").upsert({
+                "key": top_key,
+                "value": self._data.get(top_key),
+            }).execute()
+            log.info(f"[Config] Sección '{top_key}' sincronizada con Supabase.")
+        except Exception as e:
+            log.warning(f"[Config] No se pudo sincronizar '{top_key}' con Supabase: {e}")
 
     # ── Propiedades con tipo estático ─────────────────────────────────────────
 
@@ -125,7 +153,7 @@ class _Config:
 
     @property
     def GEMINI_MAX_TOKENS(self) -> int:
-        return int(self.get("gemini", "max_tokens", default=300))
+        return int(self.get("gemini", "max_tokens", default=800))
 
     @property
     def GEMINI_TEMPERATURE(self) -> float:
@@ -185,6 +213,86 @@ class _Config:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  Esquema de validación de tipos
+# ══════════════════════════════════════════════════════════════════════════════
+
+_SCHEMA: dict = {
+    "assistant": {
+        "name": str,
+        "user_name": str,
+    },
+    "gemini": {
+        "model": str,
+        "max_tokens": int,
+        "temperature": (int, float),
+        "history_turns": int,
+    },
+    "tts": {
+        "rate": (int, float),
+        "volume": int,
+    },
+    "microphone": {
+        "energy_threshold": int,
+        "pause_threshold": (int, float),
+        "listen_timeout": int,
+        "phrase_limit": int,
+    },
+    "app_cache_hours": int,
+    "speaking_tail_secs": (int, float),
+    "listen_mode": str,
+    "listen_key": str,
+    "name_similarity_cutoff": (int, float),
+    "min_words_without_name": int,
+}
+
+
+def _get_default(path_parts: list[str]) -> object:
+    """Navega _DEFAULTS siguiendo path_parts."""
+    node = _DEFAULTS
+    for p in path_parts:
+        if isinstance(node, dict):
+            node = node.get(p)
+        else:
+            return None
+    return node
+
+
+def _validate_types(data: dict, schema: dict, path: str = "") -> dict:
+    """Valida tipos del merge contra el schema. Corrige a default si el tipo no coincide."""
+    result = {}
+    path_parts = path.split(".") if path else []
+    for key, expected in schema.items():
+        full_key = f"{path}.{key}" if path else key
+        default = _get_default(path_parts + [key])
+        if key not in data:
+            if default is not None:
+                result[key] = default
+                log.warning(f"[Config] Falta '{full_key}', usando default: {default}")
+            continue
+        value = data[key]
+        if isinstance(expected, dict):
+            if isinstance(value, dict):
+                result[key] = _validate_types(value, expected, full_key)
+            else:
+                if default is not None:
+                    result[key] = default
+                log.warning(f"[Config] '{full_key}' debería ser dict, usando default")
+        else:
+            expected_types = expected if isinstance(expected, tuple) else (expected,)
+            if not isinstance(value, expected_types):
+                fallback = default if default is not None else value
+                result[key] = fallback
+                log.warning(
+                    f"[Config] '{full_key}' type={type(value).__name__} inválido "
+                    f"(esperado {'|'.join(t.__name__ for t in expected_types)}), "
+                    f"usando default: {fallback}"
+                )
+            else:
+                result[key] = value
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  Merge y carga
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -201,6 +309,28 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             result[k] = v
     return result
+
+
+def _fetch_supabase_config() -> dict | None:
+    """
+    Lee todas las filas de la tabla `config` en Supabase y las arma como
+    un dict {key: value} equivalente a la estructura top-level de config.json.
+    Devuelve None si Supabase no está disponible o la consulta falla.
+    """
+    sb = get_supabase()
+    if not sb:
+        return None
+    try:
+        resp = sb.table("config").select("key, value").execute()
+        rows = resp.data or []
+        if not rows:
+            return None
+        remote = {row["key"]: row["value"] for row in rows}
+        log.info(f"[Config] {len(remote)} secciones cargadas desde Supabase.")
+        return remote
+    except Exception as e:
+        log.warning(f"[Config] No se pudo leer config desde Supabase: {e}")
+        return None
 
 
 def _load() -> _Config:
@@ -222,9 +352,27 @@ def _load() -> _Config:
                 json.dumps(_DEFAULTS, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-            log.info(f"[Config] config.json creado con valores por defecto.")
+            log.info("[Config] config.json creado con valores por defecto.")
         except Exception as e:
             log.warning(f"[Config] No se pudo crear config.json: {e}")
+
+    # Supabase, si está disponible, tiene prioridad sobre el config.json local
+    # (es la fuente de verdad compartida entre main.py y app.py). El resultado
+    # se vuelve a escribir en config.json como caché para arranques offline.
+    remote = _fetch_supabase_config()
+    if remote:
+        data = _deep_merge(data, remote)
+        try:
+            _CONFIG_FILE.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            log.info("[Config] config.json actualizado como caché de Supabase.")
+        except Exception as e:
+            log.warning(f"[Config] No se pudo actualizar caché local: {e}")
+
+    # Validación de tipos contra el schema; datos inválidos se reemplazan con defaults
+    data = _validate_types(data, _SCHEMA)
 
     return _Config(data)
 

@@ -23,12 +23,11 @@ Uso:
   python debug_inspector_v6.py --mode NOMBRE "darius abre chrome"
 """
 
-import sys
+import argparse
+import datetime
 import os
 import re
 import time
-import datetime
-import argparse
 from difflib import SequenceMatcher
 
 # ── Colores ANSI para terminal ────────────────────────────────────────────────
@@ -53,11 +52,15 @@ LISTEN_MODE_AUTO  = "AUTO"
 # ── Importar módulo de comandos ───────────────────────────────────────────────
 try:
     from windows_commands import (
-        resolve_and_launch, resolve_action,
-        _resolve, _normalize,
-        _WIN_TABLE, _WIN_KEYS,
-        _ACT_TABLE, _ACT_KEYS,
-        WINDOWS_COMMANDS, SYSTEM_ACTIONS,
+        _ACT_KEYS,
+        _ACT_TABLE,
+        _WIN_KEYS,
+        _WIN_TABLE,
+        SYSTEM_ACTIONS,
+        WINDOWS_COMMANDS,
+        _normalize,
+        _resolve,
+        resolve_action,
     )
     WINCMD_OK = True
 except ImportError as e:
@@ -467,7 +470,7 @@ def print_inspection_report(query: str, mode: str = LISTEN_MODE_AUTO):
 
     if not filter_result["accepted"]:
         print(f"\n  {YELLOW}⚑ El comando fue descartado por el filtro de modo.{RESET}")
-        print(f"  No se realiza resolución de comandos.")
+        print("  No se realiza resolución de comandos.")
         print(f"{'─'*65}\n")
         return
 
@@ -478,8 +481,8 @@ def print_inspection_report(query: str, mode: str = LISTEN_MODE_AUTO):
     print(f"\n  {BOLD}DESPACHO DE COMANDO{RESET}")
     print(f"  Query efectiva:  {BOLD}'{effective_query}'{RESET}")
     if trace["pattern_matched"]:
-        print(f"  Regex activado:  {DIM}{trace['pattern_matched'][:60]}...{RESET}" 
-              if len(trace["pattern_matched"]) > 60 
+        print(f"  Regex activado:  {DIM}{trace['pattern_matched'][:60]}...{RESET}"
+              if len(trace["pattern_matched"]) > 60
               else f"  Regex activado:  {DIM}{trace['pattern_matched']}{RESET}")
         print(f"  Handler local:   {MAGENTA}{trace['local_handler']}{RESET}")
 
@@ -585,7 +588,7 @@ def print_benchmark_report():
         print(f"  {RED}windows_commands.py no disponible{RESET}")
         return
 
-    print(f"  Ejecutando round-trip sobre todos los aliases...\n")
+    print("  Ejecutando round-trip sobre todos los aliases...\n")
     t0     = time.perf_counter()
     report = run_benchmark()
     total  = time.perf_counter() - t0
@@ -628,9 +631,9 @@ def print_benchmark_report():
 def interactive_menu():
     """Menú interactivo para explorar el inspector sin argumentos CLI."""
     print(f"\n{BOLD}{CYAN}  ╔══════════════════════════════════════╗")
-    print(f"  ║   DARIUS AI v6 — Debug Inspector    ║")
+    print("  ║   DARIUS AI v6 — Debug Inspector    ║")
     print(f"  ╚══════════════════════════════════════╝{RESET}\n")
-    print(f"  Comandos disponibles:")
+    print("  Comandos disponibles:")
     print(f"    {GREEN}[1]{RESET} Inspeccionar un comando")
     print(f"    {GREEN}[2]{RESET} Diagnóstico de entorno")
     print(f"    {GREEN}[3]{RESET} Benchmark de resolución")
@@ -644,10 +647,10 @@ def interactive_menu():
             break
 
         if choice == "1":
-            query = input(f"  Comando a inspeccionar: ").strip()
+            query = input("  Comando a inspeccionar: ").strip()
             if not query:
                 continue
-            print(f"  Modo de activación [PTT/NOMBRE/AUTO] (Enter = AUTO): ", end="")
+            print("  Modo de activación [PTT/NOMBRE/AUTO] (Enter = AUTO): ", end="")
             mode_input = input().strip().upper()
             mode = mode_input if mode_input in (LISTEN_MODE_PTT, LISTEN_MODE_NAME, LISTEN_MODE_AUTO) \
                    else LISTEN_MODE_AUTO

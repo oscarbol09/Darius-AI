@@ -22,11 +22,11 @@ Ejecución:
   python test_commands_v6.py WinCmd       # solo una clase
 """
 
-import sys
 import re
+import sys
 import unittest
 from difflib import SequenceMatcher
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 
 # ── Importaciones del proyecto ────────────────────────────────────────────────
 # Ajusta el path si ejecutas desde fuera del directorio del proyecto
@@ -34,15 +34,19 @@ sys.path.insert(0, ".")
 
 try:
     from windows_commands import (
-        resolve_and_launch,
-        resolve_action,
-        run_action,
-        _resolve,
-        _normalize,
-        _WIN_TABLE, _WIN_KEYS,
-        _ACT_TABLE, _ACT_KEYS,
-        WINDOWS_COMMANDS,
+        _ACT_CUTOFF,
+        _ACT_KEYS,
+        _ACT_TABLE,
+        _WIN_CUTOFF,
+        _WIN_KEYS,
+        _WIN_TABLE,
         SYSTEM_ACTIONS,
+        WINDOWS_COMMANDS,
+        _normalize,
+        _resolve,
+        resolve_action,
+        resolve_and_launch,
+        run_action,
     )
     WINCMD_AVAILABLE = True
 except ImportError as e:
@@ -109,52 +113,52 @@ class TestWinCmdTypeA(unittest.TestCase):
     # ── Exact match ──────────────────────────────────────────────────────────
 
     def test_exact_match_wifi(self):
-        canonical = _resolve("wifi", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("wifi", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(canonical, "wifi")
 
     def test_exact_match_bluetooth(self):
-        canonical = _resolve("bluetooth", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("bluetooth", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(canonical, "bluetooth")
 
     def test_exact_match_with_tilde(self):
         """Una query con tilde debe resolver igual que sin tilde."""
-        c1 = _resolve("configuración", _WIN_TABLE, _WIN_KEYS)
-        c2 = _resolve("configuracion", _WIN_TABLE, _WIN_KEYS)
+        c1 = _resolve("configuración", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
+        c2 = _resolve("configuracion", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(c1, c2)
 
     # ── Alias match ──────────────────────────────────────────────────────────
 
     def test_alias_red_wifi(self):
-        canonical = _resolve("configurar red", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("configurar red", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertIn(canonical, ["configuracion de red", "wifi"])
 
     def test_alias_windows_defender(self):
-        canonical = _resolve("windows defender", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("windows defender", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(canonical, "seguridad de windows")
 
     def test_alias_descargas(self):
-        canonical = _resolve("mis descargas", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("mis descargas", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(canonical, "descargas")
 
     def test_alias_administrador_tareas(self):
-        canonical = _resolve("task manager", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("task manager", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(canonical, "administrador de tareas")
 
     # ── Fuzzy match ──────────────────────────────────────────────────────────
 
     def test_fuzzy_typo_bluetooh(self):
         """Typo común: 'bluetooh' → 'bluetooth'"""
-        canonical = _resolve("bluetooh", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("bluetooh", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(canonical, "bluetooth")
 
     def test_fuzzy_partial_configuracion(self):
-        canonical = _resolve("configuracion de pantalla", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("configuracion de pantalla", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         self.assertEqual(canonical, "pantalla")
 
     def test_fuzzy_score_threshold(self):
         """Queries muy distintos deben retornar None (no hacer match forzado)."""
         # "hola mundo" no debe resolverse a ningún panel de Windows
-        canonical = _resolve("hola mundo xyz123", _WIN_TABLE, _WIN_KEYS)
+        canonical = _resolve("hola mundo xyz123", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         # Si retorna algo, el score debe haber sido ≥ 0.52 (comportamiento esperado)
         # Este test documenta el umbral, no lo invalida
         if canonical is not None:
@@ -355,7 +359,7 @@ class TestFuzzyMatching(unittest.TestCase):
     def test_threshold_boundary_at_0_52(self):
         """Queries en el límite del umbral deben resolverse o no según el score."""
         query  = "configurar pantallas"
-        result = _resolve(query, _WIN_TABLE, _WIN_KEYS)
+        result = _resolve(query, _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         key, score = _best_match(query, _WIN_KEYS)
         if score >= 0.52:
             self.assertIsNotNone(result,
@@ -369,7 +373,7 @@ class TestFuzzyMatching(unittest.TestCase):
         El fallback de palabras clave debe activarse cuando el fuzzy falla.
         'ver servicios activos' → todas las palabras en la clave.
         """
-        result = _resolve("ver servicios activos", _ACT_TABLE, _ACT_KEYS)
+        result = _resolve("ver servicios activos", _ACT_TABLE, _ACT_KEYS, _ACT_CUTOFF)
         self.assertIsNotNone(result,
             "El fallback de palabras clave debe capturar 'ver servicios activos'")
 
@@ -378,8 +382,8 @@ class TestFuzzyMatching(unittest.TestCase):
         'ver ip' debe resolverse en SYSTEM_ACTIONS (Tipo B),
         NO en WINDOWS_COMMANDS (Tipo A).
         """
-        type_a = _resolve("ver ip", _WIN_TABLE, _WIN_KEYS)
-        type_b = _resolve("ver ip", _ACT_TABLE, _ACT_KEYS)
+        type_a = _resolve("ver ip", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
+        type_b = _resolve("ver ip", _ACT_TABLE, _ACT_KEYS, _ACT_CUTOFF)
         self.assertIsNone(type_a,
             "'ver ip' no debe resolverse como panel de Windows (Tipo A)")
         self.assertIsNotNone(type_b,
@@ -565,7 +569,13 @@ class TestGeminiErrorHandling(unittest.TestCase):
 class TestCmdPatterns(unittest.TestCase):
     """
     Prueba los regex de _CMD_PATTERNS de main.py sin instanciar la UI.
-    Se compilan localmente para aislar este test del estado de la aplicación.
+    Los patrones se replican localmente (en lugar de importarlos de main.py)
+    porque main.py tiene imports de Windows (tkinter, win32api) que fallan
+    en CI no-Windows o sin GUI.
+
+    La verificación contra la fuente de verdad está en
+    test_verify_patterns_match_main(), que importa los patrones reales
+    de main.py solo en Windows.
     """
 
     # Replica de _CMD_PATTERNS de main.py (los patrones relevantes)
@@ -688,6 +698,45 @@ class TestDictionaryIntegrity(unittest.TestCase):
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  9. VERIFICACIÓN CONTRA MAIN.PY (Windows únicamente)
+# ═════════════════════════════════════════════════════════════════════════════
+
+try:
+    # Solo funciona en Windows con GUI; falla elegantemente en otros entornos
+    from main import _CMD_PATTERNS as _REAL_PATTERNS
+    MAIN_PATTERNS_AVAILABLE = True
+except Exception:
+    MAIN_PATTERNS_AVAILABLE = False
+
+
+@unittest.skipUnless(MAIN_PATTERNS_AVAILABLE, "main.py no disponible (no Windows o sin GUI)")
+class TestPatternsMatchMain(unittest.TestCase):
+    """
+    Verifica que los patrones replicados en TestCmdPatterns coincidan
+    con los patrones reales de la variable _CMD_PATTERNS de main.py.
+    Esto detecta desincronización entre el código fuente y los tests.
+    """
+
+    def setUp(self):
+        self.real_handlers = {p[1] for p in _REAL_PATTERNS}
+        self.test_handlers = {p[1] for p in TestCmdPatterns.PATTERNS}
+
+    def test_all_real_handlers_have_tests(self):
+        missing = self.real_handlers - self.test_handlers
+        self.assertEqual(
+            len(missing), 0,
+            f"Handlers en main.py sin test: {missing}"
+        )
+
+    def test_no_extra_handlers_in_tests(self):
+        extra = self.test_handlers - self.real_handlers
+        self.assertEqual(
+            len(extra), 0,
+            f"Handlers en tests que no existen en main.py: {extra}"
+        )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  RUNNER
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -700,7 +749,7 @@ if __name__ == "__main__":
         for cls in [TestNormalization, TestWinCmdTypeA, TestWinCmdTypeB,
                     TestFuzzyMatching, TestActivationModes,
                     TestGeminiErrorHandling, TestCmdPatterns,
-                    TestDictionaryIntegrity]:
+                    TestDictionaryIntegrity, TestPatternsMatchMain]:
             if pattern.lower() in cls.__name__.lower():
                 suite.addTests(loader.loadTestsFromTestCase(cls))
         runner = unittest.TextTestRunner(verbosity=2)

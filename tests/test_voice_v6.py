@@ -15,13 +15,12 @@ Ejecución:
   python test_voice_v6.py --live --ptt # prueba PTT en vivo
 """
 
-import sys
-import os
 import io
-import wave
+import os
 import struct
+import sys
 import unittest
-from unittest.mock import MagicMock, patch
+import wave
 from difflib import SequenceMatcher
 
 # ── Constantes de main.py ─────────────────────────────────────────────────────
@@ -411,7 +410,7 @@ class TestLiveMicrophone(unittest.TestCase):
         r.energy_threshold = MIC_ENERGY_THRESHOLD
         r.pause_threshold  = MIC_PAUSE_THRESHOLD
 
-        print(f"\n[LIVE] Di 'darius qué hora es' (modo NOMBRE)...")
+        print("\n[LIVE] Di 'darius qué hora es' (modo NOMBRE)...")
         try:
             with sr.Microphone() as source:
                 audio = r.listen(source, timeout=MIC_LISTEN_TIMEOUT,
@@ -421,10 +420,10 @@ class TestLiveMicrophone(unittest.TestCase):
             ok, cmd = _process_recognized_text(text, LISTEN_MODE_NAME)
             print(f"[LIVE] Filtro NOMBRE: aceptado={ok}, comando='{cmd}'")
             if ok:
-                print(f"[LIVE] ✓ Comando procesado correctamente")
+                print("[LIVE] ✓ Comando procesado correctamente")
             else:
-                print(f"[LIVE] ✗ Comando descartado por filtro NOMBRE "
-                      f"(¿dijiste 'darius' al inicio?)")
+                print("[LIVE] ✗ Comando descartado por filtro NOMBRE "
+                      "(¿dijiste 'darius' al inicio?)")
         except sr.WaitTimeoutError:
             self.skipTest("Timeout de audio")
         except sr.UnknownValueError:

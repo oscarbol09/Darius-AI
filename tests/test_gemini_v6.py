@@ -18,12 +18,11 @@ import os
 import re
 import sys
 import unittest
-import argparse
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 GEMINI_MODEL         = "gemini-2.5-flash"
-GEMINI_MAX_TOKENS    = 300
+GEMINI_MAX_TOKENS    = 800
 GEMINI_TEMPERATURE   = 0.7
 GEMINI_HISTORY_TURNS = 10
 ASSISTANT_NAME       = "darius"
@@ -89,9 +88,9 @@ class TestResponseExtraction(unittest.TestCase):
         """Cuando response.text es None/vacío, debe usar candidates."""
         mock_response      = MagicMock()
         mock_response.text = None
-        mock_part          = MagicMock()
-        mock_part.text     = "Respuesta desde candidates."
-        mock_response.candidates[0].content.parts[0] = mock_part
+        mock_candidate     = MagicMock()
+        mock_candidate.content.parts = [MagicMock(text="Respuesta desde candidates.")]
+        mock_response.candidates = [mock_candidate]
         result = _extract_text_from_response(mock_response)
         self.assertEqual(result, "Respuesta desde candidates.")
 
@@ -401,7 +400,6 @@ class TestGeminiLiveIntegration(unittest.TestCase):
         """Una API key inválida debe clasificarse como auth_error."""
         self._skip_if_not_live()
         from google import genai
-        from google.genai import types
 
         client = genai.Client(api_key="INVALID_KEY_FOR_TESTING")
         try:

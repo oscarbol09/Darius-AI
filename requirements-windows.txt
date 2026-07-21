@@ -3,7 +3,7 @@
 #  Instalar con: pip install -r requirements-windows.txt
 #
 #  Este archivo es SOLO para el entorno de desarrollo en Windows (main.py).
-#  Para Azure App Service (Linux) usa: requirements.txt
+#  Para Railway (Linux) usa: requirements.txt
 # ══════════════════════════════════════════════════════════════════════════════
 
 # ── IA principal ──────────────────────────────────────────────────────────────
@@ -14,6 +14,9 @@ requests>=2.31.0
 
 # ── Variables de entorno ──────────────────────────────────────────────────────
 python-dotenv>=1.0.0
+
+# ── Persistencia y datos compartidos con app.py/Railway (chat_history, config) ─
+supabase>=2.9.0
 
 # ── Interfaz gráfica (escritorio) ─────────────────────────────────────────────
 customtkinter>=5.2.0
