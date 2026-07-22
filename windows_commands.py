@@ -11,7 +11,12 @@ import os
 import re
 import subprocess
 from difflib import SequenceMatcher
-from typing import Optional
+
+_WINDIR = os.environ.get("SYSTEMROOT", "C:\\Windows")
+_PS = _WINDIR + "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+_CMD = _WINDIR + "\\System32\\cmd.exe"
+_MMC = _WINDIR + "\\System32\\mmc.exe"
+_CONTROL = _WINDIR + "\\System32\\control.exe"
 
 log = logging.getLogger("DARIUS.WinCMD")
 
@@ -733,7 +738,7 @@ _WIN_TABLE, _WIN_KEYS = _build_table(WINDOWS_COMMANDS)
 _ACT_TABLE, _ACT_KEYS = _build_table(SYSTEM_ACTIONS)
 
 
-def _resolve(query: str, table: dict, keys: list, cutoff: float) -> Optional[str]:
+def _resolve(query: str, table: dict, keys: list, cutoff: float) -> str | None:
     nq = _normalize(query)
 
     # 1. Exacta
@@ -772,7 +777,7 @@ _WIN_CUTOFF = 0.68
 _ACT_CUTOFF = 0.75
 
 
-def resolve(query: str) -> Optional[tuple[str, str, str]]:
+def resolve(query: str) -> tuple[str, str, str] | None:
     canonical = _resolve(query, _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
     if canonical:
         data = WINDOWS_COMMANDS[canonical]
@@ -780,7 +785,7 @@ def resolve(query: str) -> Optional[tuple[str, str, str]]:
     return None
 
 
-def resolve_and_launch(query: str) -> Optional[str]:
+def resolve_and_launch(query: str) -> str | None:
     result = resolve(query)
     if not result:
         return None
@@ -790,7 +795,7 @@ def resolve_and_launch(query: str) -> Optional[str]:
     return desc if success else None
 
 
-def resolve_action(query: str) -> Optional[dict]:
+def resolve_action(query: str) -> dict | None:
     canonical = _resolve(query, _ACT_TABLE, _ACT_KEYS, _ACT_CUTOFF)
     if canonical:
         entry = SYSTEM_ACTIONS[canonical].copy()
@@ -809,24 +814,24 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
     try:
         if open_window:
             if atype == "powershell":
-                subprocess.Popen(["powershell", "-NoExit", "-Command", run],
+                subprocess.Popen([_PS, "-NoExit", "-Command", run],  # noqa: S603,S607
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
             else:
-                subprocess.Popen(["cmd", "/k", run],
+                subprocess.Popen([_CMD, "/k", run],  # noqa: S603,S607
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
             return True, ""
 
         elif return_out:
             if atype == "powershell":
-                result = subprocess.run(
-                    ["powershell", "-NonInteractive", "-Command", run],
+                result = subprocess.run(  # noqa: S603
+                    [_PS, "-NonInteractive", "-Command", run],  # noqa: S607
                     capture_output=True, text=True, timeout=15,
                     encoding="utf-8", errors="replace"
                 )
             else:
-                result = subprocess.run(
-                    ["cmd", "/c", run], capture_output=True,
-                    text=True, timeout=15, encoding="utf-8", errors="replace"
+                result = subprocess.run(  # noqa: S603
+                    [_CMD, "/c", run],  # noqa: S607
+                    capture_output=True, text=True, timeout=15, encoding="utf-8", errors="replace"
                 )
             output = (result.stdout or result.stderr or "Sin salida").strip()
             if len(output) > 300:
@@ -836,12 +841,13 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
 
         else:
             if atype == "powershell":
-                subprocess.Popen(
-                    ["powershell", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", run],
+                subprocess.Popen(  # noqa: S603
+                    [_PS, "-NonInteractive", "-WindowStyle", "Hidden", "-Command", run],  # noqa: S607
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
-                subprocess.Popen(["cmd", "/c", run], creationflags=subprocess.CREATE_NO_WINDOW)
+                subprocess.Popen([_CMD, "/c", run],  # noqa: S603,S607
+                                 creationflags=subprocess.CREATE_NO_WINDOW)
             return True, ""
 
     except subprocess.TimeoutExpired:
@@ -852,7 +858,7 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
         return False, str(e)
 
 
-def _launch(cmd: str, fallback_cmd: Optional[str] = None) -> bool:
+def _launch(cmd: str, fallback_cmd: str | None = None) -> bool:
     from pathlib import Path
     # DETACHED_PROCESS garantiza que el proceso hijo es completamente
     # independiente de Darius: no hereda la ventana ni compite por el foco.
@@ -862,30 +868,30 @@ def _launch(cmd: str, fallback_cmd: Optional[str] = None) -> bool:
     try:
         # 1. URIs de protocolo de Windows (ms-settings:, windowsdefender:, shell:…)
         if re.match(r"^[a-z\-]+:", cmd) and not cmd.endswith(".exe"):
-            os.startfile(cmd)
+            os.startfile(cmd)  # noqa: S606
             return True
         # 2. Snap-ins de MMC (.msc)
         if cmd.endswith(".msc"):
-            subprocess.Popen(["mmc", cmd], shell=False, creationflags=detached)
+            subprocess.Popen([_MMC, cmd], creationflags=detached)  # noqa: S603,S607
             return True
         # 3. Applets del Panel de Control (.cpl)
         if cmd.endswith(".cpl"):
-            subprocess.Popen(["control", cmd], shell=False, creationflags=detached)
+            subprocess.Popen([_CONTROL, cmd], creationflags=detached)  # noqa: S603,S607
             return True
         # 4. Ejecutable con ruta absoluta
         if Path(cmd).is_file():
-            os.startfile(cmd)
+            os.startfile(cmd)  # noqa: S606
             return True
         # 5. Comandos del sistema (msconfig, taskmgr, regedit, calc…)
         #    Se usa shell=True para que Windows los localice en PATH igual que
         #    si el usuario los escribiera en Ejecutar (Win+R). DETACHED evita
         #    que el proceso herede la consola de Darius.
-        subprocess.Popen(["cmd", "/c", cmd], creationflags=detached)
+        subprocess.Popen([_CMD, "/c", cmd], creationflags=detached)  # noqa: S603,S607
         return True
     except FileNotFoundError:
         if fallback_cmd:
             try:
-                subprocess.Popen(["cmd", "/c", fallback_cmd], creationflags=detached)
+                subprocess.Popen([_CMD, "/c", fallback_cmd], creationflags=detached)  # noqa: S603,S607
                 return True
             except Exception:
                 log.warning(f"[WinCMD] fallback '{fallback_cmd}' también falló")

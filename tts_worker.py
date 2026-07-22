@@ -36,8 +36,8 @@ class TTSWorker:
         speaker = win32com.client.Dispatch("SAPI.SpVoice")
         if self._voice_token:
             speaker.Voice = self._voice_token
-        speaker.Rate = cfg.TTS_RATE
-        speaker.Volume = cfg.TTS_VOLUME
+        speaker.Rate = cfg.tts_rate
+        speaker.Volume = cfg.tts_volume
         while True:
             text = self._queue.get()
             if text is None:
@@ -49,7 +49,7 @@ class TTSWorker:
                 log.error(f"Error en TTS: {e}")
             finally:
                 self.is_speaking.clear()
-                time.sleep(cfg.SPEAKING_TAIL_SECS)
+                time.sleep(cfg.speaking_tail_secs)
                 self._queue.task_done()
         pythoncom.CoUninitialize()
 

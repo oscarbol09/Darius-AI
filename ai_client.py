@@ -40,7 +40,7 @@ _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 def _build_system_instruction() -> str:
     return (
-        f"Eres {cfg.ASSISTANT_NAME}, un asistente de inteligencia artificial "
+        f"Eres {cfg.assistant_name}, un asistente de inteligencia artificial "
         "amigable, conciso y preciso. Tu creador es Dario. "
         "Respondes siempre en el idioma del usuario. "
         "Evitas respuestas excesivamente largas a menos que el tema lo requiera. "
@@ -78,12 +78,12 @@ def ask_gemini(prompt: str, history: list[dict] | None = None) -> tuple[str, str
 
     try:
         response = _gemini_client.models.generate_content(
-            model=cfg.GEMINI_MODEL,
+            model=cfg.gemini_model,
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                max_output_tokens=cfg.GEMINI_MAX_TOKENS,
-                temperature=cfg.GEMINI_TEMPERATURE,
+                max_output_tokens=cfg.gemini_max_tokens,
+                temperature=cfg.gemini_temperature,
             ),
         )
         text = response.text.strip()
@@ -103,7 +103,7 @@ def ask_openrouter(prompt: str, history: list[dict] | None = None) -> tuple[str,
 
     messages = [{"role": "system", "content": system_instruction}]
     if history:
-        for m in history[-cfg.GEMINI_HISTORY_TURNS * 2:]:
+        for m in history[-cfg.gemini_history_turns * 2:]:
             messages.append({"role": m["role"], "content": m["content"]})
     messages.append({"role": "user", "content": prompt})
 
@@ -122,13 +122,13 @@ def ask_openrouter(prompt: str, history: list[dict] | None = None) -> tuple[str,
         payload = {
             "model": model,
             "messages": messages,
-            "max_tokens": cfg.GEMINI_MAX_TOKENS,
-            "temperature": cfg.GEMINI_TEMPERATURE,
+            "max_tokens": cfg.gemini_max_tokens,
+            "temperature": cfg.gemini_temperature,
         }
         try:
             data = json.dumps(payload).encode("utf-8")
-            request = _req.Request(_OPENROUTER_URL, data=data, headers=headers, method="POST")
-            with _req.urlopen(request, timeout=20) as resp:
+            request = _req.Request(_OPENROUTER_URL, data=data, headers=headers, method="POST")  # noqa: S310
+            with _req.urlopen(request, timeout=20) as resp:  # noqa: S310
                 body = json.loads(resp.read().decode("utf-8"))
                 choices = body.get("choices", [])
                 if not choices:

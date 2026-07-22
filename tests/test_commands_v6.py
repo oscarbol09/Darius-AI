@@ -37,6 +37,7 @@ try:
         _ACT_CUTOFF,
         _ACT_KEYS,
         _ACT_TABLE,
+        _MMC,
         _WIN_CUTOFF,
         _WIN_KEYS,
         _WIN_TABLE,
@@ -185,8 +186,8 @@ class TestWinCmdTypeA(unittest.TestCase):
         self.assertIsNotNone(desc)
         mock_popen.assert_called()
         cmd_args = mock_popen.call_args[0][0]
-        self.assertEqual(cmd_args[0], "mmc",
-                         f"Se esperaba 'mmc', se obtuvo: {cmd_args}")
+        self.assertEqual(cmd_args[0], _MMC,
+                         f"Se esperaba '{_MMC}', se obtuvo: {cmd_args}")
 
     @patch("windows_commands.os.startfile")
     def test_launch_returns_desc_string(self, mock_startfile):

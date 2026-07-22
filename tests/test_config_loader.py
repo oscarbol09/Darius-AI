@@ -63,9 +63,9 @@ class TestDefaults:
 class TestConfigLive:
     def test_cfg_imports_without_error(self):
         from config_loader import cfg
-        assert cfg.ASSISTANT_NAME == "darius"
-        assert cfg.GEMINI_MAX_TOKENS == 800
-        assert cfg.GEMINI_MODEL == "gemini-2.5-flash"
+        assert cfg.assistant_name == "darius"
+        assert cfg.gemini_max_tokens == 800
+        assert cfg.gemini_model == "gemini-2.5-flash"
 
     def test_cfg_get_returns_default_for_missing(self):
         from config_loader import cfg
@@ -73,8 +73,8 @@ class TestConfigLive:
 
     def test_cfg_set_updates_and_persists(self):
         from config_loader import cfg
-        original = cfg.USER_NAME
+        original = cfg.user_name
         cfg.set("TestUser", "assistant", "user_name")
-        assert cfg.USER_NAME == "TestUser"
+        assert cfg.user_name == "TestUser"
         cfg.set(original, "assistant", "user_name")
-        assert original == cfg.USER_NAME
+        assert original == cfg.user_name

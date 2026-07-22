@@ -36,12 +36,12 @@ OPENROUTER_KEY   = os.getenv("OPENROUTER_API_KEY", "")
 # ── Configuración base ─────────────────────────────────────────────────────────
 # Importada desde config_loader.py, que comparte defaults con main.py.
 # Prioridad: Supabase (tabla `config`) > config.json local > defaults.
-ASSISTANT_NAME   = cfg.ASSISTANT_NAME
-USER_NAME        = cfg.USER_NAME
-GEMINI_MODEL     = cfg.GEMINI_MODEL
-MAX_TOKENS       = cfg.GEMINI_MAX_TOKENS
-TEMPERATURE      = cfg.GEMINI_TEMPERATURE
-HISTORY_TURNS    = cfg.GEMINI_HISTORY_TURNS
+ASSISTANT_NAME   = cfg.assistant_name
+USER_NAME        = cfg.user_name
+GEMINI_MODEL     = cfg.gemini_model
+MAX_TOKENS       = cfg.gemini_max_tokens
+TEMPERATURE      = cfg.gemini_temperature
+HISTORY_TURNS    = cfg.gemini_history_turns
 
 OPENROUTER_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 OPENROUTER_URL   = "https://openrouter.ai/api/v1/chat/completions"

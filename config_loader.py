@@ -10,8 +10,8 @@ que el usuario siempre tenga un archivo editable listo.
 Uso en main.py:
     from config_loader import cfg
 
-    ASSISTANT_NAME = cfg.ASSISTANT_NAME   # "darius"
-    USER_NAME      = cfg.USER_NAME        # "Oscar"
+    assistant_name = cfg.assistant_name   # "darius"
+    user_name      = cfg.user_name        # "Oscar"
     ...
 
     # Cambio en tiempo de ejecución (se persiste en config.json):
@@ -140,75 +140,75 @@ class _Config:
     # ── Propiedades con tipo estático ─────────────────────────────────────────
 
     @property
-    def ASSISTANT_NAME(self) -> str:
+    def assistant_name(self) -> str:
         return str(self.get("assistant", "name", default="darius"))
 
     @property
-    def USER_NAME(self) -> str:
+    def user_name(self) -> str:
         return str(self.get("assistant", "user_name", default="Oscar"))
 
     @property
-    def GEMINI_MODEL(self) -> str:
+    def gemini_model(self) -> str:
         return str(self.get("gemini", "model", default="gemini-2.5-flash"))
 
     @property
-    def GEMINI_MAX_TOKENS(self) -> int:
+    def gemini_max_tokens(self) -> int:
         return int(self.get("gemini", "max_tokens", default=800))
 
     @property
-    def GEMINI_TEMPERATURE(self) -> float:
+    def gemini_temperature(self) -> float:
         return float(self.get("gemini", "temperature", default=0.7))
 
     @property
-    def GEMINI_HISTORY_TURNS(self) -> int:
+    def gemini_history_turns(self) -> int:
         return int(self.get("gemini", "history_turns", default=10))
 
     @property
-    def TTS_RATE(self) -> int:
+    def tts_rate(self) -> int:
         return int(self.get("tts", "rate", default=1))
 
     @property
-    def TTS_VOLUME(self) -> int:
+    def tts_volume(self) -> int:
         return int(self.get("tts", "volume", default=100))
 
     @property
-    def MIC_ENERGY_THRESHOLD(self) -> int:
+    def mic_energy_threshold(self) -> int:
         return int(self.get("microphone", "energy_threshold", default=3000))
 
     @property
-    def MIC_PAUSE_THRESHOLD(self) -> float:
+    def mic_pause_threshold(self) -> float:
         return float(self.get("microphone", "pause_threshold", default=0.8))
 
     @property
-    def MIC_LISTEN_TIMEOUT(self) -> int:
+    def mic_listen_timeout(self) -> int:
         return int(self.get("microphone", "listen_timeout", default=5))
 
     @property
-    def MIC_PHRASE_LIMIT(self) -> int:
+    def mic_phrase_limit(self) -> int:
         return int(self.get("microphone", "phrase_limit", default=10))
 
     @property
-    def APP_CACHE_HOURS(self) -> int:
+    def app_cache_hours(self) -> int:
         return int(self.get("app_cache_hours", default=6))
 
     @property
-    def SPEAKING_TAIL_SECS(self) -> float:
+    def speaking_tail_secs(self) -> float:
         return float(self.get("speaking_tail_secs", default=0.4))
 
     @property
-    def DEFAULT_LISTEN_MODE(self) -> str:
+    def default_listen_mode(self) -> str:
         return str(self.get("listen_mode", default="NOMBRE"))
 
     @property
-    def LISTEN_KEY(self) -> str:
+    def listen_key(self) -> str:
         return str(self.get("listen_key", default="right ctrl"))
 
     @property
-    def NAME_SIMILARITY_CUTOFF(self) -> float:
+    def name_similarity_cutoff(self) -> float:
         return float(self.get("name_similarity_cutoff", default=0.60))
 
     @property
-    def MIN_WORDS_WITHOUT_NAME(self) -> int:
+    def min_words_without_name(self) -> int:
         return int(self.get("min_words_without_name", default=99))
 
 

@@ -19,11 +19,7 @@ Correcciones v6.1:
     palabras clave exclusivamente relacionadas con el SO
 """
 
-# ── Carga de .env ANTES de cualquier otro import que use os.getenv ──────────
-from dotenv import load_dotenv
-
-load_dotenv()   # busca .env en el directorio del script (BASE_DIR)
-
+import contextlib
 import datetime
 import json
 import logging
@@ -48,10 +44,17 @@ import win32api
 import win32com.client
 import win32event
 import winerror
+from dotenv import load_dotenv
 
-from config_loader import cfg
 from supabase_client import get_supabase
 from tts_worker import TTSWorker
+from voice_filter import (
+    LISTEN_MODE_AUTO,
+    LISTEN_MODE_NAME,
+    LISTEN_MODE_PTT,
+    _strip_name,
+    check_name_in_text,
+)
 from windows_commands import (
     resolve_action as wincmd_resolve_action,
 )
@@ -61,6 +64,10 @@ from windows_commands import (
 from windows_commands import (
     run_action as wincmd_run_action,
 )
+
+load_dotenv()
+
+from config_loader import cfg  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  INSTANCIA ÚNICA
@@ -77,25 +84,24 @@ if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
 #  CONFIGURACIÓN
 # ─────────────────────────────────────────────────────────────────────────────
 
-ASSISTANT_NAME       = cfg.ASSISTANT_NAME
-USER_NAME            = cfg.USER_NAME
-GEMINI_MODEL         = cfg.GEMINI_MODEL
-GEMINI_MAX_TOKENS    = cfg.GEMINI_MAX_TOKENS
-GEMINI_TEMPERATURE   = cfg.GEMINI_TEMPERATURE
-GEMINI_HISTORY_TURNS = cfg.GEMINI_HISTORY_TURNS
-TTS_RATE             = cfg.TTS_RATE
-TTS_VOLUME           = cfg.TTS_VOLUME
-MIC_ENERGY_THRESHOLD = cfg.MIC_ENERGY_THRESHOLD
-MIC_PAUSE_THRESHOLD  = cfg.MIC_PAUSE_THRESHOLD
-MIC_LISTEN_TIMEOUT   = cfg.MIC_LISTEN_TIMEOUT
-MIC_PHRASE_LIMIT     = cfg.MIC_PHRASE_LIMIT
-APP_CACHE_HOURS      = cfg.APP_CACHE_HOURS
-SPEAKING_TAIL_SECS   = cfg.SPEAKING_TAIL_SECS
-
-LISTEN_KEY             = cfg.LISTEN_KEY
-DEFAULT_LISTEN_MODE    = cfg.DEFAULT_LISTEN_MODE
-NAME_SIMILARITY_CUTOFF = cfg.NAME_SIMILARITY_CUTOFF
-MIN_WORDS_WITHOUT_NAME = cfg.MIN_WORDS_WITHOUT_NAME
+ASSISTANT_NAME       = cfg.assistant_name
+USER_NAME            = cfg.user_name
+GEMINI_MODEL         = cfg.gemini_model
+GEMINI_MAX_TOKENS    = cfg.gemini_max_tokens
+GEMINI_TEMPERATURE   = cfg.gemini_temperature
+GEMINI_HISTORY_TURNS = cfg.gemini_history_turns
+TTS_RATE             = cfg.tts_rate
+TTS_VOLUME           = cfg.tts_volume
+MIC_ENERGY_THRESHOLD = cfg.mic_energy_threshold
+MIC_PAUSE_THRESHOLD  = cfg.mic_pause_threshold
+MIC_LISTEN_TIMEOUT   = cfg.mic_listen_timeout
+MIC_PHRASE_LIMIT     = cfg.mic_phrase_limit
+APP_CACHE_HOURS      = cfg.app_cache_hours
+SPEAKING_TAIL_SECS   = cfg.speaking_tail_secs
+LISTEN_KEY             = cfg.listen_key
+DEFAULT_LISTEN_MODE    = cfg.default_listen_mode
+NAME_SIMILARITY_CUTOFF = cfg.name_similarity_cutoff
+MIN_WORDS_WITHOUT_NAME = cfg.min_words_without_name
 
 BASE_DIR  = Path(__file__).parent
 LOG_FILE  = BASE_DIR / "darius.log"
@@ -118,17 +124,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("DARIUS")
 
-# ── Módulos extraídos ──────────────────────────────────────────────────────────
-import contextlib
-
-from ai_client import get_ai_response
-from voice_filter import (
-    LISTEN_MODE_AUTO,
-    LISTEN_MODE_NAME,
-    LISTEN_MODE_PTT,
-    _strip_name,
-    check_name_in_text,
-)
+from ai_client import get_ai_response  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONTROL DE VOLUMEN
@@ -151,19 +147,19 @@ def volume_up():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMasterVolumeLevelScalar(min(1.0, _volume_ctrl.GetMasterVolumeLevelScalar() + 0.1), None)
     else:
-        subprocess.run(["nircmd.exe", "changesysvolume", "5000"], shell=False)
+        subprocess.run(["nircmd.exe", "changesysvolume", "5000"], shell=False)  # noqa: S607
 
 def volume_down():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMasterVolumeLevelScalar(max(0.0, _volume_ctrl.GetMasterVolumeLevelScalar() - 0.1), None)
     else:
-        subprocess.run(["nircmd.exe", "changesysvolume", "-5000"], shell=False)
+        subprocess.run(["nircmd.exe", "changesysvolume", "-5000"], shell=False)  # noqa: S607
 
 def volume_mute():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMute(1, None)
     else:
-        subprocess.run(["nircmd.exe", "mutesysvolume", "1"], shell=False)
+        subprocess.run(["nircmd.exe", "mutesysvolume", "1"], shell=False)  # noqa: S607
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  WAKE WORD / TECLADO
@@ -510,7 +506,8 @@ class DariusFinal(ctk.CTk):
                     except Exception:
                         self._current_audio_level = 0.0
                     time.sleep(0.05)
-                stream.stop_stream(); stream.close()
+                stream.stop_stream()
+                stream.close()
             except Exception as e:
                 log.warning(f"Monitor de audio no disponible: {e}")
             finally:
@@ -725,9 +722,11 @@ class DariusFinal(ctk.CTk):
     def main_loop(self):
         while self.running:
             if self.is_muted or self.tts_worker.is_speaking.is_set():
-                time.sleep(0.05); continue
+                time.sleep(0.05)
+                continue
             if self.listen_mode == LISTEN_MODE_PTT:
-                time.sleep(0.1); continue
+                time.sleep(0.1)
+                continue
             self.listen_and_process()
 
     def _ptt_loop(self):
@@ -735,13 +734,15 @@ class DariusFinal(ctk.CTk):
             log.warning("keyboard no disponible — fallback a NOMBRE.")
             self.listen_mode = LISTEN_MODE_NAME
             self.after(0, self._set_listen_mode, LISTEN_MODE_NAME)
-            self.main_loop(); return
+            self.main_loop()
+            return
 
         log.info(f"[PTT] Loop iniciado. Tecla: [{LISTEN_KEY}]")
         key_was_down = False
         while self.running:
             if self.is_muted:
-                time.sleep(0.1); continue
+                time.sleep(0.1)
+                continue
             key_down = keyboard.is_pressed(LISTEN_KEY)
             if key_down and not key_was_down and not self.tts_worker.is_speaking.is_set():
                 key_was_down = True
@@ -774,18 +775,24 @@ class DariusFinal(ctk.CTk):
                 data = stream.read(chunk, exception_on_overflow=False)
                 frames.append(data)
                 self._current_audio_level = float(audioop.rms(data, 2))
-            stream.stop_stream(); stream.close()
+            stream.stop_stream()
+            stream.close()
         except Exception as e:
             log.error(f"[PTT] Error de grabación: {e}")
-            pa.terminate(); self.set_status("LISTO", "gray"); return
+            pa.terminate()
+            self.set_status("LISTO", "gray")
+            return
         finally:
             pa.terminate()
         if not frames:
-            self.set_status("LISTO", "gray"); return
+            self.set_status("LISTO", "gray")
+            return
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wf:
-            wf.setnchannels(channels); wf.setsampwidth(2)
-            wf.setframerate(rate); wf.writeframes(b"".join(frames))
+            wf.setnchannels(channels)
+            wf.setsampwidth(2)
+            wf.setframerate(rate)
+            wf.writeframes(b"".join(frames))
         wav_buffer.seek(0)
         try:
             with sr.AudioFile(wav_buffer) as source:
@@ -796,11 +803,14 @@ class DariusFinal(ctk.CTk):
             self._append_chat_file(USER_NAME.upper(), text)
             self.execute_command(_strip_name(text, ASSISTANT_NAME) or text)
         except sr.UnknownValueError:
-            log.debug("[PTT] Audio no reconocido."); self.set_status("LISTO", "gray")
+            log.debug("[PTT] Audio no reconocido.")
+            self.set_status("LISTO", "gray")
         except sr.RequestError as e:
-            log.error(f"[PTT] STT error: {e}"); self.talk("Error de conexión con el servicio de voz.")
+            log.error(f"[PTT] STT error: {e}")
+            self.talk("Error de conexión con el servicio de voz.")
         except Exception as e:
-            log.error(f"[PTT] Error: {e}", exc_info=True); self.set_status("LISTO", "gray")
+            log.error(f"[PTT] Error: {e}", exc_info=True)
+            self.set_status("LISTO", "gray")
 
     def _porcupine_loop(self):
         import struct
@@ -809,7 +819,8 @@ class DariusFinal(ctk.CTk):
         import pyaudio
         access_key = os.getenv("PORCUPINE_ACCESS_KEY", "")
         if not access_key:
-            self.main_loop(); return
+            self.main_loop()
+            return
         try:
             porcupine = pvporcupine.create(access_key=access_key, keywords=["computer"])
             pa        = pyaudio.PyAudio()
@@ -818,15 +829,19 @@ class DariusFinal(ctk.CTk):
                                 frames_per_buffer=porcupine.frame_length)
             while self.running:
                 if self.is_muted or self.tts_worker.is_speaking.is_set():
-                    time.sleep(0.05); continue
+                    time.sleep(0.05)
+                    continue
                 pcm   = stream.read(porcupine.frame_length, exception_on_overflow=False)
                 pcm   = struct.unpack_from("h" * porcupine.frame_length, pcm)
                 if porcupine.process(pcm) >= 0:
                     self.listen_and_process()
-            stream.stop_stream(); stream.close()
-            pa.terminate(); porcupine.delete()
+            stream.stop_stream()
+            stream.close()
+            pa.terminate()
+            porcupine.delete()
         except Exception as e:
-            log.error(f"Porcupine error: {e}"); self.main_loop()
+            log.error(f"Porcupine error: {e}")
+            self.main_loop()
 
     # =========================================================================
     #  RECONOCIMIENTO DE VOZ
@@ -835,14 +850,16 @@ class DariusFinal(ctk.CTk):
     def listen_and_process(self):
         try:
             with sr.Microphone() as source:
-                if self.tts_worker.is_speaking.is_set(): return
+                if self.tts_worker.is_speaking.is_set():
+                    return
                 self.set_status("ESCUCHANDO…", "#00fbff")
                 self.is_listening = True
                 self.after(0, self.animate_logic)
                 audio = self.listener.listen(source, timeout=MIC_LISTEN_TIMEOUT,
                                              phrase_time_limit=MIC_PHRASE_LIMIT)
                 self.is_listening = False
-                if self.tts_worker.is_speaking.is_set(): return
+                if self.tts_worker.is_speaking.is_set():
+                    return
                 self.set_status("PROCESANDO…", "#ffaa00")
                 text = self.listener.recognize_google(audio, language="es-ES").lower()
                 log.info(f"Reconocido: '{text}'")
@@ -852,7 +869,8 @@ class DariusFinal(ctk.CTk):
         except sr.UnknownValueError:
             log.debug("Audio no reconocido.")
         except sr.RequestError as e:
-            log.error(f"STT error: {e}"); self.talk("Error de conexión con el servicio de voz.")
+            log.error(f"STT error: {e}")
+            self.talk("Error de conexión con el servicio de voz.")
         except Exception as e:
             log.error(f"listen_and_process error: {e}", exc_info=True)
         finally:
@@ -1014,13 +1032,16 @@ class DariusFinal(ctk.CTk):
         self._open_app(app_name)
 
     def _cmd_vol_up(self, _):
-        volume_up(); self.talk("Volumen incrementado.")
+        volume_up()
+        self.talk("Volumen incrementado.")
 
     def _cmd_vol_down(self, _):
-        volume_down(); self.talk("Volumen disminuido.")
+        volume_down()
+        self.talk("Volumen disminuido.")
 
     def _cmd_vol_mute(self, _):
-        volume_mute(); self.talk("Audio silenciado.")
+        volume_mute()
+        self.talk("Audio silenciado.")
 
     def _cmd_estado(self, _):
         mode_names = {LISTEN_MODE_PTT: "P.T.T.", LISTEN_MODE_NAME: "nombre", LISTEN_MODE_AUTO: "automático"}
@@ -1038,7 +1059,8 @@ class DariusFinal(ctk.CTk):
             self._pending_action = {
                 "desc": "Apagar el equipo en 10 segundos",
                 "confirm": True,
-                "_fn": lambda: subprocess.run(["shutdown", "/s", "/t", "10"], shell=False, check=False),
+                "_fn": lambda: subprocess.run([os.environ["WINDIR"] + "\\System32\\shutdown.exe", "/s", "/t", "10"],  # noqa: S603,E501
+                                               shell=False, check=False),
             }
         self.talk("Estás a punto de apagar el equipo. Di confirmar para proceder o cancelar para abortar.")
         self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
@@ -1048,7 +1070,8 @@ class DariusFinal(ctk.CTk):
             self._pending_action = {
                 "desc": "Reiniciar el equipo en 10 segundos",
                 "confirm": True,
-                "_fn": lambda: subprocess.run(["shutdown", "/r", "/t", "10"], shell=False, check=False),
+                "_fn": lambda: subprocess.run([os.environ["WINDIR"] + "\\System32\\shutdown.exe", "/r", "/t", "10"],  # noqa: S603,E501
+                                               shell=False, check=False),
             }
         self.talk("Estás a punto de reiniciar el equipo. Di confirmar para proceder o cancelar para abortar.")
         self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
@@ -1127,7 +1150,7 @@ class DariusFinal(ctk.CTk):
         path = self.find_app(app_name)
         if path:
             try:
-                os.startfile(path)
+                os.startfile(path)  # noqa: S606
                 self.talk(f"Abriendo {app_name}.")
                 return
             except Exception as e:
@@ -1143,8 +1166,8 @@ class DariusFinal(ctk.CTk):
     def play_on_youtube(self, song: str):
         try:
             url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(song)}"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})  # noqa: S310
+            with urllib.request.urlopen(req, timeout=8) as resp:  # noqa: S310
                 html = resp.read().decode("utf-8")
             match = re.search(r'"videoId":"([a-zA-Z0-9_-]{11})"', html)
             if match:
@@ -1203,8 +1226,10 @@ class DariusFinal(ctk.CTk):
         self.tts_worker.wait_until_done(timeout=5.0)
         self.tts_worker.stop()
         time.sleep(0.2)
-        with contextlib.suppress(Exception): self.destroy()
-        with contextlib.suppress(Exception): win32api.CloseHandle(_mutex_handle)
+        with contextlib.suppress(Exception):
+            self.destroy()
+        with contextlib.suppress(Exception):
+            win32api.CloseHandle(_mutex_handle)
         log.info("Darius cerrado correctamente.")
         sys.exit(0)
 
