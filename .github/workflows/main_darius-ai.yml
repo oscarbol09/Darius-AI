@@ -1,4 +1,4 @@
-name: Build and deploy Python app to Azure Web App - Darius-AI
+name: CI — Darius AI
 
 on:
   push:
@@ -40,7 +40,7 @@ jobs:
         run: ruff check --output-format=github .
 
       - name: Test with pytest + coverage
-        run: python -m pytest tests/test_commands_v6.py tests/test_gemini_v6.py -v --junitxml=test-results.xml --cov=. --cov-report=term-missing -m "not windows and not live"
+        run: python -m pytest tests/ -v --junitxml=test-results.xml --cov=. --cov-report=term-missing -m "not windows and not live"
 
       - name: Upload test results
         if: always()
@@ -48,58 +48,3 @@ jobs:
         with:
           name: test-results
           path: test-results.xml
-
-  build:
-    runs-on: ubuntu-latest
-    needs: test
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python version
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Create and start virtual environment and install dependencies
-        run: |
-          python -m venv antenv
-          source antenv/bin/activate
-          pip install -r requirements.txt
-
-      - name: Upload artifact for deployment jobs
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-app
-          path: |
-            .
-            !antenv/
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      id-token: write
-      contents: read
-
-    steps:
-      - name: Download artifact from build job
-        uses: actions/download-artifact@v4
-        with:
-          name: python-app
-
-      - name: Login to Azure
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_8130D0DA59C54DD29CB0AD2802E12AA4 }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_1E05ABF99BCD4EAB9A709D03C7489B60 }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9DB93471D0F14832B22F33FF4B6ED488 }}
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        id: deploy-to-webapp
-        with:
-          app-name: 'Darius-AI'
-          slot-name: 'Production'

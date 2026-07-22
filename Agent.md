@@ -54,17 +54,16 @@ Darius-AI/
 ├── .gitignore               <- Excluye .env, *.log, cache, binarios, .vscode/, .venv/
 ├── .github/
 │   └── workflows/
-│       └── main_darius-ai.yml  <- Pipeline CI/CD
+│       └── main_darius-ai.yml  <- CI: ruff + pytest + gitleaks + pip-audit
 ├── Agent.md                 <- ESTE ARCHIVO — contexto maestro para IAs
 ├── README.md                <- Documentacion tecnica completa
-├── requirements.txt         <- Deps para Azure App Service (Linux / Streamlit)
+├── requirements.txt         <- Deps para Railway / Linux (Streamlit)
 ├── requirements-windows.txt <- Deps para desarrollo local en Windows (main.py)
 ├── config.json              <- Parametros de usuario (nombre, modelo Gemini, mic, TTS...)
 ├── config_loader.py         <- Carga config.json, expone objeto `cfg` con propiedades tipadas
 ├── main.py                  <- NUCLEO — UI, voz, comandos, logica Gemini + fallback OpenRouter
 ├── windows_commands.py      <- Catalogo de comandos del SO (paneles, subprocesos PowerShell/CMD)
-├── app.py                   <- Interfaz web Streamlit (demostracion / Azure)
-├── startup.sh               <- Script de arranque para Azure App Service
+├── app.py                   <- Interfaz web Streamlit
 │
 ├── darius.log               <- Log rotativo (excluido de Git — patron *.log)
 ├── chat_history.txt         <- Historial de conversacion (excluido de Git)

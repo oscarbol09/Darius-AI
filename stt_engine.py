@@ -23,7 +23,6 @@ Dependencias opcionales:
 
 import logging
 import queue
-import threading
 
 log = logging.getLogger("DARIUS.STT")
 

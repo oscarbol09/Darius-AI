@@ -10,7 +10,7 @@
 
 ### Agregado
 - Indicador de progreso en escaneo de aplicaciones (`rglob("*.exe")`)
-- `Dockerfile` multi-etapa para Railway/Azure
+- `Dockerfile` multi-etapa para Railway
 - Tests unitarios para `supabase_client.py` y `config_loader.py`
 - Test de verificación de patrones `_CMD_PATTERNS` vs `test_commands_v6.py`
 - `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`

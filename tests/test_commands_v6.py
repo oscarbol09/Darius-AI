@@ -408,61 +408,56 @@ class TestFuzzyMatching(unittest.TestCase):
 #  5. MODOS DE ACTIVACIÓN (simulación de process_recognized_text)
 # ═════════════════════════════════════════════════════════════════════════════
 
+try:
+    from voice_filter import check_name_in_text
+    VOICE_FILTER_AVAILABLE = True
+except ImportError:
+    VOICE_FILTER_AVAILABLE = False
+
+ASSISTANT_NAME         = "darius"
+NAME_SIMILARITY_CUTOFF = 0.60
+
+
+@unittest.skipUnless(VOICE_FILTER_AVAILABLE, "voice_filter.py no disponible")
 class TestActivationModes(unittest.TestCase):
     """
-    Prueba la lógica de filtrado de modos sin necesidad de
-    instanciar DariusFinal (que requiere UI + micrófono).
-    Aísla _check_name_in_text y process_recognized_text como funciones puras.
+    Prueba la lógica de filtrado de modos usando la función real
+    check_name_in_text() de voice_filter.py (extraída de main.py).
     """
-
-    ASSISTANT_NAME         = "darius"
-    NAME_SIMILARITY_CUTOFF = 0.60
-
-    def _check_name_in_text(self, text: str) -> tuple[bool, str]:
-        """Replica de DariusFinal._check_name_in_text para tests aislados."""
-        words = text.split()
-        if self.ASSISTANT_NAME in text:
-            clean = text.replace(self.ASSISTANT_NAME, "").strip()
-            return True, clean
-        if words:
-            sim = SequenceMatcher(None, self.ASSISTANT_NAME, words[0]).ratio()
-            if sim >= self.NAME_SIMILARITY_CUTOFF:
-                return True, " ".join(words[1:]).strip()
-        return False, text
 
     # ── Modo NOMBRE ───────────────────────────────────────────────────────────
 
     def test_nombre_mode_accepts_exact_name(self):
-        found, clean = self._check_name_in_text("darius abre el explorador")
+        found, clean = check_name_in_text("darius abre el explorador", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
         self.assertTrue(found)
         self.assertEqual(clean, "abre el explorador")
 
     def test_nombre_mode_accepts_name_mid_sentence(self):
         """El nombre puede aparecer en cualquier posición."""
-        found, clean = self._check_name_in_text("oye darius qué hora es")
+        found, clean = check_name_in_text("oye darius qué hora es", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
         self.assertTrue(found)
 
     def test_nombre_mode_rejects_random_noise(self):
-        found, _ = self._check_name_in_text("um ah")
+        found, _ = check_name_in_text("um ah", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
         self.assertFalse(found)
 
     def test_nombre_mode_accepts_phonetic_variant_dario(self):
         """'dario' tiene similitud > 0.60 con 'darius' → debe aceptarse."""
-        score = SequenceMatcher(None, "darius", "dario").ratio()
-        self.assertGreater(score, self.NAME_SIMILARITY_CUTOFF,
-            f"'dario' score {score:.2f} debería superar {self.NAME_SIMILARITY_CUTOFF}")
-        found, _ = self._check_name_in_text("dario abre chrome")
+        score = SequenceMatcher(None, ASSISTANT_NAME, "dario").ratio()
+        self.assertGreater(score, NAME_SIMILARITY_CUTOFF,
+            f"'dario' score {score:.2f} debería superar {NAME_SIMILARITY_CUTOFF}")
+        found, _ = check_name_in_text("dario abre chrome", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
         self.assertTrue(found, "'dario' debería ser aceptado como variante fonética")
 
     def test_nombre_mode_rejects_very_different_word(self):
         """Una palabra muy diferente al nombre no debe activar el asistente."""
-        found, _ = self._check_name_in_text("computadora abre chrome")
+        found, _ = check_name_in_text("computadora abre chrome", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
         self.assertFalse(found,
             "'computadora' no debe confundirse con 'darius'")
 
     def test_nombre_mode_clean_text_is_command_only(self):
         """El texto limpio NO debe contener el nombre del asistente."""
-        _, clean = self._check_name_in_text("darius sube el volumen")
+        _, clean = check_name_in_text("darius sube el volumen", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
         self.assertNotIn("darius", clean)
         self.assertEqual(clean, "sube el volumen")
 
@@ -479,12 +474,10 @@ class TestActivationModes(unittest.TestCase):
         for word, expected_above_cutoff in variants.items():
             # normaliza tilde para la prueba
             clean_word = word.replace("í", "i").replace("á", "a")
-            score = SequenceMatcher(None, self.ASSISTANT_NAME, clean_word).ratio()
-            actual_above = score >= self.NAME_SIMILARITY_CUTOFF
+            score = SequenceMatcher(None, ASSISTANT_NAME, clean_word).ratio()
+            actual_above = score >= NAME_SIMILARITY_CUTOFF
             print(f"  '{word}' → score: {score:.3f} | "
                   f"{'ACEPTA' if actual_above else 'RECHAZA'}")
-            # No forzamos el assert en 'mario'/'varios' porque el score
-            # puede variar — este test documenta el comportamiento real
             if expected_above_cutoff:
                 self.assertTrue(actual_above or score > 0.50,
                     f"'{word}' debería tener score razonable, obtuvo {score:.2f}")

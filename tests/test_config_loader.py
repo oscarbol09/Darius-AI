@@ -1,12 +1,6 @@
 """Tests unitarios para config_loader.py"""
 
-import json
-import os
-import tempfile
-from pathlib import Path
-from unittest.mock import patch
 
-import pytest
 
 from config_loader import _DEFAULTS, _SCHEMA, _deep_merge, _validate_types
 
@@ -14,7 +8,10 @@ from config_loader import _DEFAULTS, _SCHEMA, _deep_merge, _validate_types
 class TestValidateTypes:
     def test_valid_types_pass_unchanged(self):
         data = {
-            "gemini": {"model": "gemini-pro", "max_tokens": 500, "temperature": 0.5, "history_turns": 5},
+            "gemini": {
+                "model": "gemini-pro", "max_tokens": 500,
+                "temperature": 0.5, "history_turns": 5,
+            },
         }
         result = _validate_types(data, _SCHEMA)
         assert result["gemini"]["max_tokens"] == 500
@@ -80,4 +77,4 @@ class TestConfigLive:
         cfg.set("TestUser", "assistant", "user_name")
         assert cfg.USER_NAME == "TestUser"
         cfg.set(original, "assistant", "user_name")
-        assert cfg.USER_NAME == original
+        assert original == cfg.USER_NAME

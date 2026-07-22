@@ -92,10 +92,6 @@ MIC_PHRASE_LIMIT     = cfg.MIC_PHRASE_LIMIT
 APP_CACHE_HOURS      = cfg.APP_CACHE_HOURS
 SPEAKING_TAIL_SECS   = cfg.SPEAKING_TAIL_SECS
 
-LISTEN_MODE_PTT   = "PTT"
-LISTEN_MODE_NAME  = "NOMBRE"
-LISTEN_MODE_AUTO  = "AUTO"
-
 LISTEN_KEY             = cfg.LISTEN_KEY
 DEFAULT_LISTEN_MODE    = cfg.DEFAULT_LISTEN_MODE
 NAME_SIMILARITY_CUTOFF = cfg.NAME_SIMILARITY_CUTOFF
@@ -123,7 +119,16 @@ logging.basicConfig(
 log = logging.getLogger("DARIUS")
 
 # ── Módulos extraídos ──────────────────────────────────────────────────────────
+import contextlib
+
 from ai_client import get_ai_response
+from voice_filter import (
+    LISTEN_MODE_AUTO,
+    LISTEN_MODE_NAME,
+    LISTEN_MODE_PTT,
+    _strip_name,
+    check_name_in_text,
+)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONTROL DE VOLUMEN
@@ -182,11 +187,6 @@ except ImportError:
 # ─────────────────────────────────────────────────────────────────────────────
 #  HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _strip_name(text: str) -> str:
-    """Quita el nombre del asistente del texto y devuelve el comando limpio."""
-    return text.replace(ASSISTANT_NAME, "").strip()
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CLASE PRINCIPAL
@@ -275,7 +275,7 @@ class DariusFinal(ctk.CTk):
 
     def _trim_chat_file(self):
         try:
-            with open(CHAT_FILE, "r", encoding="utf-8") as f:
+            with open(CHAT_FILE, encoding="utf-8") as f:
                 lines = f.readlines()
             if len(lines) > MAX_CHAT_LINES:
                 with open(CHAT_FILE, "w", encoding="utf-8") as f:
@@ -432,10 +432,8 @@ class DariusFinal(ctk.CTk):
             if not KEYBOARD_AVAILABLE:
                 self.talk("Advertencia: librería keyboard no instalada. Ejecuta pip install keyboard")
         else:
-            try:
+            with contextlib.suppress(Exception):
                 self.ptt_hint.pack_forget()
-            except Exception:
-                pass
         log.info(f"Modo cambiado a: {mode}")
         self.set_status(self._mode_label_text(), "#00fbff")
 
@@ -566,8 +564,8 @@ class DariusFinal(ctk.CTk):
                 data     = json.loads(APP_CACHE.read_text(encoding="utf-8"))
                 saved_at = datetime.datetime.fromisoformat(data["saved_at"])
                 if saved_at.tzinfo is None:
-                    saved_at = saved_at.replace(tzinfo=datetime.timezone.utc)
-                age_h = (datetime.datetime.now(datetime.timezone.utc) - saved_at).total_seconds() / 3600
+                    saved_at = saved_at.replace(tzinfo=datetime.UTC)
+                age_h = (datetime.datetime.now(datetime.UTC) - saved_at).total_seconds() / 3600
                 if age_h < APP_CACHE_HOURS:
                     self.installed_apps = data["apps"]
                     log.info(f"Apps desde caché local: {len(self.installed_apps)}")
@@ -661,7 +659,7 @@ class DariusFinal(ctk.CTk):
         log.info(f"Apps detectadas: {len(apps)}")
         try:
             APP_CACHE.write_text(
-                json.dumps({"saved_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "apps": apps},
+                json.dumps({"saved_at": datetime.datetime.now(datetime.UTC).isoformat(), "apps": apps},
                            ensure_ascii=False, indent=2),
                 encoding="utf-8"
             )
@@ -689,7 +687,7 @@ class DariusFinal(ctk.CTk):
                 sb.table("apps_cache").upsert(rows[i:i + batch_size]).execute()
             sb.table("apps_cache_meta").upsert({
                 "id": 1,
-                "last_full_scan": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "last_full_scan": datetime.datetime.now(datetime.UTC).isoformat(),
             }).execute()
             log.info(f"Apps sincronizadas con Supabase: {len(rows)}")
         except Exception as e:
@@ -766,14 +764,14 @@ class DariusFinal(ctk.CTk):
         import wave
 
         import pyaudio
-        RATE, CHUNK, CHANNELS = 16000, 512, 1
+        rate, chunk, channels = 16000, 512, 1
         pa = pyaudio.PyAudio()
         frames = []
         try:
-            stream = pa.open(format=pyaudio.paInt16, channels=CHANNELS,
-                             rate=RATE, input=True, frames_per_buffer=CHUNK)
+            stream = pa.open(format=pyaudio.paInt16, channels=channels,
+                             rate=rate, input=True, frames_per_buffer=chunk)
             while KEYBOARD_AVAILABLE and keyboard.is_pressed(LISTEN_KEY) and self.running:
-                data = stream.read(CHUNK, exception_on_overflow=False)
+                data = stream.read(chunk, exception_on_overflow=False)
                 frames.append(data)
                 self._current_audio_level = float(audioop.rms(data, 2))
             stream.stop_stream(); stream.close()
@@ -786,8 +784,8 @@ class DariusFinal(ctk.CTk):
             self.set_status("LISTO", "gray"); return
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wf:
-            wf.setnchannels(CHANNELS); wf.setsampwidth(2)
-            wf.setframerate(RATE); wf.writeframes(b"".join(frames))
+            wf.setnchannels(channels); wf.setsampwidth(2)
+            wf.setframerate(rate); wf.writeframes(b"".join(frames))
         wav_buffer.seek(0)
         try:
             with sr.AudioFile(wav_buffer) as source:
@@ -796,7 +794,7 @@ class DariusFinal(ctk.CTk):
             log.info(f"[PTT] Reconocido: '{text}'")
             self.add_to_chat(USER_NAME, text)
             self._append_chat_file(USER_NAME.upper(), text)
-            self.execute_command(_strip_name(text) or text)
+            self.execute_command(_strip_name(text, ASSISTANT_NAME) or text)
         except sr.UnknownValueError:
             log.debug("[PTT] Audio no reconocido."); self.set_status("LISTO", "gray")
         except sr.RequestError as e:
@@ -869,7 +867,7 @@ class DariusFinal(ctk.CTk):
         if self.listen_mode == LISTEN_MODE_AUTO:
             if ASSISTANT_NAME in text:
                 name_found = True
-                clean_text = _strip_name(text)
+                clean_text = _strip_name(text, ASSISTANT_NAME)
             elif words and SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio() > NAME_SIMILARITY_CUTOFF:
                 name_found = True
                 clean_text = " ".join(words[1:]).strip()
@@ -885,15 +883,7 @@ class DariusFinal(ctk.CTk):
         self.execute_command(clean_text or text)
 
     def _check_name_in_text(self, text: str) -> tuple[bool, str]:
-        words = text.split()
-        if ASSISTANT_NAME in text:
-            return True, _strip_name(text)
-        if words:
-            similarity = SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio()
-            if similarity >= NAME_SIMILARITY_CUTOFF:
-                log.debug(f"[NOMBRE] Variante aceptada: '{words[0]}' ({similarity:.2f})")
-                return True, " ".join(words[1:]).strip()
-        return False, text
+        return check_name_in_text(text, ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
 
     # =========================================================================
     #  PARSEO Y EJECUCIÓN DE COMANDOS
@@ -970,7 +960,7 @@ class DariusFinal(ctk.CTk):
     def execute_command(self, cmd: str):
         # BUG 2 FIX: limpia el nombre si todavía aparece en el comando
         # (puede ocurrir en entrada de texto manual o modo AUTO sin limpieza previa)
-        cmd = _strip_name(cmd.strip())
+        cmd = _strip_name(cmd.strip(), ASSISTANT_NAME)
         if not cmd:
             return
         log.info(f"Ejecutando: '{cmd}'")
@@ -1119,8 +1109,8 @@ class DariusFinal(ctk.CTk):
         threading.Thread(target=run, daemon=True, name="action").start()
 
     def _format_output_for_tts(self, raw: str, desc: str) -> str:
-        lines = [l.strip() for l in raw.splitlines()
-                 if l.strip() and not set(l.strip()) <= set("-= |+")]
+        lines = [line.strip() for line in raw.splitlines()
+                 if line.strip() and not set(line.strip()) <= set("-= |+")]
         if not lines:
             return f"{desc} completado."
         if len(lines) == 1:
@@ -1137,7 +1127,7 @@ class DariusFinal(ctk.CTk):
         path = self.find_app(app_name)
         if path:
             try:
-                os.startfile(path) if os.path.isfile(path) else os.system(path)
+                os.startfile(path)
                 self.talk(f"Abriendo {app_name}.")
                 return
             except Exception as e:
@@ -1213,10 +1203,8 @@ class DariusFinal(ctk.CTk):
         self.tts_worker.wait_until_done(timeout=5.0)
         self.tts_worker.stop()
         time.sleep(0.2)
-        try: self.destroy()
-        except Exception: pass
-        try: win32api.CloseHandle(_mutex_handle)
-        except Exception: pass
+        with contextlib.suppress(Exception): self.destroy()
+        with contextlib.suppress(Exception): win32api.CloseHandle(_mutex_handle)
         log.info("Darius cerrado correctamente.")
         sys.exit(0)
 

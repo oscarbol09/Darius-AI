@@ -23,6 +23,19 @@ import unittest
 import wave
 from difflib import SequenceMatcher
 
+# Añade la raíz del proyecto al path antes de importar módulos del proyecto
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
+from voice_filter import (  # noqa: E402
+    LISTEN_MODE_AUTO,
+    LISTEN_MODE_NAME,
+    LISTEN_MODE_PTT,
+    check_name_in_text,
+    process_recognized_text,
+)
+
 # ── Constantes de main.py ─────────────────────────────────────────────────────
 ASSISTANT_NAME         = "darius"
 NAME_SIMILARITY_CUTOFF = 0.60
@@ -32,55 +45,15 @@ MIC_LISTEN_TIMEOUT     = 5
 MIC_PHRASE_LIMIT       = 10
 MIN_WORDS_WITHOUT_NAME = 99
 
-LISTEN_MODE_PTT   = "PTT"
-LISTEN_MODE_NAME  = "NOMBRE"
-LISTEN_MODE_AUTO  = "AUTO"
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  HELPERS — réplicas aisladas de lógica de main.py
-# ─────────────────────────────────────────────────────────────────────────────
-
+# Thin wrappers que llaman a las funciones reales de voice_filter.py
+# con las constantes locales. No replican lógica — solo llenan defaults.
 def _check_name_in_text(text: str) -> tuple[bool, str]:
-    """Réplica de DariusFinal._check_name_in_text()."""
-    words = text.split()
-    if ASSISTANT_NAME in text:
-        return True, text.replace(ASSISTANT_NAME, "").strip()
-    if words:
-        sim = SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio()
-        if sim >= NAME_SIMILARITY_CUTOFF:
-            return True, " ".join(words[1:]).strip()
-    return False, text
+    return check_name_in_text(text, ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
 
 
 def _process_recognized_text(text: str, mode: str) -> tuple[bool, str]:
-    """
-    Réplica de DariusFinal.process_recognized_text().
-    Retorna (should_process: bool, effective_command: str).
-    """
-    words = text.split()
-
-    if mode == LISTEN_MODE_AUTO:
-        if ASSISTANT_NAME in text:
-            return True, text.replace(ASSISTANT_NAME, "").strip()
-        if words:
-            sim = SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio()
-            if sim > NAME_SIMILARITY_CUTOFF:
-                return True, " ".join(words[1:]).strip()
-        return True, text
-
-    elif mode == LISTEN_MODE_NAME:
-        found, clean = _check_name_in_text(text)
-        if not found:
-            return False, ""
-        return True, clean
-
-    elif mode == LISTEN_MODE_PTT:
-        # PTT siempre procesa, elimina el nombre si aparece
-        clean = text.replace(ASSISTANT_NAME, "").strip() if ASSISTANT_NAME in text else text
-        return True, clean
-
-    return False, ""
+    return process_recognized_text(text, mode, ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
 
 
 def _build_wav_in_memory(samples: list[int], rate: int = 16000) -> io.BytesIO:

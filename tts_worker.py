@@ -5,10 +5,10 @@ Extraído de main.py para separar responsabilidades.
 Usa SAPI5 de Windows (win32com.client).
 """
 
+import logging
 import queue
 import threading
 import time
-import logging
 
 from config_loader import cfg
 

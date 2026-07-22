@@ -4,10 +4,10 @@ ai_client.py — Clientes de IA (Gemini + OpenRouter fallback)
 Extraído de main.py para separar responsabilidades.
 """
 
-import os
 import json
-import random
 import logging
+import os
+import random
 import urllib.request as _req
 
 from google import genai

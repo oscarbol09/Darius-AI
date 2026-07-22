@@ -24,7 +24,6 @@ Nota de migración:
 
 import asyncio
 import logging
-import threading
 
 log = logging.getLogger("DARIUS.EdgeTTS")
 
@@ -78,8 +77,11 @@ class EdgeTTS:
             import edge_tts
             communicate = edge_tts.Communicate(text, self.voice)
             await communicate.save("_tts_temp.mp3")
-            # Reproducir _tts_temp.mp3 con pygame o playsound
-            # playsound.playsound("_tts_temp.mp3")
+            try:
+                import playsound
+                playsound.playsound("_tts_temp.mp3")
+            except ImportError:
+                log.warning("playsound no instalado. pip install playsound")
         except ImportError:
             log.warning("edge-tts no instalado. pip install edge-tts")
         except Exception as e:

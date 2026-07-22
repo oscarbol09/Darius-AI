@@ -10,7 +10,6 @@ from supabase_client import get_supabase
 
 def teardown_module():
     """Limpia el singleton entre tests recargando el módulo."""
-    import importlib
     import supabase_client
     supabase_client._client = None
     supabase_client._init_attempted = False

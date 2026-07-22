@@ -714,7 +714,7 @@ $ip     = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlia
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _normalize(text: str) -> str:
-    for src, dst in zip("áéíóúüñàèìòù", "aeiouunaeio u"):
+    for src, dst in zip("áéíóúüñàèìòù", "aeiouunaeiou", strict=True):
         text = text.replace(src, dst)
     return text.lower().strip()
 
@@ -858,7 +858,7 @@ def _launch(cmd: str, fallback_cmd: Optional[str] = None) -> bool:
     # independiente de Darius: no hereda la ventana ni compite por el foco.
     # Esto corrige el bug donde msconfig/taskmgr/regedit abría el reproductor
     # de audio porque el proceso no se desenganchaba del hilo de TTS.
-    DETACHED = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    detached = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     try:
         # 1. URIs de protocolo de Windows (ms-settings:, windowsdefender:, shell:…)
         if re.match(r"^[a-z\-]+:", cmd) and not cmd.endswith(".exe"):
@@ -866,11 +866,11 @@ def _launch(cmd: str, fallback_cmd: Optional[str] = None) -> bool:
             return True
         # 2. Snap-ins de MMC (.msc)
         if cmd.endswith(".msc"):
-            subprocess.Popen(["mmc", cmd], shell=False, creationflags=DETACHED)
+            subprocess.Popen(["mmc", cmd], shell=False, creationflags=detached)
             return True
         # 3. Applets del Panel de Control (.cpl)
         if cmd.endswith(".cpl"):
-            subprocess.Popen(["control", cmd], shell=False, creationflags=DETACHED)
+            subprocess.Popen(["control", cmd], shell=False, creationflags=detached)
             return True
         # 4. Ejecutable con ruta absoluta
         if Path(cmd).is_file():
@@ -880,15 +880,15 @@ def _launch(cmd: str, fallback_cmd: Optional[str] = None) -> bool:
         #    Se usa shell=True para que Windows los localice en PATH igual que
         #    si el usuario los escribiera en Ejecutar (Win+R). DETACHED evita
         #    que el proceso herede la consola de Darius.
-        subprocess.Popen(["cmd", "/c", cmd], creationflags=DETACHED)
+        subprocess.Popen(["cmd", "/c", cmd], creationflags=detached)
         return True
     except FileNotFoundError:
         if fallback_cmd:
             try:
-                subprocess.Popen(["cmd", "/c", fallback_cmd], creationflags=DETACHED)
+                subprocess.Popen(["cmd", "/c", fallback_cmd], creationflags=detached)
                 return True
             except Exception:
-                pass
+                log.warning(f"[WinCMD] fallback '{fallback_cmd}' también falló")
         return False
     except Exception as e:
         log.error(f"[WinCMD] _launch error: {e}")

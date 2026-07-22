@@ -129,7 +129,7 @@ def get_ai_response(user_text: str, history: list[dict]) -> tuple[str, str]:
         try:
             return call_gemini(user_text, history), "Gemini"
         except Exception:
-            pass  # Caemos al fallback
+            log.warning("Gemini falló, usando OpenRouter como fallback")
 
     if OPENROUTER_KEY:
         try:
@@ -331,8 +331,7 @@ def render_input_area():
         send_btn = st.button("Enviar", use_container_width=True, type="primary")
 
     # Botón para limpiar el historial
-    if st.session_state.messages:
-        if st.button("🗑️ Limpiar conversación", use_container_width=True):
+    if st.session_state.messages and st.button("🗑️ Limpiar conversación", use_container_width=True):
             st.session_state.messages = []
             st.rerun()
 
