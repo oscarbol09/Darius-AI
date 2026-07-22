@@ -5,7 +5,7 @@
 > arquitectura real del sistema, las decisiones de diseño ya tomadas y las
 > reglas que debes respetar para no romper el comportamiento existente.
 >
-> Ultima actualizacion: Auditoria tecnica completa — Abril 2026.
+> Ultima actualizacion: Ruff 208→0, limpieza repo, rutas completas en subprocess — Julio 2026.
 
 ---
 
@@ -51,7 +51,7 @@ futurista y directa.
 Darius-AI/
 ├── .env                     <- Secretos (GEMINI_API_KEY, OPENROUTER_API_KEY). NO subir a Git.
 ├── .env.example             <- Plantilla sin valores reales (si subir a Git).
-├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/
+├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/, supabase/migrations/, docs/
 ├── .github/
 │   └── workflows/
 │       └── main_darius-ai.yml  <- CI: ruff + pytest + gitleaks + pip-audit
@@ -60,9 +60,9 @@ Darius-AI/
 ├── requirements.txt         <- Deps para Railway / Linux (Streamlit)
 ├── requirements-windows.txt <- Deps para desarrollo local en Windows (main.py)
 ├── config.json              <- Parametros de usuario
-├── config_loader.py         <- Carga config.json, expone objeto `cfg`
+├── config_loader.py         <- Carga config.json, expone objeto `cfg` con propiedades snake_case
 ├── main.py                  <- NUCLEO — UI, voz, comandos, IA
-├── windows_commands.py      <- Catalogo de comandos del SO
+├── windows_commands.py      <- Catalogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL con rutas completas)
 ├── app.py                   <- Interfaz web Streamlit
 ├── voice_filter.py          <- Filtro de nombre en texto (check_name_in_text)
 ├── ai_client.py             <- Clientes Gemini + OpenRouter
@@ -78,7 +78,7 @@ Darius-AI/
 │   ├── test_config_loader.py<- Tests de config_loader
 │   └── test_supabase_client.py <- Tests de supabase_client
 │
-├── pyproject.toml           <- Configuracion Ruff, pytest, coverage
+├── pyproject.toml           <- Configuracion Ruff (line-length=120), pytest, coverage
 ├── Dockerfile               <- Contenedor multi-etapa (Railway)
 ├── requirements-dev.txt     <- Dependencias de desarrollo
 ├── CHANGELOG.md             <- Historial de versiones
@@ -121,7 +121,7 @@ USUARIO HABLA / ESCRIBE
                │ coincide _CMD_PATTERNS?                        │ No
                v                                                v
         handler local                                    ask_gemini(cmd)
-        (_cmd_hora, _cmd_abrir,                                 |
+        (_cmd_hora, _cmd_abrir,                                  |
          _cmd_accion -> windows_commands.py...)       ┌─────────┴──────────┐
                |                                      │ Gemini OK          │ Gemini falla
                v                                      v                    v
@@ -132,7 +132,6 @@ USUARIO HABLA / ESCRIBE
                 |                                             |
          [tts-worker]                                    talk(respuesta)
        SAPI.SpVoice.Speak()
-       [DETACHED_PROCESS — independiente del proceso principal]
 ```
 
 ---
@@ -197,158 +196,132 @@ Usuario envia prompt -> no coincide ningun patron local
                 ├── is_network_error  (network / connection / unreachable)
                 │       └─► talk("Sin conexion...") — sin fallback
                 |
-                └── cualquier otro error (cuota, timeout, 503, respuesta vacia)
-                        └─► _ask_openrouter() — itera modelos aleatorios
+                └── otro error (API, timeout, parse, rate limit)
+                        └─► _ask_openrouter(prompt, system_instruction)
                                 |
-                                ├── OK ──► talk(respuesta)
-                                |
-                                └── Todos fallan
-                                        └─► talk("Motores no disponibles...")
-                                             comandos locales siguen activos
+                                ├── Exito ──► talk(respuesta)
+                                │
+                                └── Falla en todos los modelos
+                                        └─► talk("No pude obtener respuesta...")
 ```
-
-**Resumen clave:** Gemini siempre es el primero. OpenRouter es el respaldo automatico.
-Los comandos locales (paneles del SO, acciones PowerShell) NUNCA dependen de IA.
 
 ---
 
-## 6. Dependencias Windows (`requirements-windows.txt`)
+## 6. Decisiones arquitectonicas clave
 
-```
-google-genai>=1.0.0        # SDK Gemini (genai.Client)
-requests>=2.31.0           # HTTP auxiliar
-python-dotenv>=1.0.0       # Carga .env antes de os.getenv()
-customtkinter>=5.2.0       # UI escritorio tema oscuro
-SpeechRecognition>=3.10.0  # STT (Google es-ES)
-PyAudio>=0.2.14            # Captura de audio del microfono
-pywin32>=306               # win32com (SAPI TTS), win32event (mutex), winreg
-comtypes>=1.2.0            # Interfaz COM requerida por pycaw
-pycaw>=20181226            # Control de volumen por hardware (IAudioEndpointVolume)
-keyboard>=0.13.5           # Push-to-Talk (requiere ejecutar como administrador)
-numpy>=1.24.0              # Calculo de nivel de audio RMS para animacion de ondas
-streamlit>=1.35.0          # Web UI (app.py, pruebas locales)
-```
+(En adelante, "D" = Decision, seguido de un titulo descriptivo y su fundamento.)
 
-**Opcional (mejora experiencia, no requerida para arrancar):**
-- `pvporcupine` + `pyaudio` — wake word por hardware (requiere `PORCUPINE_ACCESS_KEY`)
+### D1 — Gemini como IA principal, OpenRouter como fallback
+
+**Decision:** Gemini es el motor principal por su calidad superior y menor latencia.
+OpenRouter con modelos gratuitos es el plan B, sin dependencias extra (solo stdlib).
+No se implementa un reintento sobre el mismo modelo fallido — se pasa al siguiente.
+
+### D2 — TTS en hilo separado con cola de mensajes
+
+**Decision:** `TTSWorker` corre en su propio thread con `pythoncom.CoInitialize()` y
+una `queue.Queue`. Esto evita que el habla bloquee la UI o el reconocimiento de voz.
+`wait_until_done()` permite pausar la escucha mientras Darius habla.
+
+### D3 — Mutex Win32 para instancia unica
+
+**Decision:** `win32event.CreateMutex` con nombre global. Si ya existe, muestra un
+messagebox y sale con `sys.exit(0)`. Simple, nativo, no requiere archivo PID.
+
+### D4 — DETACHED_PROCESS para comandos del SO
+
+**Decision:** Todos los subprocesos de `windows_commands.py` usan
+`creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP`. Esto evita que el
+proceso hijo herede la consola de Darius y compita por el foco de audio o ventana.
+Rutas completas (_PS, _CMD, _MMC, _CONTROL) via `os.environ["SystemRoot"]`.
+
+### D5 — config_loader con merge de 3 fuentes (local > defaults < Supabase)
+
+**Decision:** La configuracion se construye como merge jerarquico:
+1. `_DEFAULTS` (hardcodeado en `config_loader.py`)
+2. `config.json` local (valores del usuario)
+3. Supabase (tabla `config`) — si esta disponible, tiene prioridad y se cachea
+   en `config.json` para arranques offline.
+Propiedades de `cfg` usan snake_case (`cfg.assistant_name`, `cfg.gemini_model`).
+
+### D6 — No se usa `shell=True` (seguridad)
+
+**Decision:** `shell=False` siempre que sea posible. Los comandos PowerShell/CMD
+se pasan como listas de argumentos. En `_launch()` (linea 882) se usa
+`["cmd", "/c", cmd]` en vez de `cmd` directamente, para evitar inyeccion de
+comandos via nombres de archivo maliciosos.
+
+### D7 — Sin base de datos local; Supabase es opcional
+
+**Decision:** Darius funciona completamente offline sin Supabase. Si
+`SUPABASE_URL`/`SUPABASE_KEY` no estan en `.env`, `get_supabase()` retorna `None`
+y todo el sistema sigue funcionando en modo local. La tabla `config` en Supabase
+permite compartir configuracion entre `main.py` y `app.py`.
+
+### D8 — Ruff con reglas estrictas, 0 errores
+
+**Decision:** Se mantiene `ruff check` en CI con `line-length=120`. Todo el codigo
+pasa sin errores ni advertencias. Excepciones documentadas con `# noqa`:
+- `S310` en urlopen con URLs hardcodeadas (OpenRouter, YouTube)
+- `S603` en subprocess donde el input proviene de un dict controlado
+- `S606` en `os.startfile()` (API correcta de Windows)
+- `S607` en `nircmd.exe` (tercero, sin ruta fija)
+- `E501` en data dictionary de `windows_commands.py`
 
 ---
 
-## 7. Modulos clave y sus responsabilidades
+## 7. Modos de escucha (PTT / NOMBRE / AUTO)
 
-### `main.py`
+### Modo PTT (Push-to-Talk)
+- Activacion: mantener presionada una tecla (`LISTEN_KEY`, default `right ctrl`)
+- Mientras se mantiene presionada: graba audio continuamente en buffer
+- Al soltar: envia a Google STT y procesa
+- Visual: icono verde con indicador de habla
+- Ventaja: sin falsos positivos, control total del usuario
 
-- **NO modificar** la seccion de mutex (instancia unica) — rompe el comportamiento deseado
-- **NO eliminar** el patron `finally: self.set_status("LISTO", "gray")` — la UI queda colgada
-- El `load_dotenv()` debe estar **antes** de cualquier `os.getenv()` — ya esta correcto
-- Toda actualizacion de widgets desde hilos daemon debe hacerse con `self.after(0, fn)`
+### Modo NOMBRE
+- Darius ignora todo el audio hasta que detecta su nombre
+- Deteccion: `check_name_in_text()` — busqueda exacta + fuzzy con `SequenceMatcher`
+  (umbral `NAME_SIMILARITY_CUTOFF`, default 0.60)
+- Despues del nombre: procesa el resto del texto como comando
+- Si el texto tiene muchas palabras (≥ `MIN_WORDS_WITHOUT_NAME`, default 99):
+  asume que es una conversacion con Gemini y no requiere nombre
 
-### `config_loader.py`
+### Modo AUTO
+- Combina NOMBRE + envio directo a Gemini
+- Si hay nombre: procesa comando local
+- Si no hay nombre: envia directo a Gemini como conversacion
+- Util para charlas rapidas sin necesidad de activacion explicita
 
-- Single source of truth para parametros operativos
-- `cfg` es una instancia global importada con `from config_loader import cfg`
-- `cfg.set(value, *keys)` persiste cambios en `config.json` en tiempo real
-- Los defaults en `_DEFAULTS` garantizan arranque seguro incluso sin `config.json`
-- `max_tokens` por defecto: **800** (ajustado en auditoria para evitar truncado)
-
-### `windows_commands.py`
-
-- Completamente stateless y thread-safe
-- **Bug del foco corregido:** `_launch()` usa `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP`
-  para que comandos como `msconfig`, `taskmgr` o `regedit` sean procesos totalmente
-  independientes de Darius. Esto elimina el bug donde el proceso heredaba el contexto
-  de ventana del hilo TTS y abria el reproductor de audio en lugar del programa pedido.
-- Para agregar un panel del SO: anadir entrada en `WINDOWS_COMMANDS` con `cmd`, `aliases`, `desc`
-- Para anadir una accion: anadir entrada en `SYSTEM_ACTIONS` con `action.type`, `action.run`,
-  `aliases`, `desc`; y opcionalmente `confirm: True`, `return_output: True`, `open_window: True`
-- Cutoffs fuzzy: `_WIN_CUTOFF = 0.68` (paneles), `_ACT_CUTOFF = 0.75` (acciones)
-
-### `.env`
-
-- Leido por `python-dotenv` al arrancar `main.py`
-- Variables:
-  - `GEMINI_API_KEY` — **obligatoria**
-  - `OPENROUTER_API_KEY` — para el fallback
-  - `PORCUPINE_ACCESS_KEY` — opcional, wake-word por hardware
+### Logica de `process_recognized_text()`:
+```python
+# En cada modo:
+#   - PTT: todo el texto es comando
+#   - NOMBRE: solo si detecta nombre; puede ir directamente a Gemini
+#   - AUTO: prioriza comandos locales, resto a Gemini
+#   - Si es nombre exacto (p.ej. "darius" solo): Darius responde "Dime"
+```
 
 ---
 
-## 8. Variables de entorno y configuracion
+## 8. Base de datos de aplicaciones (apps_cache.json)
 
-### Secretos (`.env`, NO en Git)
-```
-GEMINI_API_KEY="tu_clave_aqui"
-OPENROUTER_API_KEY="tu_clave_aqui"
-PORCUPINE_ACCESS_KEY=""   # opcional
-```
+Darius mantiene un cache local de aplicaciones instaladas para abrirlas por voz.
 
-### Parametros de usuario (`config.json`, SI en Git)
+**Formato:**
 ```json
 {
-  "assistant": { "name": "darius", "user_name": "Oscar" },
-  "gemini":    { "model": "gemini-2.5-flash", "max_tokens": 800,
-                 "temperature": 0.7, "history_turns": 10 },
-  "tts":       { "rate": 1, "volume": 100 },
-  "microphone":{ "energy_threshold": 3000, "pause_threshold": 0.8,
-                 "listen_timeout": 5, "phrase_limit": 10 },
-  "listen_mode": "NOMBRE",
-  "listen_key": "right ctrl",
-  "name_similarity_cutoff": 0.60
+    "chrome": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "spotify": "C:\\Users\\oscar\\AppData\\Roaming\\Spotify\\Spotify.exe",
+    "vscode": "C:\\Users\\oscar\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+    "_meta": {
+        "cached_at": "2026-04-05T12:00:00",
+        "version": 6
+    }
 }
 ```
 
-> **Importante:** `max_tokens` fue subido de 300 a **800** en la auditoria de Abril 2026
-> para evitar que las respuestas de Gemini se corten antes de completarse.
-
----
-
-## 9. Reglas de estilo de codigo
-
-1. **Separadores de seccion:** linea de 77 guiones `# ─────...─────`
-2. **Docstrings:** solo en funciones publicas y metodos no triviales, en espanol
-3. **Type hints:** en firmas publicas. Usar `str | None` (Python 3.10+)
-4. **Nombres de hilos:** siempre pasar `name=` en `threading.Thread()`
-5. **Logging:** usar `log = logging.getLogger("DARIUS")`. Nunca `print()` en produccion
-6. **Imports** al inicio del archivo, excepto imports condicionales en hilos daemon
-7. **`self.after(0, fn)`** para toda actualizacion de UI desde hilos daemon
-8. **Constantes** en SCREAMING_SNAKE_CASE, instancias en snake_case, clases en PascalCase
-9. **`try/except Exception`** amplio solo en puntos de entrada de hilos y llamadas externas
-
----
-
-## 10. Extensiones planificadas (Roadmap v7+)
-
-- **Mem0 (memoria persistente):** Recordar preferencias entre sesiones via MCP
-- **Tavily (busqueda web):** Datos actuales via Function Calling en Gemini
-- **n8n (automatizacion):** Webhooks disparados por comandos de voz
-- **MCP dinamico (v8):** Cargar herramientas MCP desde un directorio de plugins
-
----
-
-## 11. Comandos rapidos de mantenimiento
-
-```bash
-# Activar entorno virtual
-.venv\Scripts\activate
-
-# Instalar dependencias Windows
-pip install -r requirements-windows.txt
-
-# Limpiar archivos que no deberian estar en Git
-git rm -r --cached .venv/
-git rm -r --cached .vscode/
-git commit -m "chore: remove .venv and .vscode from tracking"
-git push
-
-# Ver que esta rastreado actualmente
-git ls-files --cached
-
-# Ejecutar Darius (como administrador para modo PTT)
-python main.py
-```
-
----
-
-*Documento reescrito en auditoria tecnica completa sobre codigo real:
-`main.py` v6.x, `windows_commands.py`, `config_loader.py`, `config.json`,
-`requirements-windows.txt` y `.gitignore`. Abril 2026.*
+- Carga perezosa: solo escanea `%ProgramData%\Microsoft\Windows\Start Menu` al
+  arrancar si el cache tiene mas de `APP_CACHE_HOURS` horas.
+- No bloquea el arranque: si el scan falla, se usa el cache existente.
+- `find_app(name)`: hace fuzzy match del nombre contra las keys del cache.
