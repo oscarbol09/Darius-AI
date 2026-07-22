@@ -54,6 +54,11 @@ except ImportError as e:
     WINCMD_AVAILABLE = False
     print(f"[WARN] No se pudo importar windows_commands.py: {e}")
 
+# ── Guard de plataforma ──────────────────────────────────────────────────────
+# TestWinCmdTypeA/B usan os.startfile, subprocess.DETACHED_PROCESS, etc. —
+# solo existen en Windows.
+IS_WINDOWS = sys.platform == "win32"
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  HELPERS
@@ -104,7 +109,7 @@ class TestNormalization(unittest.TestCase):
 #  2. TIPO A — RESOLUCIÓN DE PANELES / VENTANAS
 # ═════════════════════════════════════════════════════════════════════════════
 
-@unittest.skipUnless(WINCMD_AVAILABLE, "windows_commands no disponible")
+@unittest.skipUnless(WINCMD_AVAILABLE and IS_WINDOWS, "solo Windows")
 class TestWinCmdTypeA(unittest.TestCase):
     """
     Prueba la resolución de comandos Tipo A (WINDOWS_COMMANDS).
@@ -206,7 +211,7 @@ class TestWinCmdTypeA(unittest.TestCase):
 #  3. TIPO B — RESOLUCIÓN DE ACCIONES / SUBPROCESOS
 # ═════════════════════════════════════════════════════════════════════════════
 
-@unittest.skipUnless(WINCMD_AVAILABLE, "windows_commands no disponible")
+@unittest.skipUnless(WINCMD_AVAILABLE and IS_WINDOWS, "solo Windows")
 class TestWinCmdTypeB(unittest.TestCase):
     """
     Prueba la resolución y ejecución de comandos Tipo B (SYSTEM_ACTIONS).

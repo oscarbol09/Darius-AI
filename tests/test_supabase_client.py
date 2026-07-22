@@ -26,7 +26,8 @@ class TestGetSupabase:
         with patch.dict(os.environ, {"SUPABASE_KEY": "test-key"}, clear=True):
             assert get_supabase() is None
 
-    def test_handles_import_error_gracefully(self):
+    @patch("supabase.create_client", side_effect=ImportError("No module named supabase"))
+    def test_handles_import_error_gracefully(self, mock_create):
         import supabase_client as sc
         sc._client = None
         sc._init_attempted = False
@@ -37,7 +38,11 @@ class TestGetSupabase:
             result = get_supabase()
             assert result is None
 
-    def test_handles_connection_error_gracefully(self):
+    @patch("supabase.create_client", side_effect=Exception("connection refused"))
+    def test_handles_connection_error_gracefully(self, mock_create):
+        import supabase_client as sc
+        sc._client = None
+        sc._init_attempted = False
         with patch.dict(os.environ, {
             "SUPABASE_URL": "http://invalid",
             "SUPABASE_KEY": "bad-key",
