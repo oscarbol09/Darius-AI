@@ -35,11 +35,17 @@ nircmd.exe
 *.exe
 
 # =========================
-# Supabase CLI temporales
+# Supabase
 # =========================
 supabase/.temp/
+supabase/migrations/
 
 # =========================
 # Configuración del Editor
 # =========================
 .vscode/
+
+# =========================
+# Documentación de migración/arquitectura (obsoleta)
+# =========================
+docs/

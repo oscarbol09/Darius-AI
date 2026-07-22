@@ -51,7 +51,7 @@ futurista y directa.
 Darius-AI/
 ├── .env                     <- Secretos (GEMINI_API_KEY, OPENROUTER_API_KEY). NO subir a Git.
 ├── .env.example             <- Plantilla sin valores reales (si subir a Git).
-├── .gitignore               <- Excluye .env, *.log, cache, binarios, .vscode/, .venv/
+├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/
 ├── .github/
 │   └── workflows/
 │       └── main_darius-ai.yml  <- CI: ruff + pytest + gitleaks + pip-audit
@@ -59,20 +59,35 @@ Darius-AI/
 ├── README.md                <- Documentacion tecnica completa
 ├── requirements.txt         <- Deps para Railway / Linux (Streamlit)
 ├── requirements-windows.txt <- Deps para desarrollo local en Windows (main.py)
-├── config.json              <- Parametros de usuario (nombre, modelo Gemini, mic, TTS...)
-├── config_loader.py         <- Carga config.json, expone objeto `cfg` con propiedades tipadas
-├── main.py                  <- NUCLEO — UI, voz, comandos, logica Gemini + fallback OpenRouter
-├── windows_commands.py      <- Catalogo de comandos del SO (paneles, subprocesos PowerShell/CMD)
+├── config.json              <- Parametros de usuario
+├── config_loader.py         <- Carga config.json, expone objeto `cfg`
+├── main.py                  <- NUCLEO — UI, voz, comandos, IA
+├── windows_commands.py      <- Catalogo de comandos del SO
 ├── app.py                   <- Interfaz web Streamlit
+├── voice_filter.py          <- Filtro de nombre en texto (check_name_in_text)
+├── ai_client.py             <- Clientes Gemini + OpenRouter
+├── tts_worker.py            <- Worker TTS (SAPI) en hilo propio
+├── edge_tts_engine.py       <- Blueprint: TTS edge-tts (cross-platform)
+├── stt_engine.py            <- Blueprint: STT con backends intercambiables
+├── supabase_client.py       <- Cliente Supabase compartido
 │
-├── darius.log               <- Log rotativo (excluido de Git — patron *.log)
+├── tests/
+│   ├── test_commands_v6.py  <- Tests de comandos del SO
+│   ├── test_voice_v6.py     <- Tests del subsistema de voz
+│   ├── test_gemini_v6.py    <- Tests de integracion con Gemini API
+│   ├── test_config_loader.py<- Tests de config_loader
+│   └── test_supabase_client.py <- Tests de supabase_client
+│
+├── pyproject.toml           <- Configuracion Ruff, pytest, coverage
+├── Dockerfile               <- Contenedor multi-etapa (Railway)
+├── requirements-dev.txt     <- Dependencias de desarrollo
+├── CHANGELOG.md             <- Historial de versiones
+├── CONTRIBUTING.md          <- Guia de contribucion
+├── SECURITY.md              <- Politica de seguridad
+│
+├── darius.log               <- Log rotativo (excluido de Git)
 ├── chat_history.txt         <- Historial de conversacion (excluido de Git)
-├── apps_cache.json          <- Cache de apps instaladas, TTL 6h (excluido de Git)
-│
-├── debug_inspector_v6.py    <- Script de diagnostico y testing (no usar en produccion)
-├── test_commands_v6.py      <- Tests de comandos del SO
-├── test_gemini_v6.py        <- Tests de integracion con Gemini API
-└── test_voice_v6.py         <- Tests del subsistema de voz
+└── apps_cache.json          <- Cache de apps instaladas, TTL 6h (excluido de Git)
 ```
 
 > **Nota sobre Git:** Las carpetas `.venv/` y `.vscode/` estan en `.gitignore`.

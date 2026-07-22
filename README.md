@@ -2,7 +2,7 @@
 
 > **Versión del documento:** 1.0.0  
 > **Versión del software:** 6.x (rama `main`)  
-> **Última actualización:** 2025  
+> **Última actualización:** 2026  
 > **Stack:** Python 3.11+ · CustomTkinter · Google GenAI · SAPI · Win32
 
 ---
@@ -149,9 +149,9 @@ El hilo `_ptt_loop` realiza **polling a 50 Hz** sobre el estado de `LISTEN_KEY` 
 ```python
 wav_buffer = io.BytesIO()
 with wave.open(wav_buffer, "wb") as wf:
-    wf.setnchannels(CHANNELS)
+    wf.setnchannels(channels)
     wf.setsampwidth(2)      # paInt16 = 2 bytes por muestra
-    wf.setframerate(RATE)
+    wf.setframerate(rate)
     wf.writeframes(raw)
 wav_buffer.seek(0)
 
@@ -306,24 +306,25 @@ El campo `fallback_cmd` permite una cadena de fallback para ejecutables de ruta 
 ```python
 "brave": {
     "cmd": r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe",
-    "fallback_cmd": "start brave",   # fallback si el exe no existe en esa ruta
+    "fallback_cmd": "start brave",
     "desc": "Brave Browser"
 },
 ```
 
-La función interna `_launch()` implementa la lógica de dispatching:
+La función interna `_launch()` implementa la lógica de dispatching con procesos desenganchados para evitar robos de foco:
 
 ```python
 def _launch(cmd: str, fallback_cmd: Optional[str] = None) -> bool:
+    detached = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     if re.match(r"^[a-z\-]+:", cmd) and not cmd.endswith(".exe"):
-        os.startfile(cmd); return True          # URI/protocolo
+        os.startfile(cmd); return True
     if cmd.endswith(".msc"):
-        subprocess.Popen(["mmc", cmd]); return True
+        subprocess.Popen(["mmc", cmd], creationflags=detached); return True
     if cmd.endswith(".cpl"):
-        subprocess.Popen(["control", cmd]); return True
+        subprocess.Popen(["control", cmd], creationflags=detached); return True
     if Path(cmd).is_file():
-        os.startfile(cmd); return True          # ruta absoluta
-    subprocess.Popen(cmd, shell=True); return True  # comando de shell
+        os.startfile(cmd); return True
+    subprocess.Popen(["cmd", "/c", cmd], creationflags=detached); return True
 ```
 
 ### 4.2 Tipo B — Subprocesos y Acciones del Sistema
@@ -406,7 +407,7 @@ El motor de resolución opera sobre **tablas planas de aliases normalizados** co
 
 ```python
 def _normalize(text: str) -> str:
-    for src, dst in zip("áéíóúüñàèìòù", "aeiouunaeio u"):
+    for src, dst in zip("áéíóúüñàèìòù", "aeiouunaeiou", strict=True):
         text = text.replace(src, dst)
     return text.lower().strip()
 
@@ -543,7 +544,8 @@ El sistema diferencia entre error de cuota (degradación a comandos locales), er
 
 | Variable | Requerida | Descripción |
 |---|---|---|
-| `GEMINI_API_KEY` | **Obligatoria** | API key de Google AI Studio. Sin ella, `sys.exit(1)` al arrancar |
+| `GEMINI_API_KEY` | **Obligatoria** | API key de Google AI Studio |
+| `OPENROUTER_API_KEY` | Opcional | API key de OpenRouter para fallback |
 | `PORCUPINE_ACCESS_KEY` | Opcional | API key de Picovoice para wake-word por hardware (`pvporcupine`) |
 
 ### Dependencias y justificación técnica
@@ -568,7 +570,7 @@ Todos los parámetros operativos se definen como constantes en la sección de co
 
 ```python
 GEMINI_MODEL         = "gemini-2.5-flash"
-GEMINI_MAX_TOKENS    = 300
+GEMINI_MAX_TOKENS    = 800
 GEMINI_TEMPERATURE   = 0.7
 GEMINI_HISTORY_TURNS = 10        # ventana de contexto conversacional (turnos)
 MIC_ENERGY_THRESHOLD = 3000      # umbral mínimo de energía de activación
@@ -605,16 +607,13 @@ cd darius-ai
 python -m venv .venv
 .venv\Scripts\activate
 
-# 3. Instalar dependencias base
-pip install -r requirements.txt
+# 3. Instalar dependencias (Windows)
+pip install -r requirements-windows.txt
 
-# 4. Instalar dependencias Win32 adicionales
-pip install pywin32 pycaw comtypes
-
-# 5. (Opcional) Instalar soporte PTT
+# 4. (Opcional) Instalar soporte PTT
 pip install keyboard
 
-# 6. (Opcional) Instalar wake-word por hardware
+# 5. (Opcional) Instalar wake-word por hardware
 pip install pvporcupine pyaudio
 ```
 
