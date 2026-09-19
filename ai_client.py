@@ -13,6 +13,7 @@ Soporta:
 Integra memoria de Obsidian de forma transparente en todos los proveedores.
 """
 
+import datetime
 import json
 import logging
 import os
@@ -98,14 +99,43 @@ def get_gemini_client() -> Any | None:
 #  INYECCIÓN DE SISTEMA Y MEMORIA OBSIDIAN
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _get_system_time_context() -> str:
+    """Obtiene la fecha, hora y zona horaria locales del equipo para inyectar en los prompts."""
+    now = datetime.datetime.now().astimezone()
+    dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    meses = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+    ]
+    dia_semana = dias[now.weekday()]
+    dia = now.day
+    mes = meses[now.month - 1]
+    anio = now.year
+    hora_12 = now.strftime("%I:%M %p").lower().replace("am", "a. m.").replace("pm", "p. m.")
+    hora_24 = now.strftime("%H:%M")
+    tz_name = now.tzname() or "Local"
+    offset = now.strftime("%z")
+    formatted_offset = f"UTC{offset[:3]}:{offset[3:]}" if offset else "UTC"
+
+    return (
+        f"[HORA Y FECHA LOCAL DEL EQUIPO]\n"
+        f"- Fecha del sistema: {dia_semana}, {dia} de {mes} de {anio}\n"
+        f"- Hora del sistema: {hora_12} ({hora_24} formato 24h)\n"
+        f"- Zona horaria del sistema: {tz_name} ({formatted_offset})\n"
+        "Debes basar cualquier referencia temporal, fecha u hora exclusivamente en estos datos locales del equipo."
+    )
+
+
 def _build_system_instruction(prompt: str = "") -> str:
-    """Construye las directrices de personalidad de Darius con memoria de Obsidian."""
+    """Construye las directrices de personalidad de Darius con tiempo local y memoria de Obsidian."""
+    time_context = _get_system_time_context()
     base = (
         f"Eres {cfg.assistant_name}, un asistente de inteligencia artificial "
         f"amigable, conciso y preciso para Windows. Tu usuario es {cfg.user_name}. "
         "Respondes siempre en español de forma natural, fluida y directa. "
         "Evitas respuestas excesivamente largas a menos que el tema lo requiera. "
-        "Si no sabes algo, dilo honestamente."
+        "Si no sabes algo, dilo honestamente.\n\n"
+        f"{time_context}"
     )
     try:
         from obsidian_brain import brain

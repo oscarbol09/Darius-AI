@@ -1231,10 +1231,18 @@ class DariusFinal(ctk.CTk):
         r"\b(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\b",
         re.IGNORECASE
     )
+    _RE_HORA = re.compile(
+        r"\b(qu[eé]\s+horas?(\s+(es|son|tienes|marca))?|hora\s+actual|hora\s+exacta|dime\s+la\s+hora|la\s+hora|tienes\s+la\s+hora)\b",
+        re.IGNORECASE
+    )
+    _RE_FECHA = re.compile(
+        r"\b(qu[eé]\s+fecha(\s+(es|tenemos|hoy))?|qu[eé]\s+d[ií]a(\s+(es(\s+hoy)?|tenemos))?|fecha\s+de\s+hoy|d[ií]a\s+de\s+hoy|a\s+qu[eé]\s+estamos(\s+hoy)?)\b",
+        re.IGNORECASE
+    )
 
     _CMD_PATTERNS = [
-        (re.compile(r"\b(qué hora|hora exacta)\b"),                              "_cmd_hora"),
-        (re.compile(r"\b(qué fecha|fecha de hoy|día de hoy)\b"),                 "_cmd_fecha"),
+        (_RE_HORA,                                                                "_cmd_hora"),
+        (_RE_FECHA,                                                               "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
         (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "_cmd_youtube"),
         (re.compile(r"\b(busca|buscar|googlea)\b"),                              "_cmd_buscar"),
@@ -1279,10 +1287,20 @@ class DariusFinal(ctk.CTk):
     # ── Handlers ──────────────────────────────────────────────────────────────
 
     def _cmd_hora(self, _):
-        self.talk(f"Son las {datetime.datetime.now().strftime('%H:%M')}.")
+        now = datetime.datetime.now()
+        hora_12 = now.strftime("%I:%M %p").lower().replace("am", "a. m.").replace("pm", "p. m.")
+        self.talk(f"Son las {hora_12}.")
 
     def _cmd_fecha(self, _):
-        self.talk(f"Hoy es {datetime.datetime.now().strftime('%d de %B de %Y')}.")
+        now = datetime.datetime.now()
+        dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        meses = [
+            "enero", "febrero", "marzo", "abril", "mayo", "junio",
+            "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+        ]
+        dia_semana = dias[now.weekday()]
+        mes = meses[now.month - 1]
+        self.talk(f"Hoy es {dia_semana}, {now.day} de {mes} de {now.year}.")
 
     def _cmd_reset(self, _):
         self.reset_conversation()

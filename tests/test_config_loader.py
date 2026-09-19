@@ -51,6 +51,9 @@ class TestDefaults:
     def test_gemini_max_tokens_is_800(self):
         assert _DEFAULTS["gemini"]["max_tokens"] == 800
 
+    def test_gemini_default_model_is_3_6_flash(self):
+        assert _DEFAULTS["gemini"]["model"] == "gemini-3.6-flash"
+
     def test_all_schema_keys_have_defaults(self):
         for key, expected_type in _SCHEMA.items():
             if isinstance(expected_type, dict):
@@ -65,7 +68,7 @@ class TestConfigLive:
         from config_loader import cfg
         assert cfg.assistant_name == "darius"
         assert cfg.gemini_max_tokens == 800
-        assert cfg.gemini_model == "gemini-3.6-flash"
+        assert isinstance(cfg.gemini_model, str) and len(cfg.gemini_model) > 0
 
     def test_cfg_get_returns_default_for_missing(self):
         from config_loader import cfg

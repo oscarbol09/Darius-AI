@@ -577,10 +577,22 @@ class TestCmdPatterns(unittest.TestCase):
     de main.py solo en Windows.
     """
 
+    _RE_HORA_TEST = re.compile(
+        r"\b(qu[eé]\s+horas?(\s+(es|son|tienes|marca))?|hora\s+actual|hora\s+exacta|"
+        r"dime\s+la\s+hora|la\s+hora|tienes\s+la\s+hora)\b",
+        re.IGNORECASE
+    )
+    _RE_FECHA_TEST = re.compile(
+        r"\b(qu[eé]\s+fecha(\s+(es|tenemos|hoy))?|qu[eé]\s+d[ií]a(\s+(es(\s+hoy)?|tenemos))?|"
+        r"fecha\s+de\s+hoy|d[ií]a\s+de\s+hoy|a\s+qu[eé]\s+estamos(\s+hoy)?)\b",
+        re.IGNORECASE
+    )
+
     # Replica de _CMD_PATTERNS de main.py (los patrones relevantes)
     PATTERNS = [
-        (re.compile(r"\b(qué hora|hora exacta)\b"),                              "hora"),
-        (re.compile(r"\b(qué fecha|fecha de hoy|día de hoy)\b"),                 "fecha"),
+        (_RE_HORA_TEST,                                                          "hora"),
+        (_RE_FECHA_TEST,                                                         "fecha"),
+        (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "reset"),
         (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "youtube"),
         (re.compile(r"\b(busca|buscar|googlea)\b"),                              "buscar"),
         (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),           "abrir"),
@@ -592,7 +604,7 @@ class TestCmdPatterns(unittest.TestCase):
     ]
 
     def _route(self, cmd: str) -> str | None:
-        cmd = cmd.strip().lower()
+        cmd = cmd.strip()
         for pattern, handler in self.PATTERNS:
             if pattern.search(cmd):
                 return handler
@@ -600,10 +612,16 @@ class TestCmdPatterns(unittest.TestCase):
 
     def test_hora_commands(self):
         self.assertEqual(self._route("qué hora es"), "hora")
+        self.assertEqual(self._route("que hora es"), "hora")
+        self.assertEqual(self._route("dime la hora"), "hora")
+        self.assertEqual(self._route("tienes la hora"), "hora")
         self.assertEqual(self._route("hora exacta por favor"), "hora")
 
     def test_fecha_commands(self):
         self.assertEqual(self._route("qué fecha es hoy"), "fecha")
+        self.assertEqual(self._route("que fecha es"), "fecha")
+        self.assertEqual(self._route("que dia es hoy"), "fecha")
+        self.assertEqual(self._route("a que estamos hoy"), "fecha")
         self.assertEqual(self._route("fecha de hoy"), "fecha")
 
     def test_youtube_commands(self):
