@@ -181,8 +181,158 @@ except ImportError:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  HELPERS
+#  SOPORTE HIGH-DPI Y HELPERS
 # ─────────────────────────────────────────────────────────────────────────────
+
+def enable_dpi_awareness():
+    """Habilita DPI awareness en Windows para nitidez en pantallas de alta resolución."""
+    if sys.platform == "win32":
+        with contextlib.suppress(Exception):
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)  # Per-monitor DPI aware
+            return
+        with contextlib.suppress(Exception):
+            import ctypes
+            ctypes.windll.user32.SetProcessDPIAware()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  VISUALIZADOR VECTORIAL DE ONDAS A 60 FPS (Senior Craftsmanship)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class HighPerfWaveVisualizer(ctk.CTkFrame):
+    """
+    Visualizador vectorial de ondas a 60 FPS con múltiples armónicos sinusoidales vectorizados en NumPy.
+    Utiliza actualizaciones atómicas con canvas.coords() eliminando canvas.delete('all')
+    para evitar fugas de memoria en el intérprete Tcl y parpadeos visuales.
+    """
+
+    def __init__(self, master, width: int = 480, height: int = 80, num_points: int = 120, **kwargs):
+        super().__init__(
+            master,
+            fg_color="#111827",
+            corner_radius=12,
+            border_width=1,
+            border_color="#1E293B",
+            **kwargs
+        )
+        self.w = width
+        self.h = height
+        self.num_points = num_points
+        self.cy = height / 2.0
+
+        self.canvas = tk.Canvas(
+            self,
+            width=self.w,
+            height=self.h,
+            bg="#111827",
+            highlightthickness=0,
+            bd=0
+        )
+        self.canvas.pack(fill="both", expand=True, padx=8, pady=4)
+
+        # Precalcular proyecciones de coordenadas X estáticas
+        self.x_screen = np.linspace(0, self.w, self.num_points, dtype=np.float32)
+        self.x_norm = np.linspace(0, 4.0 * np.pi, self.num_points, dtype=np.float32)
+
+        # Buffers preasignados de coordenadas (x0, y0, x1, y1...) para evitar reallocaciones
+        self._buf_primary = np.empty((self.num_points, 2), dtype=np.float32)
+        self._buf_primary[:, 0] = self.x_screen
+        self._buf_primary[:, 1] = self.cy
+
+        self._buf_secondary = np.empty((self.num_points, 2), dtype=np.float32)
+        self._buf_secondary[:, 0] = self.x_screen
+        self._buf_secondary[:, 1] = self.cy
+
+        self._buf_tertiary = np.empty((self.num_points, 2), dtype=np.float32)
+        self._buf_tertiary[:, 0] = self.x_screen
+        self._buf_tertiary[:, 1] = self.cy
+
+        # Crear líneas vectoriales una sola vez durante la inicialización
+        self.line_tertiary = self.canvas.create_line(
+            *self._buf_tertiary.ravel().tolist(),
+            fill="#34D399",  # Emerald sutil
+            width=1.0,
+            capstyle=tk.ROUND,
+            joinstyle=tk.ROUND
+        )
+        self.line_secondary = self.canvas.create_line(
+            *self._buf_secondary.ravel().tolist(),
+            fill="#818CF8",  # Indigo armónico
+            width=1.5,
+            capstyle=tk.ROUND,
+            joinstyle=tk.ROUND
+        )
+        self.line_primary = self.canvas.create_line(
+            *self._buf_primary.ravel().tolist(),
+            fill="#38BDF8",  # Sky-400 primario
+            width=2.5,
+            capstyle=tk.ROUND,
+            joinstyle=tk.ROUND
+        )
+
+        self._phase = 0.0
+
+    def update_frame(self, state: str, audio_energy: float = 0.0):
+        """
+        Calcula la proyección matemática en NumPy y actualiza las líneas atómicamente.
+        state: 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING' | 'MUTED'
+        """
+        self._phase += 0.07
+        p = self._phase
+        x = self.x_norm
+        cy = self.cy
+
+        if state == "LISTENING":
+            amp = float(np.clip(audio_energy / 2500.0 * 28.0 + 4.0, 3.0, 34.0))
+            y1 = cy + amp * np.sin(2.0 * x + p) * np.cos(0.8 * x - p * 0.4)
+            y2 = cy + (amp * 0.65) * np.sin(3.2 * x - p * 1.2 + 1.0)
+            y3 = cy + (amp * 0.35) * np.cos(1.5 * x + p * 0.8)
+            self.canvas.itemconfig(self.line_primary, fill="#38BDF8")
+            self.canvas.itemconfig(self.line_secondary, fill="#818CF8")
+            self.canvas.itemconfig(self.line_tertiary, fill="#34D399")
+
+        elif state == "SPEAKING":
+            y1 = cy + 18.0 * np.sin(2.5 * x + p * 1.6) * np.sin(0.7 * x + p * 0.3)
+            y2 = cy + 12.0 * np.cos(3.0 * x - p * 1.3)
+            y3 = cy + 6.0 * np.sin(1.2 * x + p * 0.5)
+            self.canvas.itemconfig(self.line_primary, fill="#38BDF8")
+            self.canvas.itemconfig(self.line_secondary, fill="#60A5FA")
+            self.canvas.itemconfig(self.line_tertiary, fill="#818CF8")
+
+        elif state == "THINKING":
+            y1 = cy + 11.0 * np.sin(5.5 * x + p * 2.2) * np.cos(2.0 * x - p)
+            y2 = cy + 8.0 * np.sin(4.0 * x - p * 1.8 + 0.5)
+            y3 = cy + 5.0 * np.cos(2.5 * x + p * 1.2)
+            self.canvas.itemconfig(self.line_primary, fill="#A78BFA")
+            self.canvas.itemconfig(self.line_secondary, fill="#818CF8")
+            self.canvas.itemconfig(self.line_tertiary, fill="#F472B6")
+
+        elif state == "MUTED":
+            y1 = cy + 0.8 * np.sin(1.0 * x + p * 0.2)
+            y2 = cy + 0.5 * np.cos(1.0 * x + p * 0.2)
+            y3 = cy + np.zeros_like(x)
+            self.canvas.itemconfig(self.line_primary, fill="#64748B")
+            self.canvas.itemconfig(self.line_secondary, fill="#475569")
+            self.canvas.itemconfig(self.line_tertiary, fill="#334155")
+
+        else:  # IDLE
+            y1 = cy + 4.5 * np.sin(1.8 * x + p * 0.6)
+            y2 = cy + 2.8 * np.cos(1.2 * x - p * 0.4 + 0.8)
+            y3 = cy + 1.5 * np.sin(0.8 * x + p * 0.3)
+            self.canvas.itemconfig(self.line_primary, fill="#38BDF8")
+            self.canvas.itemconfig(self.line_secondary, fill="#818CF8")
+            self.canvas.itemconfig(self.line_tertiary, fill="#34D399")
+
+        self._buf_primary[:, 1] = y1
+        self._buf_secondary[:, 1] = y2
+        self._buf_tertiary[:, 1] = y3
+
+        # Actualizaciones atómicas en Tcl
+        self.canvas.coords(self.line_tertiary, *self._buf_tertiary.ravel().tolist())
+        self.canvas.coords(self.line_secondary, *self._buf_secondary.ravel().tolist())
+        self.canvas.coords(self.line_primary, *self._buf_primary.ravel().tolist())
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CLASE PRINCIPAL
@@ -192,9 +342,10 @@ class DariusFinal(ctk.CTk):
 
     def __init__(self):
         super().__init__()
-        self.title("DARIUS AI - SISTEMA OPERATIVO")
-        self.geometry("520x920")
-        self.configure(fg_color="#0f0f0f")
+        self.title("DARIUS AI — Sistema Operativo Autónomo")
+        self.geometry("540x960")
+        self.minsize(500, 850)
+        self.configure(fg_color="#090D16")
         self.protocol("WM_DELETE_WINDOW", self.kill_process)
 
         self.running              = True
@@ -203,8 +354,10 @@ class DariusFinal(ctk.CTk):
         self.is_muted             = False
         self.installed_apps       = {}
         self._current_audio_level = 0.0
+        self._smoothed_energy     = 0.0
+        self._is_thinking         = False
         self._pending_action: dict | None = None
-        self._pending_lock = threading.RLock()
+        self._pending_lock        = threading.RLock()
         self._ptt_active          = False
 
         self.listen_mode = DEFAULT_LISTEN_MODE
@@ -217,6 +370,7 @@ class DariusFinal(ctk.CTk):
         self.configure_listener()
         self.setup_ui()
         self.scan_apps_async()
+        self._start_render_pipeline()
 
     # =========================================================================
     #  TTS / VOZ
@@ -283,138 +437,231 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def setup_ui(self):
-        ctk.CTkLabel(self, text="DARIUS AI",
-                     font=("Orbitron", 32, "bold"), text_color="#00fbff").pack(pady=(20, 0))
+        # ── 1. HEADER & TELEMETRÍA ──────────────────────────────────────────
+        header_card = ctk.CTkFrame(
+            self, fg_color="#111827", corner_radius=12,
+            border_width=1, border_color="#1E293B"
+        )
+        header_card.pack(pady=(14, 6), padx=16, fill="x")
 
-        self.status_label = ctk.CTkLabel(self, text="SISTEMA LISTO",
-                                         font=("Arial", 12), text_color="gray")
-        self.status_label.pack(pady=3)
+        title_row = ctk.CTkFrame(header_card, fg_color="transparent")
+        title_row.pack(fill="x", padx=16, pady=(10, 4))
 
-        self.mode_label = ctk.CTkLabel(self, text=self._mode_label_text(),
-                                       font=("Consolas", 11), text_color="#555555")
-        self.mode_label.pack(pady=0)
+        ctk.CTkLabel(
+            title_row, text="DARIUS AI",
+            font=("Segoe UI", 22, "bold"), text_color="#38BDF8"
+        ).pack(side="left")
 
-        self.canvas = tk.Canvas(self, width=350, height=100,
-                                bg="#0f0f0f", highlightthickness=0)
-        self.canvas.pack(pady=10)
-        self.wave_bars = [
-            self.canvas.create_rectangle(
-                10 + i * 14, 45, 10 + i * 14 + 8, 55, fill="#00fbff", outline="")
-            for i in range(25)
-        ]
+        ctk.CTkLabel(
+            title_row, text="SISTEMA OPERATIVO v6.5.0",
+            font=("Segoe UI", 10, "bold"), text_color="#64748B"
+        ).pack(side="right", pady=(6, 0))
+
+        # Fila de badges / telemetría
+        telemetry_row = ctk.CTkFrame(header_card, fg_color="transparent")
+        telemetry_row.pack(fill="x", padx=16, pady=(0, 10))
+
+        # Status Pill con punto de estado
+        status_pill = ctk.CTkFrame(telemetry_row, fg_color="#1F2937", corner_radius=8)
+        status_pill.pack(side="left", padx=(0, 6))
+
+        self.status_dot = ctk.CTkLabel(
+            status_pill, text="●",
+            font=("Segoe UI", 12), text_color="#34D399"
+        )
+        self.status_dot.pack(side="left", padx=(8, 3), pady=2)
+
+        self.status_label = ctk.CTkLabel(
+            status_pill, text="SISTEMA LISTO",
+            font=("Segoe UI", 10, "bold"), text_color="#F8FAFC"
+        )
+        self.status_label.pack(side="left", padx=(0, 8), pady=2)
+
+        # Obsidian Pill
+        obsidian_connected = bool(brain.vault_path and Path(brain.vault_path).exists())
+        obsidian_text = "CONECTADO" if obsidian_connected else "LOCAL"
+        obsidian_color = "#34D399" if obsidian_connected else "#94A3B8"
+        self.brain_pill = ctk.CTkLabel(
+            telemetry_row, text=f"🧠 OBSIDIAN: {obsidian_text}",
+            font=("Segoe UI", 10, "bold"), text_color=obsidian_color,
+            fg_color="#1F2937", corner_radius=8, padx=8, pady=2
+        )
+        self.brain_pill.pack(side="left", padx=4)
+
+        # Apps Count Pill
+        self.apps_pill = ctk.CTkLabel(
+            telemetry_row, text="📦 APPS: 0",
+            font=("Segoe UI", 10, "bold"), text_color="#94A3B8",
+            fg_color="#1F2937", corner_radius=8, padx=8, pady=2
+        )
+        self.apps_pill.pack(side="left", padx=4)
+
+        # ── 2. VISUALIZADOR VECTORIAL DE ONDAS (60 FPS) ───────────────────────
+        self.visualizer = HighPerfWaveVisualizer(self, width=500, height=80)
+        self.visualizer.pack(pady=4, padx=16, fill="x")
+
+        # ── 3. CONSOLA DE CONVERSACIÓN / ACTIVIDAD ─────────────────────────────
+        chat_card = ctk.CTkFrame(
+            self, fg_color="#111827", corner_radius=12,
+            border_width=1, border_color="#1E293B"
+        )
+        chat_card.pack(pady=6, padx=16, fill="both", expand=True)
+
+        chat_header = ctk.CTkFrame(chat_card, fg_color="transparent")
+        chat_header.pack(fill="x", padx=14, pady=(8, 2))
+
+        ctk.CTkLabel(
+            chat_header, text="CONSOLA DE ACTIVIDAD Y COMANDOS",
+            font=("Segoe UI", 9, "bold"), text_color="#64748B"
+        ).pack(side="left")
+
+        self.mode_pill = ctk.CTkLabel(
+            chat_header, text=self._mode_label_text(),
+            font=("Segoe UI", 9, "bold"), text_color="#38BDF8"
+        )
+        self.mode_pill.pack(side="right")
 
         self.chat_display = ctk.CTkTextbox(
-            self, width=470, height=310, font=("Consolas", 12),
-            state="disabled", fg_color="#111111",
-            border_color="#00fbff", border_width=1,
-            scrollbar_button_color="#00fbff",
-            scrollbar_button_hover_color="#00aacc"
+            chat_card, font=("Consolas", 11),
+            state="disabled", fg_color="#0B0F19",
+            border_color="#1E293B", border_width=1,
+            scrollbar_button_color="#1F2937",
+            scrollbar_button_hover_color="#38BDF8"
         )
-        self.chat_display.pack(pady=8)
-        tb = self.chat_display._textbox
-        tb.tag_config("oscar",       foreground="#00ff88", font=("Consolas", 12, "bold"))
-        tb.tag_config("darius",      foreground="#00fbff", font=("Consolas", 12, "bold"))
-        tb.tag_config("oscar_text",  foreground="#ccffdd", font=("Consolas", 12))
-        tb.tag_config("darius_text", foreground="#ddfeff", font=("Consolas", 12))
-        tb.tag_config("timestamp",   foreground="#555555", font=("Consolas", 10))
-        tb.tag_config("warn",        foreground="#ffaa00", font=("Consolas", 12, "bold"))
+        self.chat_display.pack(padx=12, pady=(2, 12), fill="both", expand=True)
 
+        tb = self.chat_display._textbox
+        tb.tag_config("oscar", foreground="#34D399", font=("Consolas", 11, "bold"))
+        tb.tag_config("darius", foreground="#38BDF8", font=("Consolas", 11, "bold"))
+        tb.tag_config("system", foreground="#818CF8", font=("Consolas", 11, "bold"))
+        tb.tag_config("warn", foreground="#FBBF24", font=("Consolas", 11, "bold"))
+        tb.tag_config("oscar_text", foreground="#F1F5F9", font=("Consolas", 11))
+        tb.tag_config("darius_text", foreground="#E2E8F0", font=("Consolas", 11))
+        tb.tag_config("system_text", foreground="#94A3B8", font=("Consolas", 11))
+        tb.tag_config("timestamp", foreground="#64748B", font=("Consolas", 9))
+
+        # ── 4. CAMPO DE ENTRADA Y ENVÍO RÁPIDO ────────────────────────────────
         input_frame = ctk.CTkFrame(self, fg_color="transparent")
-        input_frame.pack(pady=5, padx=20, fill="x")
+        input_frame.pack(pady=4, padx=16, fill="x")
 
         self.text_input = ctk.CTkEntry(
-            input_frame, placeholder_text="Escribe un comando…",
-            font=("Consolas", 12), fg_color="#1a1a1a",
-            border_color="#00fbff", border_width=1, text_color="#ffffff"
+            input_frame, placeholder_text="Escribe un comando o consulta para Darius…",
+            font=("Segoe UI", 11), fg_color="#1F2937",
+            border_color="#374151", border_width=1,
+            text_color="#F8FAFC", placeholder_text_color="#64748B",
+            height=38, corner_radius=8
         )
         self.text_input.pack(side="left", fill="x", expand=True, padx=(0, 8))
         self.text_input.bind("<Return>", self._on_text_submit)
 
         ctk.CTkButton(
-            input_frame, text="▶", width=40, fg_color="#00fbff",
-            text_color="black", font=("Arial", 14, "bold"),
-            command=self._on_text_submit
+            input_frame, text="ENVIAR ▶", width=84, height=38,
+            fg_color="#38BDF8", hover_color="#0284C7",
+            text_color="#090D16", font=("Segoe UI", 11, "bold"),
+            corner_radius=8, command=self._on_text_submit
         ).pack(side="right")
 
+        # ── 5. BOTONES DE ACCIÓN PRINCIPAL ────────────────────────────────────
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(pady=5)
+        btn_frame.pack(pady=4, padx=16, fill="x")
 
         self.start_btn = ctk.CTkButton(
-            btn_frame, text="INICIALIZAR", fg_color="#00fbff",
-            text_color="black", font=("Arial", 13, "bold"),
+            btn_frame, text="⚡ INICIALIZAR", fg_color="#38BDF8",
+            hover_color="#0284C7", text_color="#090D16",
+            font=("Segoe UI", 11, "bold"), height=34, corner_radius=8,
             command=self.start_system
         )
-        self.start_btn.pack(side="left", padx=5)
+        self.start_btn.pack(side="left", fill="x", expand=True, padx=(0, 4))
 
         self.mute_btn = ctk.CTkButton(
-            btn_frame, text="🔇 SILENCIO", fg_color="#ff5555",
-            state="disabled", font=("Arial", 13), command=self.toggle_mute
+            btn_frame, text="🔇 SILENCIO", fg_color="#F87171",
+            hover_color="#EF4444", text_color="#090D16",
+            state="disabled", font=("Segoe UI", 11, "bold"),
+            height=34, corner_radius=8, command=self.toggle_mute
         )
-        self.mute_btn.pack(side="left", padx=5)
+        self.mute_btn.pack(side="left", fill="x", expand=True, padx=4)
 
         self.clear_btn = ctk.CTkButton(
-            btn_frame, text="🗑 NUEVA CONV.", fg_color="#555555",
-            font=("Arial", 13), command=self.reset_conversation
+            btn_frame, text="🗑 NUEVA SESIÓN", fg_color="#1F2937",
+            hover_color="#374151", text_color="#F8FAFC",
+            font=("Segoe UI", 11), height=34, corner_radius=8,
+            command=self.reset_conversation
         )
-        self.clear_btn.pack(side="left", padx=5)
+        self.clear_btn.pack(side="left", fill="x", expand=True, padx=(4, 0))
 
-        mode_frame = ctk.CTkFrame(self, fg_color="#111111", corner_radius=8)
-        mode_frame.pack(pady=8, padx=20, fill="x")
+        # ── 6. SELECTOR DE MODO DE ACTIVACIÓN ─────────────────────────────────
+        mode_frame = ctk.CTkFrame(
+            self, fg_color="#111827", corner_radius=12,
+            border_width=1, border_color="#1E293B"
+        )
+        mode_frame.pack(pady=(4, 14), padx=16, fill="x")
 
-        ctk.CTkLabel(mode_frame, text="MODO DE ACTIVACIÓN",
-                     font=("Consolas", 10, "bold"), text_color="#555555").pack(pady=(6, 2))
+        ctk.CTkLabel(
+            mode_frame, text="MODO DE ACTIVACIÓN DE VOZ",
+            font=("Segoe UI", 9, "bold"), text_color="#64748B"
+        ).pack(pady=(8, 4))
 
         btn_mode_row = ctk.CTkFrame(mode_frame, fg_color="transparent")
-        btn_mode_row.pack(pady=(0, 8))
+        btn_mode_row.pack(pady=(0, 6), padx=10, fill="x")
 
         self._mode_btns = {}
         modes = [
-            (LISTEN_MODE_PTT,  f"🎙 PTT ({LISTEN_KEY.upper()})", "#ff8800"),
-            (LISTEN_MODE_NAME, "🔤 NOMBRE",                       "#00fbff"),
-            (LISTEN_MODE_AUTO, "🔄 AUTO",                          "#888888"),
+            (LISTEN_MODE_PTT,  f"🎙 PTT ({LISTEN_KEY.upper()})", "#38BDF8"),
+            (LISTEN_MODE_NAME, f"🔤 NOMBRE («{ASSISTANT_NAME}»)", "#34D399"),
+            (LISTEN_MODE_AUTO, "🔄 AUTO", "#818CF8"),
         ]
-        for mode_id, label, color in modes:
+        for mode_id, label, active_color in modes:
+            is_active = (mode_id == self.listen_mode)
             btn = ctk.CTkButton(
-                btn_mode_row, text=label, width=130,
-                fg_color=color if mode_id == self.listen_mode else "#2a2a2a",
-                text_color="black" if mode_id == self.listen_mode else "#aaaaaa",
-                font=("Arial", 12, "bold"),
+                btn_mode_row, text=label,
+                fg_color=active_color if is_active else "#1F2937",
+                hover_color=active_color,
+                text_color="#090D16" if is_active else "#94A3B8",
+                border_color=active_color if is_active else "#374151",
+                border_width=1,
+                font=("Segoe UI", 10, "bold"),
+                height=30, corner_radius=6,
                 command=lambda m=mode_id: self._set_listen_mode(m)
             )
-            btn.pack(side="left", padx=4)
-            self._mode_btns[mode_id] = (btn, color)
+            btn.pack(side="left", fill="x", expand=True, padx=3)
+            self._mode_btns[mode_id] = (btn, active_color)
 
         self.ptt_hint = ctk.CTkLabel(
             mode_frame,
             text=f"💡 Modo PTT: mantén presionado [{LISTEN_KEY.upper()}] mientras hablas",
-            font=("Arial", 10), text_color="#444444"
+            font=("Segoe UI", 10), text_color="#94A3B8"
         )
         if self.listen_mode == LISTEN_MODE_PTT:
-            self.ptt_hint.pack(pady=(0, 6))
+            self.ptt_hint.pack(pady=(0, 8))
 
     def _mode_label_text(self) -> str:
         icons = {
-            LISTEN_MODE_PTT:  f"🎙 PTT — tecla: [{LISTEN_KEY.upper()}]",
-            LISTEN_MODE_NAME: f"🔤 NOMBRE — solo responde a «{ASSISTANT_NAME}»",
-            LISTEN_MODE_AUTO: "🔄 AUTO — escucha todo",
+            LISTEN_MODE_PTT:  f"🎙 PTT • [{LISTEN_KEY.upper()}]",
+            LISTEN_MODE_NAME: f"🔤 NOMBRE • «{ASSISTANT_NAME}»",
+            LISTEN_MODE_AUTO: "🔄 AUTO • Escucha continua",
         }
         return icons.get(self.listen_mode, "")
 
     def _set_listen_mode(self, mode: str):
         self.listen_mode = mode
-        for mode_id, (btn, color) in self._mode_btns.items():
-            btn.configure(fg_color=color if mode_id == mode else "#2a2a2a",
-                          text_color="black" if mode_id == mode else "#aaaaaa")
-        self.mode_label.configure(text=self._mode_label_text())
+        for mode_id, (btn, active_color) in self._mode_btns.items():
+            is_active = (mode_id == mode)
+            btn.configure(
+                fg_color=active_color if is_active else "#1F2937",
+                text_color="#090D16" if is_active else "#94A3B8",
+                border_color=active_color if is_active else "#374151",
+            )
+        if hasattr(self, "mode_pill"):
+            self.mode_pill.configure(text=self._mode_label_text())
         if mode == LISTEN_MODE_PTT:
-            self.ptt_hint.pack(pady=(0, 6))
+            self.ptt_hint.pack(pady=(0, 8))
             if not KEYBOARD_AVAILABLE:
                 self.talk("Advertencia: librería keyboard no instalada. Ejecuta pip install keyboard")
         else:
             with contextlib.suppress(Exception):
                 self.ptt_hint.pack_forget()
         log.info(f"Modo cambiado a: {mode}")
-        self.set_status(self._mode_label_text(), "#00fbff")
+        self.set_status(f"MODO: {mode.upper()}", "#38BDF8")
 
     def _on_text_submit(self, event=None):
         text = self.text_input.get().strip()
@@ -428,12 +675,22 @@ class DariusFinal(ctk.CTk):
 
     def _insert_message(self, speaker: str, text: str, tag: str = ""):
         self.chat_display.configure(state="normal")
-        tb        = self.chat_display._textbox
-        ts        = datetime.datetime.now().strftime("%H:%M")
-        is_darius = speaker.lower() == "darius"
-        name_tag  = "darius"      if is_darius else "oscar"
-        text_tag  = tag or ("darius_text" if is_darius else "oscar_text")
-        prefix    = "🤖 DARIUS"   if is_darius else f"🧑 {USER_NAME.upper()}"
+        tb = self.chat_display._textbox
+        ts = datetime.datetime.now().strftime("%H:%M")
+        spk = speaker.lower()
+        if spk == "darius":
+            name_tag = "darius"
+            text_tag = tag or "darius_text"
+            prefix = "🤖 DARIUS AI"
+        elif spk in ["sistema", "system"]:
+            name_tag = "system"
+            text_tag = tag or "system_text"
+            prefix = "⚙ SISTEMA"
+        else:
+            name_tag = "oscar"
+            text_tag = tag or "oscar_text"
+            prefix = f"🧑 {USER_NAME.upper()}"
+
         tb.insert("end", "\n")
         tb.insert("end", f"[{ts}] ", "timestamp")
         tb.insert("end", f"{prefix}\n", name_tag)
@@ -445,33 +702,63 @@ class DariusFinal(ctk.CTk):
         self.after(0, self._insert_message, speaker, text)
 
     def set_status(self, text: str, color: str = "gray"):
-        self.after(0, self.status_label.configure, {"text": text, "text_color": color})
+        dot_colors = {
+            "#00fbff": "#38BDF8",
+            "#00ff88": "#34D399",
+            "#ffaa00": "#FBBF24",
+            "#ff5555": "#F87171",
+            "#aa00ff": "#A78BFA",
+            "gray": "#64748B",
+            "green": "#34D399",
+            "cyan": "#38BDF8",
+            "yellow": "#FBBF24",
+            "red": "#F87171",
+        }
+        resolved_color = dot_colors.get(color, color)
+
+        def _update():
+            if hasattr(self, "status_label"):
+                self.status_label.configure(text=text)
+            if hasattr(self, "status_dot"):
+                self.status_dot.configure(text_color=resolved_color)
+
+        self.after(0, _update)
 
     # =========================================================================
-    #  ANIMACIÓN
+    #  RENDER PIPELINE & ANIMACIÓN (60 FPS)
     # =========================================================================
 
-    def animate_logic(self):
+    def _start_render_pipeline(self):
+        self._render_loop()
+
+    def _render_loop(self):
         if not self.running:
             return
-        if self.is_listening:
-            energy = self._current_audio_level
-            base_h = np.clip(energy / 4000 * 70, 4, 75)
-            for bar in self.wave_bars:
-                h = np.clip(base_h * np.random.uniform(0.5, 1.5), 4, 75)
-                x0, _, x1, _ = self.canvas.coords(bar)
-                self.canvas.coords(bar, x0, 50 - h/2, x1, 50 + h/2)
-            self.after(80, self.animate_logic)
+
+        # Suavizado de energía acústica del micrófono
+        target_energy = self._current_audio_level
+        self._smoothed_energy += 0.3 * (target_energy - self._smoothed_energy)
+
+        # Determinar estado visual
+        if self.is_muted:
+            state = "MUTED"
         elif self.tts_worker.is_speaking.is_set():
-            for bar in self.wave_bars:
-                h = np.random.randint(8, 45)
-                x0, _, x1, _ = self.canvas.coords(bar)
-                self.canvas.coords(bar, x0, 50 - h/2, x1, 50 + h/2)
-            self.after(120, self.animate_logic)
+            state = "SPEAKING"
+        elif self.is_listening:
+            state = "LISTENING"
+        elif self._is_thinking:
+            state = "THINKING"
         else:
-            for bar in self.wave_bars:
-                x0, _, x1, _ = self.canvas.coords(bar)
-                self.canvas.coords(bar, x0, 45, x1, 55)
+            state = "IDLE"
+
+        if hasattr(self, "visualizer"):
+            self.visualizer.update_frame(state, self._smoothed_energy)
+
+        self.after(16, self._render_loop)  # ~60 FPS
+
+    def animate_logic(self):
+        """Compatibilidad retrospectiva con llamadas heredadas."""
+        pass
 
     def _start_audio_level_monitor(self):
         def monitor():
@@ -488,7 +775,7 @@ class DariusFinal(ctk.CTk):
                         self._current_audio_level = float(audioop.rms(data, 2))
                     except Exception:
                         self._current_audio_level = 0.0
-                    time.sleep(0.05)
+                    time.sleep(0.02)
                 stream.stop_stream()
                 stream.close()
             except Exception as e:
@@ -504,11 +791,13 @@ class DariusFinal(ctk.CTk):
     def toggle_mute(self):
         self.is_muted = not self.is_muted
         if self.is_muted:
-            self.mute_btn.configure(text="🔊 ESCUCHAR", fg_color="#00ff88")
+            self.mute_btn.configure(text="🔊 ESCUCHAR", fg_color="#34D399", hover_color="#10B981")
             self.add_to_chat("Darius", "Modo discreto activado.")
+            self.set_status("SILENCIADO", "#F87171")
         else:
-            self.mute_btn.configure(text="🔇 SILENCIO", fg_color="#ff5555")
+            self.mute_btn.configure(text="🔇 SILENCIO", fg_color="#F87171", hover_color="#EF4444")
             self.talk("Sistemas de escucha reactivados.")
+            self.set_status("SISTEMA LISTO", "#34D399")
 
     def reset_conversation(self):
         self.conversation_history.clear()
@@ -538,9 +827,14 @@ class DariusFinal(ctk.CTk):
                 if age_h < APP_CACHE_HOURS:
                     self.installed_apps = data["apps"]
                     log.info(f"Apps desde caché local: {len(self.installed_apps)}")
-                    self.after(0, self.status_label.configure,
-                               {"text": f"BASE DE DATOS: {len(self.installed_apps)} APPS",
-                                "text_color": "#00ff88"})
+                    self.set_status(f"BASE DE DATOS: {len(self.installed_apps)} APPS", "#34D399")
+                    self.after(
+                        0,
+                        lambda: self.apps_pill.configure(
+                            text=f"📦 APPS: {len(self.installed_apps)}",
+                            text_color="#34D399"
+                        ) if hasattr(self, "apps_pill") else None
+                    )
                     return
             except Exception as e:
                 log.warning(f"Caché local inválida: {e}")
@@ -578,7 +872,7 @@ class DariusFinal(ctk.CTk):
                 key.Close()
             except OSError:
                 continue
-        self.set_status("ESCANEANDO APLICACIONES...", "#ffaa00")
+        self.set_status("ESCANEANDO APLICACIONES...", "#FBBF24")
         scanned_dirs = []
         for folder in [
             Path(os.environ.get("PROGRAMFILES",      r"C:\Program Files")),
@@ -591,7 +885,7 @@ class DariusFinal(ctk.CTk):
             try:
                 for i, exe in enumerate(folder.rglob("*.exe")):
                     if i % 100 == 0 and i > 0:
-                        self.set_status(f"ESCANEANDO: {i} EXES EN {folder.name}...", "#ffaa00")
+                        self.set_status(f"ESCANEANDO: {i} EXES EN {folder.name}...", "#FBBF24")
                     stem = exe.stem.lower().replace("-", " ").replace("_", " ")
                     if stem not in apps:
                         apps[stem] = str(exe)
@@ -607,8 +901,14 @@ class DariusFinal(ctk.CTk):
             )
         except Exception as e:
             log.warning(f"No se pudo guardar caché local: {e}")
-        self.after(0, self.status_label.configure,
-                   {"text": f"BASE DE DATOS: {len(apps)} APPS", "text_color": "#00ff88"})
+        self.set_status(f"BASE DE DATOS: {len(apps)} APPS", "#34D399")
+        self.after(
+            0,
+            lambda: self.apps_pill.configure(
+                text=f"📦 APPS: {len(apps)}",
+                text_color="#34D399"
+            ) if hasattr(self, "apps_pill") else None
+        )
 
     def find_app(self, query: str) -> str | None:
         q = query.lower().strip()
@@ -622,7 +922,12 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def start_system(self):
-        self.start_btn.configure(state="disabled", text="NÚCLEO ONLINE")
+        self.start_btn.configure(
+            state="disabled",
+            text="⚡ NÚCLEO ONLINE",
+            fg_color="#1F2937",
+            text_color="#34D399"
+        )
         self.mute_btn.configure(state="normal")
         mode_desc = {
             LISTEN_MODE_PTT:  f"Modo P.T.T. activo. Mantén presionado {LISTEN_KEY} para hablar.",
@@ -1167,6 +1472,7 @@ class DariusFinal(ctk.CTk):
           2. Si Gemini falla, escala a OpenRouter.
           3. Si ambos fallan, informa al usuario.
         """
+        self._is_thinking = True
         self.set_status("⚡ PROCESANDO IA…", "#aa00ff")
         self.conversation_history.append({"role": "user", "content": prompt})
         max_msgs = GEMINI_HISTORY_TURNS * 2
@@ -1175,21 +1481,19 @@ class DariusFinal(ctk.CTk):
 
         try:
             answer_text, provider = get_ai_response(prompt, self.conversation_history[:-1])
+            if answer_text and answer_text.strip():
+                clean = re.sub(r"[*_`#>]", "", answer_text).strip()
+                self.conversation_history.append({"role": "model", "content": clean})
+                log.info(f"[IA] Respuesta via {provider} ({len(clean)} chars)")
+                self.talk(clean)
+            else:
+                self.talk("No obtuve respuesta del motor de IA.")
         except Exception as exc:
             log.error(f"[IA] Error inesperado: {exc}")
             self.talk("Ocurrió un error al consultar la IA. Comandos locales activos.")
-            self.set_status("LISTO", "gray")
-            return
-
-        if answer_text and answer_text.strip():
-            clean = re.sub(r"[*_`#>]", "", answer_text).strip()
-            self.conversation_history.append({"role": "model", "content": clean})
-            log.info(f"[IA] Respuesta via {provider} ({len(clean)} chars)")
-            self.talk(clean)
-        else:
-            self.talk("No obtuve respuesta del motor de IA.")
-
-        self.set_status("LISTO", "gray")
+        finally:
+            self._is_thinking = False
+            self.set_status("SISTEMA LISTO", "#34D399")
 
     # =========================================================================
     #  CIERRE LIMPIO
@@ -1212,5 +1516,6 @@ class DariusFinal(ctk.CTk):
 # ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    enable_dpi_awareness()
     app = DariusFinal()
     app.mainloop()
