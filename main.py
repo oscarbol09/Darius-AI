@@ -452,10 +452,25 @@ class DariusFinal(ctk.CTk):
             font=("Segoe UI", 22, "bold"), text_color="#38BDF8"
         ).pack(side="left")
 
+        ctk.CTkButton(
+            title_row,
+            text="⚙ AJUSTES IA",
+            width=100,
+            height=26,
+            fg_color="#1F2937",
+            hover_color="#374151",
+            border_color="#38BDF8",
+            border_width=1,
+            text_color="#38BDF8",
+            font=("Segoe UI", 10, "bold"),
+            corner_radius=6,
+            command=self._open_byok_settings,
+        ).pack(side="right", padx=(8, 0))
+
         ctk.CTkLabel(
-            title_row, text="SISTEMA OPERATIVO v6.5.0",
+            title_row, text="v6.5.0 • WINDOWS",
             font=("Segoe UI", 10, "bold"), text_color="#64748B"
-        ).pack(side="right", pady=(6, 0))
+        ).pack(side="right", pady=(4, 0))
 
         # Fila de badges / telemetría
         telemetry_row = ctk.CTkFrame(header_card, fg_color="transparent")
@@ -476,6 +491,14 @@ class DariusFinal(ctk.CTk):
             font=("Segoe UI", 10, "bold"), text_color="#F8FAFC"
         )
         self.status_label.pack(side="left", padx=(0, 8), pady=2)
+
+        # Proveedor de IA Activo Pill
+        self.llm_pill = ctk.CTkLabel(
+            telemetry_row, text=self._llm_badge_text(),
+            font=("Segoe UI", 10, "bold"), text_color="#38BDF8",
+            fg_color="#1F2937", corner_radius=8, padx=8, pady=2
+        )
+        self.llm_pill.pack(side="left", padx=4)
 
         # Obsidian Pill
         obsidian_connected = bool(brain.vault_path and Path(brain.vault_path).exists())
@@ -662,6 +685,21 @@ class DariusFinal(ctk.CTk):
                 self.ptt_hint.pack_forget()
         log.info(f"Modo cambiado a: {mode}")
         self.set_status(f"MODO: {mode.upper()}", "#38BDF8")
+
+    def _llm_badge_text(self) -> str:
+        prov = cfg.active_provider.upper()
+        return f"🤖 IA: {prov}"
+
+    def _open_byok_settings(self):
+        from byok_settings import BYOKSettingsModal
+        BYOKSettingsModal(self, on_save_callback=self._on_byok_settings_saved)
+
+    def _on_byok_settings_saved(self):
+        if hasattr(self, "llm_pill"):
+            self.llm_pill.configure(text=self._llm_badge_text())
+        prov_name = cfg.active_provider.upper()
+        self.set_status(f"IA: {prov_name}", "#38BDF8")
+        self.talk(f"Configuración de IA actualizada. Proveedor activo: {prov_name}.")
 
     def _on_text_submit(self, event=None):
         text = self.text_input.get().strip()

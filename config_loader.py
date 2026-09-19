@@ -36,6 +36,25 @@ _DEFAULTS: dict = {
         "temperature": 0.7,
         "history_turns": 10,
     },
+    "llm": {
+        "active_provider": "gemini",
+        "gemini_api_key": "",
+        "gemini_model": "gemini-2.5-flash",
+        "openai_api_key": "",
+        "openai_model": "gpt-4o-mini",
+        "openrouter_api_key": "",
+        "openrouter_model": "google/gemma-3-27b-it:free",
+        "nvidia_api_key": "",
+        "nvidia_model": "meta/llama-3.1-70b-instruct",
+        "groq_api_key": "",
+        "groq_model": "llama-3.3-70b-versatile",
+        "ollama_base_url": "http://localhost:11434/v1",
+        "ollama_model": "llama3.2",
+        "custom_base_url": "http://localhost:1234/v1",
+        "custom_api_key": "",
+        "custom_model": "local-model",
+        "fallback_enabled": True,
+    },
     "tts": {
         "rate": 1,
         "volume": 100,
@@ -204,6 +223,76 @@ class _Config:
     def min_words_without_name(self) -> int:
         return int(self.get("min_words_without_name", default=99))
 
+    # ── Propiedades BYOK Multi-Proveedor ──────────────────────────────────────
+
+    @property
+    def active_provider(self) -> str:
+        return str(self.get("llm", "active_provider", default="gemini")).lower().strip()
+
+    @property
+    def llm_gemini_api_key(self) -> str:
+        return str(self.get("llm", "gemini_api_key", default=""))
+
+    @property
+    def llm_gemini_model(self) -> str:
+        return str(self.get("llm", "gemini_model", default="gemini-2.5-flash"))
+
+    @property
+    def llm_openai_api_key(self) -> str:
+        return str(self.get("llm", "openai_api_key", default=""))
+
+    @property
+    def llm_openai_model(self) -> str:
+        return str(self.get("llm", "openai_model", default="gpt-4o-mini"))
+
+    @property
+    def llm_openrouter_api_key(self) -> str:
+        return str(self.get("llm", "openrouter_api_key", default=""))
+
+    @property
+    def llm_openrouter_model(self) -> str:
+        return str(self.get("llm", "openrouter_model", default="google/gemma-3-27b-it:free"))
+
+    @property
+    def llm_nvidia_api_key(self) -> str:
+        return str(self.get("llm", "nvidia_api_key", default=""))
+
+    @property
+    def llm_nvidia_model(self) -> str:
+        return str(self.get("llm", "nvidia_model", default="meta/llama-3.1-70b-instruct"))
+
+    @property
+    def llm_groq_api_key(self) -> str:
+        return str(self.get("llm", "groq_api_key", default=""))
+
+    @property
+    def llm_groq_model(self) -> str:
+        return str(self.get("llm", "groq_model", default="llama-3.3-70b-versatile"))
+
+    @property
+    def llm_ollama_base_url(self) -> str:
+        return str(self.get("llm", "ollama_base_url", default="http://localhost:11434/v1"))
+
+    @property
+    def llm_ollama_model(self) -> str:
+        return str(self.get("llm", "ollama_model", default="llama3.2"))
+
+    @property
+    def llm_custom_base_url(self) -> str:
+        return str(self.get("llm", "custom_base_url", default="http://localhost:1234/v1"))
+
+    @property
+    def llm_custom_api_key(self) -> str:
+        return str(self.get("llm", "custom_api_key", default=""))
+
+    @property
+    def llm_custom_model(self) -> str:
+        return str(self.get("llm", "custom_model", default="local-model"))
+
+    @property
+    def llm_fallback_enabled(self) -> bool:
+        return bool(self.get("llm", "fallback_enabled", default=True))
+
 
 # ==============================================================================
 #  Esquema de validación de tipos
@@ -219,6 +308,25 @@ _SCHEMA: dict = {
         "max_tokens": int,
         "temperature": (int, float),
         "history_turns": int,
+    },
+    "llm": {
+        "active_provider": str,
+        "gemini_api_key": str,
+        "gemini_model": str,
+        "openai_api_key": str,
+        "openai_model": str,
+        "openrouter_api_key": str,
+        "openrouter_model": str,
+        "nvidia_api_key": str,
+        "nvidia_model": str,
+        "groq_api_key": str,
+        "groq_model": str,
+        "ollama_base_url": str,
+        "ollama_model": str,
+        "custom_base_url": str,
+        "custom_api_key": str,
+        "custom_model": str,
+        "fallback_enabled": bool,
     },
     "tts": {
         "rate": (int, float),

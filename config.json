@@ -9,6 +9,25 @@
     "temperature": 0.7,
     "history_turns": 10
   },
+  "llm": {
+    "active_provider": "gemini",
+    "gemini_api_key": "",
+    "gemini_model": "gemini-2.5-flash",
+    "openai_api_key": "",
+    "openai_model": "gpt-4o-mini",
+    "openrouter_api_key": "",
+    "openrouter_model": "google/gemma-3-27b-it:free",
+    "nvidia_api_key": "",
+    "nvidia_model": "meta/llama-3.1-70b-instruct",
+    "groq_api_key": "",
+    "groq_model": "llama-3.3-70b-versatile",
+    "ollama_base_url": "http://localhost:11434/v1",
+    "ollama_model": "llama3.2",
+    "custom_base_url": "http://localhost:1234/v1",
+    "custom_api_key": "",
+    "custom_model": "local-model",
+    "fallback_enabled": true
+  },
   "tts": {
     "rate": 1,
     "volume": 100
