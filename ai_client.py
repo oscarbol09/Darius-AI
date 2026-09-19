@@ -448,7 +448,7 @@ def test_provider_connection(
             from google import genai
             from google.genai import types
             client = genai.Client(api_key=effective_key)
-            effective_model = model.strip() or cfg.llm_gemini_model or "gemini-2.5-flash"
+            effective_model = model.strip() or cfg.llm_gemini_model or "gemini-3.6-flash"
             resp = client.models.generate_content(
                 model=effective_model,
                 contents=[{"role": "user", "parts": [{"text": test_prompt}]}],

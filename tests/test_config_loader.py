@@ -65,7 +65,7 @@ class TestConfigLive:
         from config_loader import cfg
         assert cfg.assistant_name == "darius"
         assert cfg.gemini_max_tokens == 800
-        assert cfg.gemini_model == "gemini-2.5-flash"
+        assert cfg.gemini_model == "gemini-3.6-flash"
 
     def test_cfg_get_returns_default_for_missing(self):
         from config_loader import cfg

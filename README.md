@@ -121,7 +121,7 @@ Puedes especificar la ruta de tu bóveda en `config.json`:
 
 | Proveedor | Identificador | Modelo Predeterminado | Endpoint Base | Variable de Entorno |
 | :--- | :--- | :--- | :--- | :--- |
-| **Google Gemini** | `gemini` | `gemini-2.5-flash` | Google GenAI SDK nativo | `GEMINI_API_KEY` |
+| **Google Gemini** | `gemini` | `gemini-3.6-flash` | Google GenAI SDK nativo | `GEMINI_API_KEY` |
 | **OpenAI / ChatGPT** | `openai` | `gpt-4o-mini` | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 | **Groq Cloud** | `groq` | `llama-3.3-70b-versatile` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
 | **NVIDIA NIM** | `nvidia_nim` | `meta/llama-3.3-70b-instruct` | `https://integrate.api.nvidia.com/v1` | `NVIDIA_API_KEY` |

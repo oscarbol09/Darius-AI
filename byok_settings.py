@@ -24,7 +24,15 @@ from config_loader import cfg
 
 # Modelos populares sugeridos por proveedor
 PROVIDER_DEFAULT_MODELS: dict[str, list[str]] = {
-    "gemini": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash", "gemini-1.5-pro"],
+    "gemini": [
+        "gemini-3.6-flash",
+        "gemini-3.8-flash",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-3.5-flash",
+        "gemini-3.7-flash",
+    ],
     "openai": ["gpt-4o-mini", "gpt-4o", "o3-mini", "gpt-4.1", "gpt-3.5-turbo"],
     "openrouter": [
         "google/gemma-3-27b-it:free",
@@ -85,7 +93,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self._provider_data: dict[str, dict[str, str]] = {
             "gemini": {
                 "key": cfg.llm_gemini_api_key or resolve_provider_key("gemini"),
-                "model": cfg.llm_gemini_model or "gemini-2.5-flash",
+                "model": cfg.llm_gemini_model or "gemini-3.6-flash",
                 "base_url": "",
             },
             "openai": {
@@ -246,7 +254,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         self.model_combo = ctk.CTkComboBox(
             self.form_card,
-            values=["gemini-2.5-flash"],
+            values=["gemini-3.6-flash"],
             font=("Consolas", 11),
             fg_color="#1F2937",
             border_color="#374151",

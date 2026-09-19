@@ -148,7 +148,7 @@ El motor de IA implementa un despachador unificado que resuelve credenciales de 
 
 | Proveedor | Identificador | Base URL | Modelo Default | Mecanismo |
 | :--- | :--- | :--- | :--- | :--- |
-| **Google Gemini** | `gemini` | N/A (Google GenAI SDK) | `gemini-2.5-flash` | `genai.Client(api_key=...)` |
+| **Google Gemini** | `gemini` | N/A (Google GenAI SDK) | `gemini-3.6-flash` | `genai.Client(api_key=...)` |
 | **OpenAI** | `openai` | `https://api.openai.com/v1` | `gpt-4o-mini` | `_call_openai_compatible()` |
 | **Groq** | `groq` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | `_call_openai_compatible()` |
 | **NVIDIA NIM** | `nvidia_nim` | `https://integrate.api.nvidia.com/v1` | `meta/llama-3.3-70b-instruct` | `_call_openai_compatible()` |

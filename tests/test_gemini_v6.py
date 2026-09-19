@@ -21,7 +21,7 @@ import unittest
 from unittest.mock import MagicMock
 
 # ── Configuración ─────────────────────────────────────────────────────────────
-GEMINI_MODEL         = "gemini-2.5-flash"
+GEMINI_MODEL         = "gemini-3.6-flash"
 GEMINI_MAX_TOKENS    = 800
 GEMINI_TEMPERATURE   = 0.7
 GEMINI_HISTORY_TURNS = 10

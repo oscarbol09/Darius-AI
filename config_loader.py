@@ -31,7 +31,7 @@ _DEFAULTS: dict = {
         "user_name": "Oscar",
     },
     "gemini": {
-        "model": "gemini-2.5-flash",
+        "model": "gemini-3.6-flash",
         "max_tokens": 800,
         "temperature": 0.7,
         "history_turns": 10,
@@ -39,7 +39,7 @@ _DEFAULTS: dict = {
     "llm": {
         "active_provider": "gemini",
         "gemini_api_key": "",
-        "gemini_model": "gemini-2.5-flash",
+        "gemini_model": "gemini-3.6-flash",
         "openai_api_key": "",
         "openai_model": "gpt-4o-mini",
         "openrouter_api_key": "",
@@ -145,7 +145,7 @@ class _Config:
 
     @property
     def gemini_model(self) -> str:
-        return str(self.get("gemini", "model", default="gemini-2.5-flash"))
+        return str(self.get("gemini", "model", default="gemini-3.6-flash"))
 
     @property
     def gemini_max_tokens(self) -> int:
@@ -235,7 +235,7 @@ class _Config:
 
     @property
     def llm_gemini_model(self) -> str:
-        return str(self.get("llm", "gemini_model", default="gemini-2.5-flash"))
+        return str(self.get("llm", "gemini_model", default="gemini-3.6-flash"))
 
     @property
     def llm_openai_api_key(self) -> str:

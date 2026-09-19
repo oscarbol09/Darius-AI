@@ -4,7 +4,7 @@
     "user_name": "Oscar"
   },
   "gemini": {
-    "model": "gemini-2.5-flash",
+    "model": "gemini-3.6-flash",
     "max_tokens": 800,
     "temperature": 0.7,
     "history_turns": 10
@@ -12,7 +12,7 @@
   "llm": {
     "active_provider": "gemini",
     "gemini_api_key": "",
-    "gemini_model": "gemini-2.5-flash",
+    "gemini_model": "gemini-3.6-flash",
     "openai_api_key": "",
     "openai_model": "gpt-4o-mini",
     "openrouter_api_key": "",
