@@ -4,7 +4,7 @@
     "user_name": "Oscar"
   },
   "gemini": {
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.1-flash-lite",
     "max_tokens": 800,
     "temperature": 0.7,
     "history_turns": 10
@@ -12,7 +12,7 @@
   "llm": {
     "active_provider": "gemini",
     "gemini_api_key": "",
-    "gemini_model": "gemini-3.6-flash",
+    "gemini_model": "gemini-3.1-flash-lite",
     "openai_api_key": "",
     "openai_model": "gpt-4o-mini",
     "openrouter_api_key": "",
@@ -29,8 +29,32 @@
     "fallback_enabled": true
   },
   "tts": {
+    "engine": "sapi",
     "rate": 1,
     "volume": 100
+  },
+  "elevenlabs": {
+    "api_key": "",
+    "voice_id": "",
+    "model_id": "eleven_multilingual_v2",
+    "output_format": "pcm_24000",
+    "cache_enabled": true
+  },
+  "workspace": {
+    "song_uri": "https://open.spotify.com/track/39shmbIHICJ2Wxnk1fPSdz?si=2900c75c2e2d4b82",
+    "claude_url": "https://claude.ai/new",
+    "monitor_claude": 1,
+    "monitor_secondary": 2,
+    "secondary_url": "https://tasaradar.com",
+    "welcome_phrase": "Bienvenido de vuelta, Óscar. Todos los sistemas de Darius AI han sido inicializados.",
+    "cursor_fullscreen": true
+  },
+  "acoustic_trigger": {
+    "enabled": false,
+    "spike_ratio": 7.0,
+    "cooldown_s": 0.45,
+    "action": "protocolo_darius",
+    "device": ""
   },
   "microphone": {
     "energy_threshold": 3000,

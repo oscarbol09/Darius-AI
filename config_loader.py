@@ -56,8 +56,32 @@ _DEFAULTS: dict = {
         "fallback_enabled": True,
     },
     "tts": {
+        "engine": "sapi",
         "rate": 1,
         "volume": 100,
+    },
+    "elevenlabs": {
+        "api_key": "",
+        "voice_id": "",
+        "model_id": "eleven_multilingual_v2",
+        "output_format": "pcm_24000",
+        "cache_enabled": True,
+    },
+    "workspace": {
+        "song_uri": "https://open.spotify.com/track/39shmbIHICJ2Wxnk1fPSdz?si=2900c75c2e2d4b82",
+        "claude_url": "https://claude.ai/new",
+        "monitor_claude": 1,
+        "monitor_secondary": 2,
+        "secondary_url": "https://tasaradar.com",
+        "welcome_phrase": "Bienvenido de vuelta, Óscar. Todos los sistemas de Darius AI han sido inicializados.",
+        "cursor_fullscreen": True,
+    },
+    "acoustic_trigger": {
+        "enabled": False,
+        "spike_ratio": 7.0,
+        "cooldown_s": 0.45,
+        "action": "protocolo_darius",
+        "device": "",
     },
     "microphone": {
         "energy_threshold": 3000,
@@ -158,6 +182,10 @@ class _Config:
     @property
     def gemini_history_turns(self) -> int:
         return int(self.get("gemini", "history_turns", default=10))
+
+    @property
+    def tts_engine(self) -> str:
+        return str(self.get("tts", "engine", default="sapi")).lower().strip()
 
     @property
     def tts_rate(self) -> int:
@@ -293,6 +321,81 @@ class _Config:
     def llm_fallback_enabled(self) -> bool:
         return bool(self.get("llm", "fallback_enabled", default=True))
 
+    # ── Propiedades ElevenLabs ────────────────────────────────────────────────
+
+    @property
+    def elevenlabs_api_key(self) -> str:
+        return str(self.get("elevenlabs", "api_key", default=""))
+
+    @property
+    def elevenlabs_voice_id(self) -> str:
+        return str(self.get("elevenlabs", "voice_id", default=""))
+
+    @property
+    def elevenlabs_model_id(self) -> str:
+        return str(self.get("elevenlabs", "model_id", default="eleven_multilingual_v2"))
+
+    @property
+    def elevenlabs_output_format(self) -> str:
+        return str(self.get("elevenlabs", "output_format", default="pcm_24000"))
+
+    @property
+    def elevenlabs_cache_enabled(self) -> bool:
+        return bool(self.get("elevenlabs", "cache_enabled", default=True))
+
+    # ── Propiedades Workspace & Multimonitor ──────────────────────────────────
+
+    @property
+    def workspace_song_uri(self) -> str:
+        return str(self.get("workspace", "song_uri", default="https://open.spotify.com/track/39shmbIHICJ2Wxnk1fPSdz?si=2900c75c2e2d4b82"))
+
+    @property
+    def workspace_claude_url(self) -> str:
+        return str(self.get("workspace", "claude_url", default="https://claude.ai/new"))
+
+    @property
+    def workspace_monitor_claude(self) -> int:
+        return int(self.get("workspace", "monitor_claude", default=1))
+
+    @property
+    def workspace_monitor_secondary(self) -> int:
+        return int(self.get("workspace", "monitor_secondary", default=2))
+
+    @property
+    def workspace_secondary_url(self) -> str:
+        return str(self.get("workspace", "secondary_url", default="https://tasaradar.com"))
+
+    @property
+    def workspace_welcome_phrase(self) -> str:
+        default_phrase = "Bienvenido a casa, señor. Todos los sistemas del entorno de trabajo han sido inicializados."
+        return str(self.get("workspace", "welcome_phrase", default=default_phrase))
+
+    @property
+    def workspace_cursor_fullscreen(self) -> bool:
+        return bool(self.get("workspace", "cursor_fullscreen", default=True))
+
+    # ── Propiedades Acoustic Trigger (Double-Clap) ───────────────────────────
+
+    @property
+    def acoustic_trigger_enabled(self) -> bool:
+        return bool(self.get("acoustic_trigger", "enabled", default=False))
+
+    @property
+    def acoustic_trigger_spike_ratio(self) -> float:
+        return float(self.get("acoustic_trigger", "spike_ratio", default=7.0))
+
+    @property
+    def acoustic_trigger_cooldown_s(self) -> float:
+        return float(self.get("acoustic_trigger", "cooldown_s", default=0.45))
+
+    @property
+    def acoustic_trigger_action(self) -> str:
+        return str(self.get("acoustic_trigger", "action", default="protocolo_darius"))
+
+    @property
+    def acoustic_trigger_device(self) -> str:
+        return str(self.get("acoustic_trigger", "device", default=""))
+
 
 # ==============================================================================
 #  Esquema de validación de tipos
@@ -329,8 +432,32 @@ _SCHEMA: dict = {
         "fallback_enabled": bool,
     },
     "tts": {
+        "engine": str,
         "rate": (int, float),
         "volume": int,
+    },
+    "elevenlabs": {
+        "api_key": str,
+        "voice_id": str,
+        "model_id": str,
+        "output_format": str,
+        "cache_enabled": bool,
+    },
+    "workspace": {
+        "song_uri": str,
+        "claude_url": str,
+        "monitor_claude": int,
+        "monitor_secondary": int,
+        "secondary_url": str,
+        "welcome_phrase": str,
+        "cursor_fullscreen": bool,
+    },
+    "acoustic_trigger": {
+        "enabled": bool,
+        "spike_ratio": (int, float),
+        "cooldown_s": (int, float),
+        "action": str,
+        "device": str,
     },
     "microphone": {
         "energy_threshold": int,

@@ -46,6 +46,7 @@ import win32event
 import winerror
 from dotenv import load_dotenv
 
+from acoustic_trigger import AcousticDoubleClapDetector, auto_select_best_mic
 from obsidian_brain import brain
 from tts_worker import TTSWorker
 from voice_filter import (
@@ -63,6 +64,14 @@ from windows_commands import (
 )
 from windows_commands import (
     run_action as wincmd_run_action,
+)
+from workspace_manager import (
+    focus_or_launch_cursor,
+    get_monitor_count,
+    get_monitor_rects,
+    run_darius_welcome_protocol,
+    run_dev_mode,
+    run_trading_mode,
 )
 
 load_dotenv()
@@ -368,6 +377,17 @@ class DariusFinal(ctk.CTk):
         self.tts_worker.start()
         self.listener = sr.Recognizer()
         self.configure_listener()
+
+        # Detector de doble aplauso (Protocolo Darius / Acoustic Trigger)
+        self._clap_detector = AcousticDoubleClapDetector(
+            on_trigger=self._on_acoustic_double_clap,
+            spike_ratio=cfg.acoustic_trigger_spike_ratio,
+            cooldown_s=cfg.acoustic_trigger_cooldown_s,
+            device_spec=cfg.acoustic_trigger_device,
+        )
+        if cfg.acoustic_trigger_enabled:
+            self._clap_detector.start()
+
         self.setup_ui()
         self.scan_apps_async()
         self._start_render_pipeline()
@@ -396,7 +416,9 @@ class DariusFinal(ctk.CTk):
         self.listener.pause_threshold          = MIC_PAUSE_THRESHOLD
         self.listener.non_speaking_duration    = 0.5
         try:
-            with sr.Microphone() as source:
+            best_mic_idx = auto_select_best_mic(cfg.acoustic_trigger_device)
+            mic_kwargs = {"device_index": best_mic_idx} if best_mic_idx is not None else {}
+            with sr.Microphone(**mic_kwargs) as source:
                 self.listener.adjust_for_ambient_noise(source, duration=1)
             log.info("Calibración completada.")
         except Exception as e:
@@ -468,7 +490,7 @@ class DariusFinal(ctk.CTk):
         ).pack(side="right", padx=(8, 0))
 
         ctk.CTkLabel(
-            title_row, text="v6.5.0 • WINDOWS",
+            title_row, text="v7.0.0 • DARIUS AI • WIN",
             font=("Segoe UI", 10, "bold"), text_color="#64748B"
         ).pack(side="right", pady=(4, 0))
 
@@ -478,7 +500,7 @@ class DariusFinal(ctk.CTk):
 
         # Status Pill con punto de estado
         status_pill = ctk.CTkFrame(telemetry_row, fg_color="#1F2937", corner_radius=8)
-        status_pill.pack(side="left", padx=(0, 6))
+        status_pill.pack(side="left", padx=(0, 4))
 
         self.status_dot = ctk.CTkLabel(
             status_pill, text="●",
@@ -496,9 +518,9 @@ class DariusFinal(ctk.CTk):
         self.llm_pill = ctk.CTkLabel(
             telemetry_row, text=self._llm_badge_text(),
             font=("Segoe UI", 10, "bold"), text_color="#38BDF8",
-            fg_color="#1F2937", corner_radius=8, padx=8, pady=2
+            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
         )
-        self.llm_pill.pack(side="left", padx=4)
+        self.llm_pill.pack(side="left", padx=3)
 
         # Obsidian Pill
         obsidian_connected = bool(brain.vault_path and Path(brain.vault_path).exists())
@@ -507,17 +529,37 @@ class DariusFinal(ctk.CTk):
         self.brain_pill = ctk.CTkLabel(
             telemetry_row, text=f"🧠 OBSIDIAN: {obsidian_text}",
             font=("Segoe UI", 10, "bold"), text_color=obsidian_color,
-            fg_color="#1F2937", corner_radius=8, padx=8, pady=2
+            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
         )
-        self.brain_pill.pack(side="left", padx=4)
+        self.brain_pill.pack(side="left", padx=3)
 
-        # Apps Count Pill
-        self.apps_pill = ctk.CTkLabel(
-            telemetry_row, text="📦 APPS: 0",
-            font=("Segoe UI", 10, "bold"), text_color="#94A3B8",
-            fg_color="#1F2937", corner_radius=8, padx=8, pady=2
+        # Monitores Pill
+        self.monitors_pill = ctk.CTkLabel(
+            telemetry_row, text=f"🖥 {get_monitor_count()} PANTALLA{'S' if get_monitor_count() > 1 else ''}",
+            font=("Segoe UI", 10, "bold"), text_color="#A78BFA",
+            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
         )
-        self.apps_pill.pack(side="left", padx=4)
+        self.monitors_pill.pack(side="left", padx=3)
+
+        # Aplauso Pill / Botón de Toggle
+        clap_active = hasattr(self, "_clap_detector") and self._clap_detector.is_running()
+        self.clap_btn = ctk.CTkButton(
+            telemetry_row, text=self._clap_badge_text(),
+            font=("Segoe UI", 10, "bold"),
+            text_color="#34D399" if clap_active else "#94A3B8",
+            fg_color="#1F2937", hover_color="#374151",
+            corner_radius=8, width=80, height=24,
+            command=self.toggle_clap_detector,
+        )
+        self.clap_btn.pack(side="left", padx=3)
+
+        # TTS Engine Pill
+        self.tts_pill = ctk.CTkLabel(
+            telemetry_row, text=self._tts_badge_text(),
+            font=("Segoe UI", 10, "bold"), text_color="#FBBF24",
+            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
+        )
+        self.tts_pill.pack(side="left", padx=3)
 
         # ── 2. VISUALIZADOR VECTORIAL DE ONDAS (60 FPS) ───────────────────────
         self.visualizer = HighPerfWaveVisualizer(self, width=500, height=80)
@@ -690,6 +732,49 @@ class DariusFinal(ctk.CTk):
         prov = cfg.active_provider.upper()
         return f"🤖 IA: {prov}"
 
+    def _clap_badge_text(self) -> str:
+        state = "ON" if hasattr(self, "_clap_detector") and self._clap_detector.is_running() else "OFF"
+        return f"👏 APLAUSO: {state}"
+
+    def _tts_badge_text(self) -> str:
+        eng = cfg.tts_engine.upper()
+        return f"🔊 TTS: {eng}"
+
+    def toggle_clap_detector(self):
+        """Alterna el detector acústico de doble aplauso en tiempo real."""
+        if self._clap_detector.is_running():
+            self._clap_detector.stop()
+            cfg.set(False, "acoustic_trigger", "enabled")
+            self.add_to_chat("Sistema", "Detector de doble aplauso desactivado.")
+            self.talk("Detector de aplausos desactivado.")
+        else:
+            self._clap_detector.start()
+            cfg.set(True, "acoustic_trigger", "enabled")
+            self.add_to_chat("Sistema", "Detector de doble aplauso activado.")
+            self.talk("Detector de aplausos activado.")
+        if hasattr(self, "clap_btn"):
+            active = self._clap_detector.is_running()
+            self.clap_btn.configure(
+                text=self._clap_badge_text(),
+                text_color="#34D399" if active else "#94A3B8",
+            )
+
+    def _on_acoustic_double_clap(self):
+        """Manejador de evento de doble aplauso acústico."""
+        log.info("👏 [Trigger] Doble aplauso recibido en DariusFinal.")
+        self.add_to_chat("Sistema", "👏 ¡Doble aplauso detectado!")
+        action = cfg.acoustic_trigger_action.lower()
+        if action in ("protocolo_darius", "welcome_protocol"):
+            self._cmd_darius_protocol(None)
+        elif action == "modo_desarrollo":
+            self._cmd_workspace_dev(None)
+        elif action == "modo_trading":
+            self._cmd_workspace_trading(None)
+        elif action == "enfocar_cursor":
+            self._cmd_focus_cursor(None)
+        else:
+            self.talk(f"Doble aplauso detectado. Esperando tus órdenes, {USER_NAME}.")
+
     def _open_byok_settings(self):
         from byok_settings import BYOKSettingsModal
         BYOKSettingsModal(self, on_save_callback=self._on_byok_settings_saved)
@@ -697,6 +782,8 @@ class DariusFinal(ctk.CTk):
     def _on_byok_settings_saved(self):
         if hasattr(self, "llm_pill"):
             self.llm_pill.configure(text=self._llm_badge_text())
+        if hasattr(self, "tts_pill"):
+            self.tts_pill.configure(text=self._tts_badge_text())
         prov_name = cfg.active_provider.upper()
         self.set_status(f"IA: {prov_name}", "#38BDF8")
         self.talk(f"Configuración de IA actualizada. Proveedor activo: {prov_name}.")
@@ -1240,10 +1327,37 @@ class DariusFinal(ctk.CTk):
         re.IGNORECASE
     )
 
+    # Regex para Workspaces y Protocolo Darius
+    _RE_DARIUS_PROTOCOL = re.compile(
+        r"\b(inicia[r]?|ejecuta[r]?|activa[r]?)?\s*(protocolo\s+darius|protocolo|modo\s+bienvenida|rutina\s+de\s+bienvenida|bienvenida\s+darius)\b",
+        re.IGNORECASE
+    )
+    _RE_WORKSPACE_DEV = re.compile(
+        r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+desarrollo|modo\s+dev|modo\s+programaci[oó]n|entorno\s+de\s+desarrollo)\b",
+        re.IGNORECASE
+    )
+    _RE_WORKSPACE_TRADING = re.compile(
+        r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+trading|modo\s+mercados|modo\s+finanzas|pantalla\s+trading)\b",
+        re.IGNORECASE
+    )
+    _RE_CURSOR = re.compile(
+        r"\b(enfoca[r]?\s+cursor|cursor\s+pantalla\s+completa|maximizar\s+cursor|abrir\s+cursor)\b",
+        re.IGNORECASE
+    )
+    _RE_MONITORES = re.compile(
+        r"\b(ver\s+monitores|cu[aá]ntos\s+monitores|pantallas\s+conectadas|info\s+monitores)\b",
+        re.IGNORECASE
+    )
+
     _CMD_PATTERNS = [
         (_RE_HORA,                                                                "_cmd_hora"),
         (_RE_FECHA,                                                               "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
+        (_RE_DARIUS_PROTOCOL,                                                     "_cmd_darius_protocol"),
+        (_RE_WORKSPACE_DEV,                                                       "_cmd_workspace_dev"),
+        (_RE_WORKSPACE_TRADING,                                                   "_cmd_workspace_trading"),
+        (_RE_CURSOR,                                                              "_cmd_focus_cursor"),
+        (_RE_MONITORES,                                                           "_cmd_ver_monitores"),
         (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "_cmd_youtube"),
         (re.compile(r"\b(busca|buscar|googlea)\b"),                              "_cmd_buscar"),
         (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),           "_cmd_abrir"),
@@ -1304,6 +1418,44 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_reset(self, _):
         self.reset_conversation()
+
+    def _cmd_darius_protocol(self, _):
+        self.talk("Iniciando Protocolo Darius. Configurando entorno de trabajo y herramientas.")
+        threading.Thread(
+            target=run_darius_welcome_protocol,
+            kwargs={
+                "talk_fn": self.talk,
+                "song_url": cfg.workspace_song_uri,
+                "claude_url": cfg.workspace_claude_url,
+                "monitor_claude": cfg.workspace_monitor_claude,
+                "monitor_secondary": cfg.workspace_monitor_secondary,
+                "secondary_url": cfg.workspace_secondary_url,
+                "welcome_phrase": cfg.workspace_welcome_phrase,
+            },
+            daemon=True,
+            name="darius-protocol",
+        ).start()
+
+    def _cmd_workspace_dev(self, _):
+        threading.Thread(target=run_dev_mode, args=(self.talk,), daemon=True, name="ws-dev").start()
+
+    def _cmd_workspace_trading(self, _):
+        threading.Thread(target=run_trading_mode, args=(self.talk,), daemon=True, name="ws-trading").start()
+
+    def _cmd_focus_cursor(self, _):
+        self.talk("Enfocando Cursor en pantalla completa.")
+        threading.Thread(
+            target=focus_or_launch_cursor,
+            kwargs={"fullscreen": True},
+            daemon=True,
+            name="focus-cursor",
+        ).start()
+
+    def _cmd_ver_monitores(self, _):
+        monitors = get_monitor_rects()
+        count = len(monitors)
+        details = ", ".join(f"Monitor {i+1} de {r[2]-r[0]} por {r[3]-r[1]} píxeles" for i, r in enumerate(monitors))
+        self.talk(f"Se han detectado {count} pantallas conectadas. {details}.")
 
     def _cmd_diario(self, cmd: str):
         entry = re.sub(
@@ -1558,6 +1710,8 @@ class DariusFinal(ctk.CTk):
     def kill_process(self):
         log.info("Iniciando cierre limpio…")
         self.running = False
+        if hasattr(self, "_clap_detector"):
+            self._clap_detector.stop()
         self.tts_worker.wait_until_done(timeout=5.0)
         self.tts_worker.stop()
         time.sleep(0.2)
