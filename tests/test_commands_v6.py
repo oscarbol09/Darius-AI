@@ -259,7 +259,7 @@ class TestWinCmdTypeB(unittest.TestCase):
                               f"'{key}.action' sin campo 'type'")
                 self.assertIn("run",    data["action"],
                               f"'{key}.action' sin campo 'run'")
-                self.assertIn(data["action"]["type"], ("powershell", "cmd"),
+                self.assertIn(data["action"]["type"], ("powershell", "cmd", "python"),
                               f"'{key}.action.type' inválido")
 
     def test_confirm_actions_are_marked(self):

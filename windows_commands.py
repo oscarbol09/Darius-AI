@@ -711,6 +711,52 @@ $ip     = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlia
         "desc": "Resumen técnico del sistema",
         "return_output": True
     },
+    "iniciar protocolo darius": {
+        "action": {"type": "python", "run": "workspace_darius_welcome"},
+        "aliases": [
+            "protocolo darius", "modo bienvenida", "rutina de bienvenida",
+            "inicia protocolo darius", "protocolo de bienvenida", "bienvenida darius",
+            "ejecutar protocolo darius", "iniciar bienvenida", "iniciar protocolo"
+        ],
+        "desc": "Iniciar Protocolo Darius (Bienvenida y Preparación de Espacio de Trabajo)",
+        "return_output": True
+    },
+    "modo desarrollo": {
+        "action": {"type": "python", "run": "workspace_dev"},
+        "aliases": [
+            "iniciar modo desarrollo", "activar modo programacion", "modo dev",
+            "entorno de desarrollo", "modo programar", "iniciar modo dev"
+        ],
+        "desc": "Activar Modo Desarrollo (Cursor + Claude)",
+        "return_output": True
+    },
+    "modo trading": {
+        "action": {"type": "python", "run": "workspace_trading"},
+        "aliases": [
+            "iniciar modo trading", "modo finanzas", "pantalla de trading",
+            "graficas de cripto", "modo mercados", "activar modo trading"
+        ],
+        "desc": "Activar Modo Trading (Binance + Tasaradar)",
+        "return_output": True
+    },
+    "enfocar cursor": {
+        "action": {"type": "python", "run": "workspace_cursor"},
+        "aliases": [
+            "cursor pantalla completa", "traer cursor al frente",
+            "maximizar cursor", "abrir editor cursor", "mostrar cursor"
+        ],
+        "desc": "Enfocar Cursor IDE en pantalla completa",
+        "return_output": True
+    },
+    "ver monitores": {
+        "action": {"type": "python", "run": "workspace_monitors"},
+        "aliases": [
+            "cuantos monitores tengo", "pantallas conectadas",
+            "ver pantallas del sistema", "informacion de monitores", "estado de monitores"
+        ],
+        "desc": "Ver información de monitores conectados",
+        "return_output": True
+    },
 }
 
 
@@ -812,7 +858,50 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
     open_window = action_entry.get("open_window", False)
 
     try:
-        if open_window:
+        if atype == "python":
+            workspace_cmd = action.get("run", "")
+            if workspace_cmd in ("workspace_darius_welcome", "workspace_welcome"):
+                from config_loader import cfg
+                from workspace_manager import run_darius_welcome_protocol
+
+                run_darius_welcome_protocol(
+                    song_url=cfg.workspace_song_uri,
+                    claude_url=cfg.workspace_claude_url,
+                    monitor_claude=cfg.workspace_monitor_claude,
+                    monitor_secondary=cfg.workspace_monitor_secondary,
+                    secondary_url=cfg.workspace_secondary_url,
+                    welcome_phrase=cfg.workspace_welcome_phrase,
+                )
+                return True, "Protocolo Darius ejecutado correctamente."
+            elif workspace_cmd == "workspace_dev":
+                from workspace_manager import run_dev_mode
+
+                run_dev_mode()
+                return True, "Modo de desarrollo activado."
+            elif workspace_cmd == "workspace_trading":
+                from workspace_manager import run_trading_mode
+
+                run_trading_mode()
+                return True, "Modo trading activado."
+            elif workspace_cmd == "workspace_cursor":
+                from workspace_manager import focus_or_launch_cursor
+
+                focus_or_launch_cursor(fullscreen=True)
+                return True, "Cursor enfocado en pantalla completa."
+            elif workspace_cmd == "workspace_monitors":
+                from workspace_manager import get_monitor_rects
+
+                monitors = get_monitor_rects()
+                count = len(monitors)
+                details = ", ".join(f"Monitor {i+1}: {r[2]-r[0]}x{r[3]-r[1]}" for i, r in enumerate(monitors))
+                return True, f"{count} monitores detectados: {details}."
+            fn = action.get("fn")
+            if callable(fn):
+                res = fn()
+                return True, str(res) if res is not None else ""
+            return True, ""
+
+        elif open_window:
             if atype == "powershell":
                 subprocess.Popen([_PS, "-NoExit", "-Command", run],  # noqa: S603,S607
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
