@@ -607,14 +607,11 @@ cd darius-ai
 python -m venv .venv
 .venv\Scripts\activate
 
-# 3. Instalar dependencias (Windows)
-pip install -r requirements-windows.txt
+# 3. Instalar dependencias para Windows
+pip install -r requirements.txt
 
-# 4. (Opcional) Instalar soporte PTT
-pip install keyboard
-
-# 5. (Opcional) Instalar wake-word por hardware
-pip install pvporcupine pyaudio
+# 4. (Opcional) Instalar wake-word por hardware
+pip install pvporcupine
 ```
 
 > **Nota sobre `keyboard`:** La librería `keyboard` requiere **privilegios de administrador** para leer eventos globales de teclado en Windows. Ejecuta el script como administrador o desde un terminal elevado si usas el modo PTT.

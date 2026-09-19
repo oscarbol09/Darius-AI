@@ -57,19 +57,17 @@ Darius-AI/
 │       └── main_darius-ai.yml  <- CI: ruff + pytest + gitleaks + pip-audit
 ├── Agent.md                 <- ESTE ARCHIVO — contexto maestro para IAs
 ├── README.md                <- Documentacion tecnica completa
-├── requirements.txt         <- Deps para Railway / Linux (Streamlit)
-├── requirements-windows.txt <- Deps para desarrollo local en Windows (main.py)
+├── requirements.txt         <- Dependencias completas para Windows (main.py)
 ├── config.json              <- Parametros de usuario
 ├── config_loader.py         <- Carga config.json, expone objeto `cfg` con propiedades snake_case
-├── main.py                  <- NUCLEO — UI, voz, comandos, IA
+├── main.py                  <- NUCLEO — UI CustomTkinter, voz, comandos, IA
 ├── windows_commands.py      <- Catalogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL con rutas completas)
-├── app.py                   <- Interfaz web Streamlit
 ├── voice_filter.py          <- Filtro de nombre en texto (check_name_in_text)
 ├── ai_client.py             <- Clientes Gemini + OpenRouter
 ├── tts_worker.py            <- Worker TTS (SAPI) en hilo propio
-├── edge_tts_engine.py       <- Blueprint: TTS edge-tts (cross-platform)
-├── stt_engine.py            <- Blueprint: STT con backends intercambiables
-├── supabase_client.py       <- Cliente Supabase compartido
+├── edge_tts_engine.py       <- Motor TTS alternativo con edge-tts
+├── stt_engine.py            <- Motor STT con backends intercambiables
+├── supabase_client.py       <- Cliente Supabase (persistencia y backup opcional)
 │
 ├── tests/
 │   ├── test_commands_v6.py  <- Tests de comandos del SO
@@ -79,7 +77,6 @@ Darius-AI/
 │   └── test_supabase_client.py <- Tests de supabase_client
 │
 ├── pyproject.toml           <- Configuracion Ruff (line-length=120), pytest, coverage
-├── Dockerfile               <- Contenedor multi-etapa (Railway)
 ├── requirements-dev.txt     <- Dependencias de desarrollo
 ├── CHANGELOG.md             <- Historial de versiones
 ├── CONTRIBUTING.md          <- Guia de contribucion
@@ -255,8 +252,8 @@ comandos via nombres de archivo maliciosos.
 
 **Decision:** Darius funciona completamente offline sin Supabase. Si
 `SUPABASE_URL`/`SUPABASE_KEY` no estan en `.env`, `get_supabase()` retorna `None`
-y todo el sistema sigue funcionando en modo local. La tabla `config` en Supabase
-permite compartir configuracion entre `main.py` y `app.py`.
+y todo el sistema sigue funcionando en modo local. Si esta configurado, permite
+respaldar historial y configuraciones en la nube.
 
 ### D8 — Ruff con reglas estrictas, 0 errores
 

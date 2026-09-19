@@ -1,5 +1,13 @@
 # Changelog
 
+## [6.4.0] - 2026-09-19
+
+### Cambios
+- Transición a arquitectura 100% nativa de escritorio para Windows.
+- Eliminación de dependencias y componentes web/Linux (`app.py`, `Dockerfile`, Railway).
+- Consolidación de dependencias en un único `requirements.txt` optimizado para Windows.
+- Actualización de metadatos del proyecto y documentación técnica.
+
 ## [6.3.0] - 2026-07-21
 
 ### Corregido
