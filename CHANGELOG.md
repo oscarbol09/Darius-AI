@@ -1,5 +1,28 @@
 # Changelog
 
+## [7.0.0] - 2026-09-19 — Workspace & Acoustic Automation Edition
+
+### Agregado
+- **Detector Acústico de Doble Aplauso (`acoustic_trigger.py`):**
+  - Detección en tiempo real de transitorios acústicos rápidos y dobles aplausos con adaptación continua del suelo de ruido (`NOISE_FLOOR_ALPHA=0.992`).
+  - Activación automática de rutinas de trabajo compuestas o despertar del asistente sin interactuar con el teclado.
+  - Sondeo y auto-selección inteligente de micrófonos para evitar bloqueos por dispositivos mudos o desconectados.
+- **Gestión Avanzada de Workspaces y Multi-Monitor Win32 (`workspace_manager.py`):**
+  - Detección y ordenación de monitores físicos conectados (`EnumDisplayMonitors`).
+  - Snap automático y apertura dirigida de navegadores y dashboards a pantallas secundarias específicas.
+  - Enfoque nativo de instancias activas de Cursor IDE y VS Code (`QueryFullProcessImageNameW` + `AttachThreadInput`), evitando la duplicación de procesos y con alternancia a pantalla completa (F11).
+  - Orquestación de rutinas automáticas: *Protocolo Darius*, *Modo Desarrollo*, *Modo Trading* y *Modo Concentración*.
+- **Motor TTS ElevenLabs con Caché Local Zero-Latency (`elevenlabs_tts_engine.py` & `tts_cache.py`):**
+  - Síntesis de voz ultra-realista con modelos multilingües de ElevenLabs y streaming de audio PCM a 24 kHz.
+  - Sistema de almacenamiento en disco con hashes SHA-256 (`audio_cache/`) para reproducir frases recurrentes con 0ms de latencia de red y 0 consumo de tokens de API.
+- **Nuevos Comandos de Voz y UI:**
+  - Nuevos patrones de voz en `windows_commands.py`: "iniciar protocolo darius", "modo desarrollo", "modo trading", "enfocar cursor", "ver monitores".
+  - Nuevos indicadores de telemetría en la interfaz gráfica: Badges de Monitores, Toggle interactivo de Doble Aplauso y Motor TTS activo.
+- **Suites de Pruebas Unitarias:**
+  - `tests/test_acoustic_trigger.py`: Pruebas de RMS, resolución de dispositivos y ciclo de vida.
+  - `tests/test_workspace_manager.py`: Pruebas de detección de monitores, snapping y rutinas compuestas.
+  - `tests/test_tts_cache.py`: Pruebas de hashing SHA-256 determinista y guardado/reproducción WAV.
+
 ## [6.6.0] - 2026-09-19
 
 ### Agregado

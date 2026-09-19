@@ -5,7 +5,7 @@
 > arquitectura real del sistema, las decisiones de diseño ya tomadas y las
 > reglas que debes respetar para no romper el comportamiento existente.
 >
-> Última actualización: Versión 6.6.0 — Arquitectura BYOK multi-proveedor, visualizador 60 FPS con NumPy, modal de configuración GUI, memoria en Obsidian — Septiembre 2026.
+> Última actualización: Versión 7.0.0 — Disparador acústico por doble aplauso, gestión multi-monitor Win32, automatización de espacio de trabajo, motor ElevenLabs con caché SHA-256 en disco, arquitectura BYOK multi-proveedor, visualizador 60 FPS con NumPy, memoria en Obsidian — Septiembre 2026.
 
 ---
 
@@ -42,8 +42,10 @@ configurado por el usuario (BYOK), y mantener un consumo mínimo de recursos (<9
 | **UI** | CustomTkinter + tkinter Canvas + NumPy | Tema oscuro Slate/Zinc nativo, soporte High-DPI, sin Electron |
 | **Animación** | `HighPerfWaveVisualizer` (NumPy + Canvas) | 60 FPS, actualización atómica `coords()`, 0 flicker, 0 fugas de memoria |
 | **Configuración GUI** | `BYOKSettingsModal` (`ctk.CTkToplevel`) | Gestión visual de proveedores, claves enmascaradas y ping en vivo |
+| **Disparador Acústico** | `acoustic_trigger.py` (sounddevice + NumPy) | Detección de doble aplauso en tiempo real, filtro adaptativo de ruido y auto-sondeo de micrófono |
 | **Voz entrada** | SpeechRecognition + PyAudio | Google STT (es-ES) con calibración de ruido ambiental |
-| **Voz salida** | SAPI vía win32com (`SpVoice`) + Edge-TTS | Síntesis nativa sin latencia en hilo COM desacoplado |
+| **Voz salida** | SAPI (`SpVoice`) + Edge-TTS + ElevenLabs | Síntesis nativa o neural en hilo COM desacoplado con caché SHA-256 en disco (`tts_cache.py`) |
+| **Espacio de Trabajo** | `workspace_manager.py` (Win32 User32) | Multi-monitor geometry, window snapping, IDE focus nativo (`AttachThreadInput`), rutinas Darius/Dev/Trading |
 | **Motor BYOK** | `ai_client.py` (Gemini SDK + OpenAI REST via `urllib`) | 7 proveedores soportados (Gemini, OpenAI, Groq, NIM, OpenRouter, Ollama, Custom) |
 | **Memoria** | `obsidian_brain.py` (Markdown + YAML) | Persistencia privada y portable en la bóveda local de Obsidian |
 | **SO Windows** | pywin32, subprocess, PowerShell, PyCAW, winreg | Control del sistema operativo con listas de argumentos (`shell=False`) |
@@ -56,9 +58,9 @@ configurado por el usuario (BYOK), y mantener un consumo mínimo de recursos (<9
 
 ```
 Darius-AI/
-├── .env                     <- Variables de entorno locales (GEMINI_API_KEY, OPENAI_API_KEY...). Excluido de Git.
+├── .env                     <- Variables de entorno locales (GEMINI_API_KEY, ELEVENLABS_API_KEY...). Excluido de Git.
 ├── .env.example             <- Plantilla de credenciales sin secretos.
-├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/, etc.
+├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/, audio_cache/, etc.
 ├── .github/
 │   └── workflows/
 │       └── main_darius-ai.yml  <- CI: Ruff + Pytest matrix (Win 3.11/3.12) + Gitleaks + Pip-audit
@@ -67,20 +69,27 @@ Darius-AI/
 ├── requirements.txt         <- Dependencias completas del entorno de ejecución en Windows
 ├── requirements-dev.txt     <- Dependencias para pruebas y linting (pytest, ruff, pytest-subtests)
 ├── pyproject.toml           <- Configuración de Ruff (line-length=120) y pytest
-├── config.json              <- Parámetros de configuración y credenciales BYOK locales
+├── config.json              <- Parámetros de configuración, credenciales BYOK y rutinas de workspace
 ├── config_loader.py         <- Carga jerárquica de config.json con propiedades tipadas snake_case
-├── main.py                  <- NÚCLEO — Interfaz CustomTkinter, visualizador 60 FPS, enrutador de comandos
+├── main.py                  <- NÚCLEO — Interfaz CustomTkinter, visualizador 60 FPS, enrutador de comandos, telemetría
 ├── byok_settings.py         <- MODAL GUI — Configuración interactiva de proveedores LLM y prueba de latencia
+├── acoustic_trigger.py      <- DISPARADOR ACÚSTICO — Detección de doble aplauso en streaming y auto-sondeo de micro
+├── workspace_manager.py     <- ESPACIO DE TRABAJO — Multi-monitor Win32, snapping, IDE focus y rutinas de automatización
+├── tts_cache.py             <- CACHÉ DE AUDIO — Almacenamiento WAV local con hash SHA-256 (texto+voz+modelo)
+├── elevenlabs_tts_engine.py <- MOTOR TTS ELEVENLABS — Síntesis neural 24kHz con fallback streaming/REST
+├── edge_tts_engine.py       <- MOTOR TTS EDGE — Síntesis neural Microsoft Edge
+├── tts_worker.py            <- WORKER TTS — Despachador multi-motor (ElevenLabs > Edge > SAPI) desacoplado en hilo COM
 ├── ai_client.py             <- MOTOR BYOK — Clientes Gemini, OpenAI, Groq, NVIDIA NIM, OpenRouter, Ollama
 ├── obsidian_brain.py        <- CEREBRO — Gestión de notas diarias, memorias y búsqueda contextual en Obsidian
-├── windows_commands.py      <- Catálogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL con rutas completas)
+├── windows_commands.py      <- Catálogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL, python actions)
 ├── voice_filter.py          <- Filtro y matching fonético de nombre en texto
-├── tts_worker.py            <- Worker TTS (SAPI COM) desacoplado en hilo propio con cola de mensajes
-├── edge_tts_engine.py       <- Motor TTS alternativo de alta fidelidad con Edge-TTS
 ├── stt_engine.py            <- Motor STT con soporte para calibración y backends
 │
 ├── tests/
 │   ├── conftest.py          <- Configuración de pytest y fixtures compartidos
+│   ├── test_acoustic_trigger.py <- Tests de detección de aplausos, RMS mono y piso de ruido adaptativo
+│   ├── test_workspace_manager.py <- Tests de geometría multi-monitor, snapping de ventanas y rutinas
+│   ├── test_tts_cache.py    <- Tests de persistencia, hashing SHA-256 y atomicidad de caché WAV
 │   ├── test_byok_providers.py  <- Tests del motor BYOK, resolución de claves y ping de conexión
 │   ├── test_commands_v6.py  <- Tests de comandos del sistema operativo y rutas absolutas
 │   ├── test_config_loader.py<- Tests de merge jerárquico y persistencia de configuración
@@ -94,7 +103,8 @@ Darius-AI/
 │
 ├── darius.log               <- Log rotativo del sistema (excluido de Git)
 ├── chat_history.txt         <- Historial local de interacciones (excluido de Git)
-└── apps_cache.json          <- Caché de aplicaciones instaladas en Windows (excluido de Git)
+├── apps_cache.json          <- Caché de aplicaciones instaladas en Windows (excluido de Git)
+└── audio_cache/             <- Caché local en disco de audios sintetizados WAV (excluido de Git)
 ```
 
 ---
@@ -209,10 +219,22 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 ### D8 — Calidad de Código Estricta con Ruff
 **Decisión:** El pipeline de integración continua valida el 100% del código con `ruff check .` bajo límite de línea de 120 caracteres. No se permiten errores de linter en el repositorio.
 
+### D9 — Disparador Acústico por Doble Aplauso con Piso de Ruido Adaptativo
+**Decisión:** `AcousticDoubleClapDetector` analiza frames PCM de 50ms en streaming con `sounddevice` y `numpy`. Mantiene un piso de ruido adaptativo exponencial (`noise_floor = alpha * noise_floor + (1 - alpha) * rms`) con factor dinámico `multiplier * max(noise_floor, min_rms)`. Detecta 2 picos acústicos consecutivos dentro de una ventana temporal calibrada (120ms a 750ms) y ejecuta auto-sondeo de micrófonos (`probe_best_input_device`) si el dispositivo predeterminado está mudo (RMS < 0.001).
+
+### D10 — Gestión Multi-Monitor Nativa Win32 y Rutinas de Espacio de Trabajo
+**Decisión:** `WorkspaceManager` utiliza `EnumDisplayMonitors` y `GetMonitorInfoW` de Win32 para mapear coordenadas reales de múltiples pantallas. Permite colocar ventanas en monitores específicos mediante `SetWindowPos` y enfocar instancias existentes de IDEs (`Cursor.exe`, `Code.exe`) usando `AttachThreadInput` y `SetForegroundWindow` para evitar la creación de procesos duplicados. Automatiza rutinas de bienvenida ("Protocolo Darius"), modo desarrollo y modo trading.
+
+### D11 — Caché de Audio en Disco con Hash SHA-256 (`TTSDiskCache`)
+**Decisión:** Almacenar respuestas de voz sintetizadas en `audio_cache/` indexadas por hash SHA-256 truncado a 24 caracteres de la tupla normalizada `(text|voice|model|format)`. Frases recurrentes de estado y saludos ("Buenos días, Óscar", "Protocolo Darius activado", "Monitores listos") se reproducen al instante (0 ms de latencia) y con 0 consumo de cuota de API en ElevenLabs.
+
 ---
 
-## 7. Modos de Activación de Voz
+## 7. Modos de Activación de Voz y Eventos
 
+- **Disparador Acústico (Doble Aplauso):**
+  - Hilo de escucha en streaming continuo en segundo plano (`sounddevice.InputStream`).
+  - Al detectar 2 aplausos sucesivos en la ventana de 120-750 ms, despierta al asistente y activa el modo de escucha STT automáticamente.
 - **Modo PTT (Push-to-Talk):**
   - Mantiene presionada la tecla configurada (`LISTEN_KEY`, por defecto `right ctrl`).
   - Graba audio continuamente en memoria y lo envía a STT al soltar la tecla.

@@ -15,8 +15,19 @@ Darius AI se basa en dos pilares de ingeniería:
 
 ---
 
-## Características Principales
-
+- **Disparador Acústico por Doble Aplauso:**
+  - Detección en tiempo real de picos acústicos transitorios (aplausos) sobre streaming PCM con `sounddevice` y `numpy`.
+  - Piso de ruido adaptativo exponencial que ajusta el umbral automáticamente al entorno sonoro.
+  - Auto-sondeo inteligente de micrófonos (`probe_best_input_device`): detecta si el micro predeterminado está mudo (RMS < 0.001) y conmuta al dispositivo activo óptimo.
+- **Gestión Multi-Monitor Win32 y Rutinas de Espacio de Trabajo:**
+  - Descubrimiento nativo de pantallas vía `EnumDisplayMonitors` y `GetMonitorInfoW`.
+  - Colocación y ajuste de navegadores y ventanas en monitores específicos (`snap_window_to_monitor`).
+  - Enfoque nativo de IDEs (`Cursor.exe`, `Code.exe`) mediante `AttachThreadInput` y `SetForegroundWindow` para evitar procesos duplicados.
+  - Rutinas automatizadas: **"Protocolo Darius"** (preparación y bienvenida completa), **"Modo Desarrollo"** (IDE monitor 1 + Docs monitor 2) y **"Modo Trading"** (TradingView + Finviz/Binance).
+- **Motor TTS ElevenLabs con Caché SHA-256 en Disco:**
+  - Síntesis neural de alta fidelidad con streaming PCM 24kHz y fallback a REST.
+  - Almacenamiento local en disco (`audio_cache/`) indexado por hash SHA-256: las frases de estado y saludos recurrentes se reproducen al instante (0 ms de latencia) y con 0 consumo de cuota de API.
+  - Despachador multi-motor dinámico: ElevenLabs > Edge-TTS > SAPI5 local.
 - **Arquitectura BYOK Multi-Proveedor:**
   - Soporte nativo y compatible para 7 motores: **Google Gemini**, **OpenAI / ChatGPT**, **OpenRouter**, **NVIDIA NIM**, **Groq Cloud**, **Ollama** (ejecución local en `http://localhost:11434/v1`) y cualquier endpoint compatible con el protocolo OpenAI.
   - Modal gráfico de configuración (`⚙`) con selector de modelo, edición de URL base, campo de clave de API enmascarada y prueba de conexión en tiempo real con medición de latencia en milisegundos.
@@ -25,23 +36,14 @@ Darius AI se basa en dos pilares de ingeniería:
   - **Diario Personal:** Comandos de voz directos (*"Anota en mi diario que..."*) que registran entradas con marca de tiempo en la nota diaria (`Diario/YYYY-MM-DD.md`).
   - **Memorias Permanentes:** Almacena hechos, preferencias y datos de contexto (*"Recuerda que..."*) en archivos Markdown estructurados con frontmatter YAML (`Darius/Memorias/`).
   - **Inyección de Contexto:** El motor de IA recupera automáticamente fragmentos relevantes de tu bóveda para enriquecer las respuestas conversacionales.
-- **Visualizador Vectorial a 60 FPS:**
-  - Onda sinusoidal armónica de 3 capas calculada matemáticamente con **NumPy** y proyectada sobre `tkinter.Canvas`.
-  - Actualización atómica de coordenadas sin llamadas a `delete("all")`, eliminando parpadeos (*flicker*) y pausas por recolección de basura.
-  - Transición fluida entre estado inactivo (*breathing animation*) y modulación reactiva durante el habla.
+- **Visualizador Vectorial a 60 FPS y Telemetría en Vivo:**
+  - Onda sinusoidal armónica de 3 capas calculada con **NumPy** y proyectada sobre `tkinter.Canvas` atómico (0 flicker, <90 MB RAM).
+  - Indicadores de telemetría en tiempo real: estado del micrófono, monitores detectados, motor TTS y botón de conmutación de aplausos.
 - **Control por Voz y Modos de Activación:**
-  - **Push-to-Talk (PTT):** Mantén presionada una tecla (`Right Ctrl` por defecto) para hablar sin falsos positivos de captura.
-  - **Modo Nombre:** Escucha continua en segundo plano que se activa al detectar el nombre ("Darius" mediante coincidencia fonética difusa).
+  - **Disparador Acústico:** Da dos aplausos seguidos para despertar al asistente inmediatamente.
+  - **Push-to-Talk (PTT):** Mantén presionada una tecla (`Right Ctrl` por defecto) para hablar sin falsos positivos.
+  - **Modo Nombre:** Escucha continua en segundo plano que se activa al detectar el nombre ("Darius").
   - **Modo Auto:** Procesa de forma inmediata cualquier frase capturada.
-  - **Síntesis de Voz Desacoplada (TTS):** Motor SAPI de Windows ejecutado en un worker COM dedicado con cola de mensajes para no bloquear la interfaz gráfica, con soporte alternativo para `edge-tts`.
-- **Automatización del Sistema Operativo Windows:**
-  - Enrutamiento seguro de comandos a paneles de configuración (`ms-settings:`), utilidades de administración (`mmc.exe`, `control.exe`) y scripts de PowerShell/CMD.
-  - Control de hardware (volumen vía PyCAW Core Audio API, comprobaciones de conectividad, procesos).
-  - Base de datos local de aplicaciones instaladas (`apps_cache.json`) con resolución difusa por nombre.
-- **Resiliencia y Seguridad:**
-  - Bloqueo por **Mutex Win32 nativo** que impide múltiples instancias simultáneas en memoria.
-  - Subprocesos ejecutados exclusivamente con listas de argumentos validadas (`shell=False`), previniendo inyecciones de comandos.
-  - Cadena de degradación defensiva (*fallback*) hacia modelos secundarios o gratuitos ante errores de cuota (HTTP 429) o fallos de proveedor.
 
 ---
 
@@ -98,18 +100,32 @@ OPENAI_API_KEY=tu_clave_de_openai
 GROQ_API_KEY=tu_clave_de_groq
 NVIDIA_API_KEY=tu_clave_de_nvidia_nim
 OPENROUTER_API_KEY=tu_clave_de_openrouter
+ELEVENLABS_API_KEY=tu_clave_de_elevenlabs
 ```
 
-### 4. Configurar la Bóveda de Obsidian (Opcional)
+### 4. Configurar la Bóveda de Obsidian y Espacio de Trabajo (Opcional)
 
-Puedes especificar la ruta de tu bóveda en `config.json`:
+Puedes personalizar rutas y pantallas en `config.json`:
 
 ```json
-"obsidian": {
-  "vault_path": "C:\\Ruta\\A\\Tu\\Obsidian Vault",
-  "daily_notes_folder": "Diario",
-  "memories_folder": "Darius/Memorias",
-  "auto_inject_context": true
+{
+  "obsidian": {
+    "vault_path": "C:\\Ruta\\A\\Tu\\Obsidian Vault",
+    "daily_notes_folder": "Diario",
+    "memories_folder": "Darius/Memorias",
+    "auto_inject_context": true
+  },
+  "tts": {
+    "engine": "elevenlabs"
+  },
+  "elevenlabs": {
+    "voice_id": "21m00Tcm4TlvDq8ikWAM",
+    "model_id": "eleven_multilingual_v2"
+  },
+  "acoustic_trigger": {
+    "enabled": true,
+    "clap_threshold_multiplier": 2.8
+  }
 }
 ```
 
@@ -131,6 +147,23 @@ Puedes especificar la ruta de tu bóveda en `config.json`:
 
 ---
 
+## Comandos de Voz y Rutinas de Automatización
+
+| Comando de Voz | Acción Ejecutada | Módulo |
+| :--- | :--- | :--- |
+| **"Protocolo Darius"** / **"Modo Bienvenida"** | Maximiza IDE Cursor/Code en monitor 1, abre herramientas en monitor 2, ajusta audio y reproduce bienvenida | `workspace_manager.py` |
+| **"Modo desarrollo"** / **"Modo programar"** | Enfoca Cursor/Code en monitor principal y abre documentación técnica en monitor secundario | `workspace_manager.py` |
+| **"Modo trading"** / **"Modo finanzas"** | Abre TradingView y Finviz en monitores 1 y 2 para análisis de mercado | `workspace_manager.py` |
+| **"¿Cuántos monitores tengo?"** | Consulta Win32 `EnumDisplayMonitors` y describe dimensiones, posición y monitor primario | `workspace_manager.py` |
+| **"Organizar pantallas"** / **"Organizar ventanas"** | Distribuye las ventanas principales en cuadrícula según la topología multi-monitor | `workspace_manager.py` |
+| **"Pantalla completa"** / **"F11"** | Envía tecla `F11` a la ventana activa mediante eventos de teclado de Windows | `workspace_manager.py` |
+| **"Anota en mi diario que..."** | Inserta entrada con hora en la nota diaria (`Diario/YYYY-MM-DD.md`) de Obsidian | `obsidian_brain.py` |
+| **"Recuerda que..."** | Almacena memoria permanente con tags y timestamp en `Darius/Memorias/` | `obsidian_brain.py` |
+| **"Subir / Bajar volumen"** | Modifica el nivel de volumen maestro del endpoint de audio con PyCAW | `windows_commands.py` |
+| **"Abrir [aplicación]"** | Búsqueda difusa y ejecución aislada (`shell=False`) de software instalado | `windows_commands.py` |
+
+---
+
 ## Arquitectura del Sistema
 
 ```
@@ -141,14 +174,22 @@ Puedes especificar la ruta de tu bóveda en `config.json`:
 │   │     HighPerfWaveVisualizer        │  │      BYOKSettingsModal        │  │
 │   │  NumPy 60 FPS · Canvas Atómico    │  │  Configuración y Ping en Vivo │  │
 │   └───────────────────────────────────┘  └───────────────────────────────┘  │
+│   [Pill: Micro Calibrado]  [Pill: Monitores]  [Pill: TTS]  [Toggle: Clap]   │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                          NÚCLEO Y ENRUTADOR                                 │
+│                    DISPARADORES Y ENRUTADOR DE COMANDOS                     │
 │  ┌──────────────────────┐  ┌───────────────────────┐  ┌──────────────────┐  │
-│  │   Motor de Audio     │  │   Enrutador Local     │  │   Motor BYOK     │  │
-│  │  (STT + SAPI COM)    │  │   (_CMD_PATTERNS)     │  │  (ai_client.py)  │  │
+│  │  Acoustic Trigger    │  │   Enrutador Local     │  │   Motor BYOK     │  │
+│  │ (Doble Aplauso RMS)  │  │   (_CMD_PATTERNS)     │  │  (ai_client.py)  │  │
 │  └──────────────────────┘  └───────────────────────┘  └──────────────────┘  │
-│        Hilos daemon             Hilo principal             Hilo daemon      │
-│   [tts-worker] [stt-worker]   [dispatch de comandos]    [Gemini/OpenAI/Oll] │
+│        Hilo streaming               Hilo principal             Hilo daemon  │
+│      [sounddevice audio]       [dispatch de comandos]    [Gemini/OpenAI/Oll]│
+├─────────────────────────────────────────────────────────────────────────────┤
+│                    GESTIÓN DE ESPACIO DE TRABAJO Y TTS                      │
+│   ┌───────────────────────────────────┐  ┌───────────────────────────────┐  │
+│   │    WorkspaceManager (Win32)       │  │   TTSWorker Multi-Motor       │  │
+│   │  Multi-Monitor · Snap · Focus IDE │  │ ElevenLabs + DiskCache + SAPI │  │
+│   └───────────────────────────────────┘  └───────────────────────────────┘  │
+│         EnumDisplayMonitors / User32            audio_cache/ (SHA-256)      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                       CEREBRO Y MEMORIA LOCAL                               │
 │                          obsidian_brain.py                                  │
@@ -157,14 +198,6 @@ Puedes especificar la ruta de tu bóveda en `config.json`:
 │   │       Diario/YYYY-MM-DD.md        │  │      Darius/Memorias/*.md     │  │
 │   └───────────────────────────────────┘  └───────────────────────────────┘  │
 │              Bóveda local de Obsidian (Markdown + YAML Frontmatter)         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                   ABSTRACCIÓN DEL SISTEMA OPERATIVO                         │
-│                          windows_commands.py                                │
-│   ┌───────────────────────────────────┐  ┌───────────────────────────────┐  │
-│   │      Paneles y URIs Win32         │  │    Subprocesos Controlados    │  │
-│   │     ms-settings: · control.exe    │  │     PowerShell / CMD Lists    │  │
-│   └───────────────────────────────────┘  └───────────────────────────────┘  │
-│            os.startfile · subprocess (shell=False) · PyCAW Audio            │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
