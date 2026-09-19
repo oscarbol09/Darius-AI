@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: read
 
@@ -40,7 +40,7 @@ jobs:
         run: ruff check --output-format=github .
 
       - name: Test with pytest + coverage
-        run: python -m pytest tests/ -v --junitxml=test-results.xml --cov=. --cov-report=term-missing -m "not windows and not live"
+        run: python -m pytest tests/ -v --junitxml=test-results.xml --cov=. --cov-report=term-missing -m "not live"
 
       - name: Upload test results
         if: always()
