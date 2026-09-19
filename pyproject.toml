@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "darius-ai"
-version = "6.4.0"
+version = "6.5.0"
 description = "Asistente de inteligencia artificial nativo para Windows con control por voz y automatización"
 requires-python = ">=3.11"
 

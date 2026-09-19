@@ -19,6 +19,12 @@
     "listen_timeout": 5,
     "phrase_limit": 10
   },
+  "obsidian": {
+    "vault_path": "",
+    "daily_notes_folder": "Diario",
+    "memories_folder": "Darius/Memorias",
+    "auto_inject_context": true
+  },
   "app_cache_hours": 6,
   "speaking_tail_secs": 0.4,
   "listen_mode": "NOMBRE",

@@ -38,14 +38,22 @@ _OPENROUTER_MODELS = [
 _OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
-def _build_system_instruction() -> str:
-    return (
+def _build_system_instruction(prompt: str = "") -> str:
+    base = (
         f"Eres {cfg.assistant_name}, un asistente de inteligencia artificial "
-        "amigable, conciso y preciso. Tu creador es Dario. "
-        "Respondes siempre en el idioma del usuario. "
+        f"amigable, conciso y preciso para Windows. Tu usuario es {cfg.user_name}. "
+        "Respondes siempre en español de forma natural y directa. "
         "Evitas respuestas excesivamente largas a menos que el tema lo requiera. "
         "Si no sabes algo, dilo honestamente."
     )
+    try:
+        from obsidian_brain import brain
+        context = brain.get_memory_context(prompt)
+        if context:
+            base += f"\n\n[CONTEXTO DE MEMORIA EN OBSIDIAN]\n{context}"
+    except Exception as e:
+        log.debug(f"No se pudo cargar contexto de Obsidian: {e}")
+    return base
 
 
 def _classify_gemini_error(exc: Exception) -> str:
@@ -68,7 +76,7 @@ def ask_gemini(prompt: str, history: list[dict] | None = None) -> tuple[str, str
     if not _gemini_client:
         raise RuntimeError("GEMINI_API_KEY no está configurada")
 
-    system_instruction = _build_system_instruction()
+    system_instruction = _build_system_instruction(prompt)
     contents = []
     if history:
         for m in history:
@@ -99,7 +107,7 @@ def ask_openrouter(prompt: str, history: list[dict] | None = None) -> tuple[str,
     if not OPENROUTER_API_KEY:
         raise RuntimeError("OPENROUTER_API_KEY no configurada")
 
-    system_instruction = _build_system_instruction()
+    system_instruction = _build_system_instruction(prompt)
 
     messages = [{"role": "system", "content": system_instruction}]
     if history:

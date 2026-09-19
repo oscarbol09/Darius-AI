@@ -10,9 +10,6 @@ requests>=2.31.0
 # -- Variables de entorno ------------------------------------------------------
 python-dotenv>=1.0.0
 
-# -- Persistencia y sincronización opcional (Supabase) -------------------------
-supabase>=2.9.0
-
 # -- Interfaz Gráfica de Escritorio --------------------------------------------
 customtkinter>=5.2.0
 

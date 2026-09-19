@@ -1,78 +1,69 @@
 """
-config_loader.py — Cargador de configuración externa para DARIUS AI
-====================================================================
+config_loader.py — Cargador de configuración local para DARIUS AI
+=================================================================
 Lee config.json del directorio del proyecto y expone un objeto `cfg`
 con acceso tipado a todos los parámetros configurables.
 
-Si config.json no existe lo crea con los valores por defecto, de forma
-que el usuario siempre tenga un archivo editable listo.
+Si config.json no existe, lo crea con los valores por defecto, de forma
+que el usuario siempre disponga de un archivo editable en disco.
 
 Uso en main.py:
     from config_loader import cfg
 
     assistant_name = cfg.assistant_name   # "darius"
     user_name      = cfg.user_name        # "Oscar"
-    ...
-
-    # Cambio en tiempo de ejecución (se persiste en config.json):
-    cfg.set("Miguel", "assistant", "user_name")
-
-Sincronización con Supabase (tabla `config`, una fila por sección top-level):
-    - Al cargar: si SUPABASE_URL/SUPABASE_KEY están configuradas, se lee la
-      tabla `config` y esos valores tienen prioridad sobre config.json local
-      (Supabase permite sincronización opcional en la nube para configuraciones).
-      El resultado combinado se vuelve a escribir en config.json como caché
-      offline, para que Darius arranque igual sin conexión.
-    - Al hacer cfg.set(): se persiste en config.json Y se hace upsert de la
-      sección correspondiente en Supabase. Si Supabase no está disponible,
-      el cambio local igual se guarda (no bloquea el arranque ni el uso).
+    vault_path     = cfg.obsidian_vault_path
 """
 
 import json
 import logging
 from pathlib import Path
 
-from supabase_client import get_supabase
-
 log = logging.getLogger("DARIUS.Config")
 
-_BASE_DIR    = Path(__file__).parent
+_BASE_DIR = Path(__file__).parent
 _CONFIG_FILE = _BASE_DIR / "config.json"
 
 # Valores por defecto: garantizan arranque seguro aunque falte config.json
 _DEFAULTS: dict = {
     "assistant": {
-        "name":      "darius",
+        "name": "darius",
         "user_name": "Oscar",
     },
     "gemini": {
-        "model":         "gemini-2.5-flash",
-        "max_tokens":    800,
-        "temperature":   0.7,
+        "model": "gemini-2.5-flash",
+        "max_tokens": 800,
+        "temperature": 0.7,
         "history_turns": 10,
     },
     "tts": {
-        "rate":   1,
+        "rate": 1,
         "volume": 100,
     },
     "microphone": {
         "energy_threshold": 3000,
-        "pause_threshold":  0.8,
-        "listen_timeout":   5,
-        "phrase_limit":     10,
+        "pause_threshold": 0.8,
+        "listen_timeout": 5,
+        "phrase_limit": 10,
     },
-    "app_cache_hours":       6,
-    "speaking_tail_secs":    0.4,
-    "listen_mode":           "NOMBRE",
-    "listen_key":            "right ctrl",
+    "obsidian": {
+        "vault_path": "",
+        "daily_notes_folder": "Diario",
+        "memories_folder": "Darius/Memorias",
+        "auto_inject_context": True,
+    },
+    "app_cache_hours": 6,
+    "speaking_tail_secs": 0.4,
+    "listen_mode": "NOMBRE",
+    "listen_key": "right ctrl",
     "name_similarity_cutoff": 0.60,
     "min_words_without_name": 99,
 }
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 #  Clase de configuración
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 class _Config:
     """
@@ -97,8 +88,7 @@ class _Config:
 
     def set(self, value, *keys):
         """
-        Actualiza un valor en la config en runtime, lo persiste en config.json
-        y lo sincroniza con Supabase (tabla `config`, fila = keys[0]).
+        Actualiza un valor en la config en runtime y lo persiste en config.json.
         Ejemplo: cfg.set("Miguel", "assistant", "user_name")
         """
         if not keys:
@@ -108,13 +98,14 @@ class _Config:
             node = node.setdefault(k, {})
         node[keys[-1]] = value
         self._save()
-        self._push_section_to_supabase(keys[0])
 
     def _save(self):
         """Persiste el estado actual en config.json."""
         try:
-            data_to_write = {k: v for k, v in self._data.items()
-                             if not k.startswith("_comment")}
+            data_to_write = {
+                k: v for k, v in self._data.items()
+                if not k.startswith("_comment")
+            }
             _CONFIG_FILE.write_text(
                 json.dumps(data_to_write, ensure_ascii=False, indent=2),
                 encoding="utf-8",
@@ -122,20 +113,6 @@ class _Config:
             log.info("config.json actualizado.")
         except Exception as e:
             log.warning(f"No se pudo guardar config.json: {e}")
-
-    def _push_section_to_supabase(self, top_key: str):
-        """Sube la sección top-level modificada a la tabla `config` de Supabase."""
-        sb = get_supabase()
-        if not sb:
-            return
-        try:
-            sb.table("config").upsert({
-                "key": top_key,
-                "value": self._data.get(top_key),
-            }).execute()
-            log.info(f"[Config] Sección '{top_key}' sincronizada con Supabase.")
-        except Exception as e:
-            log.warning(f"[Config] No se pudo sincronizar '{top_key}' con Supabase: {e}")
 
     # ── Propiedades con tipo estático ─────────────────────────────────────────
 
@@ -188,6 +165,22 @@ class _Config:
         return int(self.get("microphone", "phrase_limit", default=10))
 
     @property
+    def obsidian_vault_path(self) -> str:
+        return str(self.get("obsidian", "vault_path", default=""))
+
+    @property
+    def obsidian_daily_notes_folder(self) -> str:
+        return str(self.get("obsidian", "daily_notes_folder", default="Diario"))
+
+    @property
+    def obsidian_memories_folder(self) -> str:
+        return str(self.get("obsidian", "memories_folder", default="Darius/Memorias"))
+
+    @property
+    def obsidian_auto_inject_context(self) -> bool:
+        return bool(self.get("obsidian", "auto_inject_context", default=True))
+
+    @property
     def app_cache_hours(self) -> int:
         return int(self.get("app_cache_hours", default=6))
 
@@ -212,9 +205,9 @@ class _Config:
         return int(self.get("min_words_without_name", default=99))
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 #  Esquema de validación de tipos
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 _SCHEMA: dict = {
     "assistant": {
@@ -236,6 +229,12 @@ _SCHEMA: dict = {
         "pause_threshold": (int, float),
         "listen_timeout": int,
         "phrase_limit": int,
+    },
+    "obsidian": {
+        "vault_path": str,
+        "daily_notes_folder": str,
+        "memories_folder": str,
+        "auto_inject_context": bool,
     },
     "app_cache_hours": int,
     "speaking_tail_secs": (int, float),
@@ -292,9 +291,9 @@ def _validate_types(data: dict, schema: dict, path: str = "") -> dict:
     return result
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 #  Merge y carga
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
 def _deep_merge(base: dict, override: dict) -> dict:
     """
@@ -309,28 +308,6 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             result[k] = v
     return result
-
-
-def _fetch_supabase_config() -> dict | None:
-    """
-    Lee todas las filas de la tabla `config` en Supabase y las arma como
-    un dict {key: value} equivalente a la estructura top-level de config.json.
-    Devuelve None si Supabase no está disponible o la consulta falla.
-    """
-    sb = get_supabase()
-    if not sb:
-        return None
-    try:
-        resp = sb.table("config").select("key, value").execute()
-        rows = resp.data or []
-        if not rows:
-            return None
-        remote = {row["key"]: row["value"] for row in rows}
-        log.info(f"[Config] {len(remote)} secciones cargadas desde Supabase.")
-        return remote
-    except Exception as e:
-        log.warning(f"[Config] No se pudo leer config desde Supabase: {e}")
-        return None
 
 
 def _load() -> _Config:
@@ -355,21 +332,6 @@ def _load() -> _Config:
             log.info("[Config] config.json creado con valores por defecto.")
         except Exception as e:
             log.warning(f"[Config] No se pudo crear config.json: {e}")
-
-    # Supabase, si está disponible, tiene prioridad sobre el config.json local
-    # (permite persistencia y backup en la nube). El resultado
-    # se vuelve a escribir en config.json como caché para arranques offline.
-    remote = _fetch_supabase_config()
-    if remote:
-        data = _deep_merge(data, remote)
-        try:
-            _CONFIG_FILE.write_text(
-                json.dumps(data, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            log.info("[Config] config.json actualizado como caché de Supabase.")
-        except Exception as e:
-            log.warning(f"[Config] No se pudo actualizar caché local: {e}")
 
     # Validación de tipos contra el schema; datos inválidos se reemplazan con defaults
     data = _validate_types(data, _SCHEMA)

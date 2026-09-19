@@ -46,7 +46,7 @@ import win32event
 import winerror
 from dotenv import load_dotenv
 
-from supabase_client import get_supabase
+from obsidian_brain import brain
 from tts_worker import TTSWorker
 from voice_filter import (
     LISTEN_MODE_AUTO,
@@ -267,7 +267,6 @@ class DariusFinal(ctk.CTk):
             self._trim_chat_file()
         except Exception as e:
             log.warning(f"No se pudo escribir historial local: {e}")
-        self._push_chat_to_supabase(speaker, text)
 
     def _trim_chat_file(self):
         try:
@@ -278,22 +277,6 @@ class DariusFinal(ctk.CTk):
                     f.writelines(lines[-int(MAX_CHAT_LINES * 0.8):])
         except Exception as e:
             log.warning(f"No se pudo rotar historial: {e}")
-
-    def _push_chat_to_supabase(self, speaker: str, text: str):
-        """Inserta el mensaje en la tabla chat_history de Supabase (source='desktop').
-        Best-effort: si Supabase no está disponible, el historial local .txt
-        sigue funcionando igual que antes de esta migración."""
-        sb = get_supabase()
-        if not sb:
-            return
-        try:
-            sb.table("chat_history").insert({
-                "source":  "desktop",
-                "speaker": speaker,
-                "message": text,
-            }).execute()
-        except Exception as e:
-            log.warning(f"No se pudo sincronizar mensaje con Supabase: {e}")
 
     # =========================================================================
     #  UI
@@ -545,17 +528,6 @@ class DariusFinal(ctk.CTk):
         threading.Thread(target=self._load_or_scan_apps, daemon=True, name="app-scanner").start()
 
     def _load_or_scan_apps(self):
-        # 1) Intentar Supabase primero (fuente compartida entre máquinas/instancias)
-        remote_apps = self._load_apps_from_supabase()
-        if remote_apps is not None:
-            self.installed_apps = remote_apps
-            log.info(f"Apps desde Supabase: {len(self.installed_apps)}")
-            self.after(0, self.status_label.configure,
-                       {"text": f"BASE DE DATOS: {len(self.installed_apps)} APPS",
-                        "text_color": "#00ff88"})
-            return
-
-        # 2) Fallback: caché local (offline o Supabase no configurada)
         if APP_CACHE.exists():
             try:
                 data     = json.loads(APP_CACHE.read_text(encoding="utf-8"))
@@ -571,35 +543,8 @@ class DariusFinal(ctk.CTk):
                                 "text_color": "#00ff88"})
                     return
             except Exception as e:
-                log.warning(f"Caché inválida: {e}")
+                log.warning(f"Caché local inválida: {e}")
         self._scan_applications()
-
-    def _load_apps_from_supabase(self) -> dict | None:
-        """
-        Devuelve el dict {app_name: exe_path} desde Supabase si el último
-        escaneo completo (apps_cache_meta.last_full_scan) sigue vigente
-        según APP_CACHE_HOURS. Devuelve None si Supabase no está disponible,
-        no hay datos, o el caché remoto expiró (en cuyo caso hay que reescanear).
-        """
-        sb = get_supabase()
-        if not sb:
-            return None
-        try:
-            meta_resp = sb.table("apps_cache_meta").select("last_full_scan").eq("id", 1).execute()
-            if not meta_resp.data:
-                return None
-            last_scan = datetime.datetime.fromisoformat(meta_resp.data[0]["last_full_scan"].replace("Z", "+00:00"))
-            now       = datetime.datetime.now(last_scan.tzinfo)
-            age_h     = (now - last_scan).total_seconds() / 3600
-            if age_h >= APP_CACHE_HOURS:
-                return None
-            apps_resp = sb.table("apps_cache").select("app_name, exe_path").execute()
-            if not apps_resp.data:
-                return None
-            return {row["app_name"]: row["exe_path"] for row in apps_resp.data}
-        except Exception as e:
-            log.warning(f"No se pudo leer apps_cache desde Supabase: {e}")
-            return None
 
     def _scan_applications(self):
         apps: dict[str, str] = {
@@ -662,33 +607,8 @@ class DariusFinal(ctk.CTk):
             )
         except Exception as e:
             log.warning(f"No se pudo guardar caché local: {e}")
-        self._push_apps_to_supabase(apps)
         self.after(0, self.status_label.configure,
                    {"text": f"BASE DE DATOS: {len(apps)} APPS", "text_color": "#00ff88"})
-
-    def _push_apps_to_supabase(self, apps: dict[str, str]):
-        """
-        Sube el resultado del escaneo completo a Supabase: upsert masivo de
-        apps_cache y actualización de apps_cache_meta.last_full_scan (fila
-        única id=1), que es lo que consulta _load_apps_from_supabase() para
-        decidir si el caché remoto sigue vigente.
-        """
-        sb = get_supabase()
-        if not sb:
-            return
-        try:
-            rows = [{"app_name": name, "exe_path": path} for name, path in apps.items()]
-            # Supabase/PostgREST recomienda lotes moderados para upserts grandes
-            batch_size = 500
-            for i in range(0, len(rows), batch_size):
-                sb.table("apps_cache").upsert(rows[i:i + batch_size]).execute()
-            sb.table("apps_cache_meta").upsert({
-                "id": 1,
-                "last_full_scan": datetime.datetime.now(datetime.UTC).isoformat(),
-            }).execute()
-            log.info(f"Apps sincronizadas con Supabase: {len(rows)}")
-        except Exception as e:
-            log.warning(f"No se pudo sincronizar apps_cache con Supabase: {e}")
 
     def find_app(self, query: str) -> str | None:
         q = query.lower().strip()
@@ -956,6 +876,19 @@ class DariusFinal(ctk.CTk):
         re.IGNORECASE
     )
 
+    _RE_DIARIO = re.compile(
+        r"\b(anota|escribe|guarda)\s+(en\s+mi\s+)?(diario|bit[aá]cora)\b",
+        re.IGNORECASE
+    )
+    _RE_MEMORIA = re.compile(
+        r"\b(recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian)\b",
+        re.IGNORECASE
+    )
+    _RE_BUSCAR_NOTAS = re.compile(
+        r"\b(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\b",
+        re.IGNORECASE
+    )
+
     _CMD_PATTERNS = [
         (re.compile(r"\b(qué hora|hora exacta)\b"),                              "_cmd_hora"),
         (re.compile(r"\b(qué fecha|fecha de hoy|día de hoy)\b"),                 "_cmd_fecha"),
@@ -968,6 +901,10 @@ class DariusFinal(ctk.CTk):
         (re.compile(r"\bsilenciar\b"),                                           "_cmd_vol_mute"),
         (re.compile(r"\b(cómo estás|estado del sistema|status)\b"),              "_cmd_estado"),
         (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"),        "_cmd_cerrar"),
+        # Comandos de Memoria y Notas en Obsidian
+        (_RE_DIARIO,       "_cmd_diario"),
+        (_RE_MEMORIA,      "_cmd_memoria"),
+        (_RE_BUSCAR_NOTAS, "_cmd_buscar_notas"),
         # BUG 3 FIX ↓ — usa los regex más específicos definidos arriba
         (_RE_APAGAR,    "_cmd_apagar_pc"),
         (_RE_REINICIAR, "_cmd_reiniciar_pc"),
@@ -1006,6 +943,44 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_reset(self, _):
         self.reset_conversation()
+
+    def _cmd_diario(self, cmd: str):
+        entry = re.sub(
+            r"^.*(anota|escribe|guarda)\s+(en\s+mi\s+)?(diario|bit[aá]cora)\s*(que|:)?\s*",
+            "", cmd, flags=re.IGNORECASE
+        ).strip()
+        if entry:
+            brain.append_daily_note(entry)
+            self.talk(f"Anotado en tu diario de Obsidian: {entry}.")
+        else:
+            self.talk("¿Qué deseas que anote en tu diario?")
+
+    def _cmd_memoria(self, cmd: str):
+        note = re.sub(
+            r"^.*(recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian)\s*(que|:)?\s*",
+            "", cmd, flags=re.IGNORECASE
+        ).strip()
+        if note:
+            title = note[:40].strip()
+            brain.save_memory(title=title, content=note)
+            self.talk("Guardado en tu memoria de Obsidian.")
+        else:
+            self.talk("¿Qué información deseas que recuerde?")
+
+    def _cmd_buscar_notas(self, cmd: str):
+        query = re.sub(
+            r"^.*(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\s*(que|:)?\s*",
+            "", cmd, flags=re.IGNORECASE
+        ).strip()
+        if query:
+            results = brain.search_vault(query, max_results=2)
+            if results:
+                res_text = ". ".join(f"{r['title']}: {r['snippet']}" for r in results)
+                self.talk(f"Encontré en tus notas: {res_text}")
+            else:
+                self.talk(f"No encontré notas relacionadas con {query} en Obsidian.")
+        else:
+            self.talk("¿Qué tema deseas buscar en tus notas?")
 
     def _cmd_youtube(self, cmd):
         song = re.sub(r"^.*(reproduce|ponme|coloca|pon|escuchar|música)\s*",
