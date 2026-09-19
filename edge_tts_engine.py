@@ -6,8 +6,7 @@ Blueprint para migración desde SAPI (win32com) a edge-tts.
 Ventajas de edge-tts:
   - Voces más naturales (neurales de Microsoft)
   - Multi-idioma sin instalar paquetes de voz de Windows
-  - No requiere SAPI ni win32com
-  - Funciona en Linux/Railway (no solo Windows)
+  - Funciona de manera ligera y con excelente calidad neural
 
 Uso futuro:
     from edge_tts_engine import EdgeTTS

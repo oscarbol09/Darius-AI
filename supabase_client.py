@@ -1,8 +1,8 @@
 """
 supabase_client.py — Cliente Supabase compartido para DARIUS AI
 ==================================================================
-Usado por main.py (escritorio, Windows) y app.py (web, Railway) para que
-ambos lean/escriban los mismos datos: chat_history, apps_cache y config.
+Usado por main.py (escritorio, Windows) para persistir datos opcionales:
+chat_history, apps_cache y config en la nube.
 
 Diseño defensivo: si SUPABASE_URL / SUPABASE_KEY no están configuradas,
 o si la librería `supabase` no está instalada, get_supabase() devuelve

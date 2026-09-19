@@ -1,28 +1,31 @@
-# ══════════════════════════════════════════════════════════════════════════════
-#  DARIUS AI — requirements.txt (Railway · Linux)
+# ==============================================================================
+#  DARIUS AI — Dependencias para Windows (Asistente de Escritorio Nativo)
 #  Instalar con: pip install -r requirements.txt
-#
-#  NOTA: Las dependencias exclusivas de Windows (pywin32, customtkinter,
-#        SpeechRecognition, PyAudio, keyboard, etc.) NO se incluyen aquí
-#        porque Railway corre en Linux y esas librerías fallarían la instalación.
-#        El archivo main.py (escritorio Windows) conserva sus propias deps
-#        en requirements-windows.txt.
-# ══════════════════════════════════════════════════════════════════════════════
+# ==============================================================================
 
-# ── Interfaz web ──────────────────────────────────────────────────────────────
-streamlit>=1.35.0
-
-# ── IA principal: Google Gemini ───────────────────────────────────────────────
+# -- IA y LLMs -----------------------------------------------------------------
 google-genai>=1.0.0
-
-# ── Fallback: OpenRouter (cliente HTTP) ──────────────────────────────────────
 requests>=2.31.0
 
-# ── Variables de entorno ──────────────────────────────────────────────────────
+# -- Variables de entorno ------------------------------------------------------
 python-dotenv>=1.0.0
 
-# ── Persistencia y datos compartidos con main.py (chat_history, config) ──────
+# -- Persistencia y sincronización opcional (Supabase) -------------------------
 supabase>=2.9.0
 
-# ── Utilidades estándar (ya vienen en Python, pero declaradas por claridad) ───
-# pathlib, json, logging, os → stdlib, sin pip
+# -- Interfaz Gráfica de Escritorio --------------------------------------------
+customtkinter>=5.2.0
+
+# -- Motores de Voz y Audio (STT / TTS) ----------------------------------------
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.14
+edge-tts>=6.1.0
+
+# -- Integración con APIs de Windows y Hardware --------------------------------
+pywin32>=306
+comtypes>=1.2.0
+pycaw>=20181226
+keyboard>=0.13.5
+
+# -- Utilidades y Procesamiento Numérico ---------------------------------------
+numpy>=1.24.0

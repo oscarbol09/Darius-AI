@@ -20,7 +20,7 @@ Uso en main.py:
 Sincronización con Supabase (tabla `config`, una fila por sección top-level):
     - Al cargar: si SUPABASE_URL/SUPABASE_KEY están configuradas, se lee la
       tabla `config` y esos valores tienen prioridad sobre config.json local
-      (Supabase es la fuente de verdad compartida entre main.py y app.py).
+      (Supabase permite sincronización opcional en la nube para configuraciones).
       El resultado combinado se vuelve a escribir en config.json como caché
       offline, para que Darius arranque igual sin conexión.
     - Al hacer cfg.set(): se persiste en config.json Y se hace upsert de la
@@ -357,7 +357,7 @@ def _load() -> _Config:
             log.warning(f"[Config] No se pudo crear config.json: {e}")
 
     # Supabase, si está disponible, tiene prioridad sobre el config.json local
-    # (es la fuente de verdad compartida entre main.py y app.py). El resultado
+    # (permite persistencia y backup en la nube). El resultado
     # se vuelve a escribir en config.json como caché para arranques offline.
     remote = _fetch_supabase_config()
     if remote:
