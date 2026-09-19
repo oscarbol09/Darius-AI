@@ -5,100 +5,101 @@
 > arquitectura real del sistema, las decisiones de diseño ya tomadas y las
 > reglas que debes respetar para no romper el comportamiento existente.
 >
-> Ultima actualizacion: Ruff 208→0, limpieza repo, rutas completas en subprocess — Julio 2026.
+> Última actualización: Versión 6.6.0 — Arquitectura BYOK multi-proveedor, visualizador 60 FPS con NumPy, modal de configuración GUI, memoria en Obsidian — Septiembre 2026.
 
 ---
 
-## 1. Que es Darius AI?
+## 1. ¿Qué es Darius AI?
 
 Darius AI es un **asistente de escritorio con voz para Windows**, construido
-integramente en Python. Su proposito es ser el copiloto de Oscar en su PC:
-ejecutar comandos del sistema operativo por voz, responder preguntas en lenguaje
-natural usando Gemini como motor de IA, y hacerlo con una personalidad
-futurista y directa.
+íntegramente en Python. Su propósito es ser el copiloto de Óscar en su PC:
+ejecutar comandos del sistema operativo por voz, gestionar notas y diarios en
+Obsidian, responder preguntas en lenguaje natural utilizando el proveedor de IA
+configurado por el usuario (BYOK), y mantener un consumo mínimo de recursos (<90 MB RAM).
 
-**Principios fundacionales (NO cambiarlos sin discusion):**
+**Principios fundacionales (NO cambiarlos sin discusión):**
 
-1. **Local-first:** La mayoria de comandos se resuelven sin internet y sin
-   consumir cuota de API. Gemini es el ultimo recurso, no el primero.
-2. **Degradacion elegante:** Si Gemini falla -> OpenRouter. Si OpenRouter falla
-   -> mensaje claro y comandos locales activos. El sistema nunca se rompe
-   silenciosamente.
-3. **Una sola instancia:** Mutex Win32 garantiza que solo corra una copia.
-4. **Sin dependencias ocultas:** Toda configuracion vive en `config.json`
-   (parametros) y `.env` (secretos). Nada hardcodeado en el codigo.
-
----
-
-## 2. Stack tecnologico
-
-| Capa | Tecnologia | Motivo |
-|------|-----------|--------|
-| UI | CustomTkinter + tkinter Canvas | Tema oscuro nativo, sin Electron ni web |
-| Voz entrada | SpeechRecognition + PyAudio | Google STT gratuito, es-ES |
-| Voz salida | SAPI via win32com (SpVoice) | Integracion nativa Windows, voces instaladas |
-| IA principal | Google GenAI SDK (`google-genai`) - Gemini 2.5 Flash | Mayor calidad, contexto largo |
-| IA fallback | OpenRouter REST API (`urllib`) - modelos :free | Sin dependencia extra, stdlib |
-| SO Windows | pywin32, subprocess, PowerShell, winreg | Control total del sistema |
-| Config | `config.json` + `python-dotenv` (.env) | Sin recompilacion al cambiar parametros |
-| Threading | stdlib `threading` + `queue.Queue` | COM requiere inicializacion por hilo |
+1. **Local-first:** La mayoría de comandos se resuelven sin internet y sin
+   consumir cuota de API (abrir programas, paneles de control, volumen, diario local).
+   La IA en la nube o local es complementaria, no el primer paso.
+2. **BYOK (Bring Your Own Key) & Flexibilidad de Modelos:** El usuario puede
+   escoger su motor preferido (Google Gemini, OpenAI / ChatGPT, Groq, NVIDIA NIM,
+   OpenRouter, Ollama local o endpoints personalizados) y configurar sus claves
+   desde la interfaz gráfica o archivos de entorno.
+3. **Degradación elegante:** Si el proveedor principal falla por cuota (HTTP 429)
+   o error de API, el sistema ejecuta un fallback defensivo hacia modelos de respaldo
+   en OpenRouter o proporciona una respuesta verbal clara sin colapsar.
+4. **Una sola instancia:** Mutex Win32 nativo garantiza que solo corra una copia en memoria.
+5. **Sin dependencias ocultas:** Toda la configuración vive en `config.json`
+   (parámetros y credenciales BYOK) y `.env` (variables de entorno). Nada hardcodeado.
 
 ---
 
-## 3. Estructura de archivos actual
+## 2. Stack Tecnológico
+
+| Capa | Tecnología | Motivo |
+| :--- | :--- | :--- |
+| **UI** | CustomTkinter + tkinter Canvas + NumPy | Tema oscuro Slate/Zinc nativo, soporte High-DPI, sin Electron |
+| **Animación** | `HighPerfWaveVisualizer` (NumPy + Canvas) | 60 FPS, actualización atómica `coords()`, 0 flicker, 0 fugas de memoria |
+| **Configuración GUI** | `BYOKSettingsModal` (`ctk.CTkToplevel`) | Gestión visual de proveedores, claves enmascaradas y ping en vivo |
+| **Voz entrada** | SpeechRecognition + PyAudio | Google STT (es-ES) con calibración de ruido ambiental |
+| **Voz salida** | SAPI vía win32com (`SpVoice`) + Edge-TTS | Síntesis nativa sin latencia en hilo COM desacoplado |
+| **Motor BYOK** | `ai_client.py` (Gemini SDK + OpenAI REST via `urllib`) | 7 proveedores soportados (Gemini, OpenAI, Groq, NIM, OpenRouter, Ollama, Custom) |
+| **Memoria** | `obsidian_brain.py` (Markdown + YAML) | Persistencia privada y portable en la bóveda local de Obsidian |
+| **SO Windows** | pywin32, subprocess, PowerShell, PyCAW, winreg | Control del sistema operativo con listas de argumentos (`shell=False`) |
+| **Configuración** | `config_loader.py` (`config.json` + `.env`) | Merge jerárquico y validación de esquema con tipado fuerte |
+| **Threading** | `threading` + `queue.Queue` | Manejo de colas COM para TTS y llamadas asíncronas de red |
+
+---
+
+## 3. Estructura de Archivos
 
 ```
 Darius-AI/
-├── .env                     <- Secretos (GEMINI_API_KEY, OPENROUTER_API_KEY). NO subir a Git.
-├── .env.example             <- Plantilla sin valores reales (si subir a Git).
-├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/, supabase/migrations/, docs/
+├── .env                     <- Variables de entorno locales (GEMINI_API_KEY, OPENAI_API_KEY...). Excluido de Git.
+├── .env.example             <- Plantilla de credenciales sin secretos.
+├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/, etc.
 ├── .github/
 │   └── workflows/
-│       └── main_darius-ai.yml  <- CI: ruff + pytest + gitleaks + pip-audit
-├── Agent.md                 <- ESTE ARCHIVO — contexto maestro para IAs
-├── README.md                <- Documentacion tecnica completa
-├── requirements.txt         <- Dependencias completas para Windows (main.py)
-├── config.json              <- Parametros de usuario
-├── config_loader.py         <- Carga config.json, expone objeto `cfg` con propiedades snake_case
-├── main.py                  <- NUCLEO — UI CustomTkinter, voz, comandos, IA
-├── windows_commands.py      <- Catalogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL con rutas completas)
-├── voice_filter.py          <- Filtro de nombre en texto (check_name_in_text)
-├── ai_client.py             <- Clientes Gemini + OpenRouter
-├── tts_worker.py            <- Worker TTS (SAPI) en hilo propio
-├── edge_tts_engine.py       <- Motor TTS alternativo con edge-tts
-├── stt_engine.py            <- Motor STT con backends intercambiables
-├── obsidian_brain.py        <- Cerebro y memoria en Obsidian Vault (Markdown + YAML)
+│       └── main_darius-ai.yml  <- CI: Ruff + Pytest matrix (Win 3.11/3.12) + Gitleaks + Pip-audit
+├── Agent.md                 <- ESTE ARCHIVO — Contexto maestro para IAs y desarrolladores
+├── README.md                <- Documentación técnica pública y guía de inicio rápido
+├── requirements.txt         <- Dependencias completas del entorno de ejecución en Windows
+├── requirements-dev.txt     <- Dependencias para pruebas y linting (pytest, ruff, pytest-subtests)
+├── pyproject.toml           <- Configuración de Ruff (line-length=120) y pytest
+├── config.json              <- Parámetros de configuración y credenciales BYOK locales
+├── config_loader.py         <- Carga jerárquica de config.json con propiedades tipadas snake_case
+├── main.py                  <- NÚCLEO — Interfaz CustomTkinter, visualizador 60 FPS, enrutador de comandos
+├── byok_settings.py         <- MODAL GUI — Configuración interactiva de proveedores LLM y prueba de latencia
+├── ai_client.py             <- MOTOR BYOK — Clientes Gemini, OpenAI, Groq, NVIDIA NIM, OpenRouter, Ollama
+├── obsidian_brain.py        <- CEREBRO — Gestión de notas diarias, memorias y búsqueda contextual en Obsidian
+├── windows_commands.py      <- Catálogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL con rutas completas)
+├── voice_filter.py          <- Filtro y matching fonético de nombre en texto
+├── tts_worker.py            <- Worker TTS (SAPI COM) desacoplado en hilo propio con cola de mensajes
+├── edge_tts_engine.py       <- Motor TTS alternativo de alta fidelidad con Edge-TTS
+├── stt_engine.py            <- Motor STT con soporte para calibración y backends
 │
 ├── tests/
-│   ├── test_commands_v6.py  <- Tests de comandos del SO
-│   ├── test_voice_v6.py     <- Tests del subsistema de voz
-│   ├── test_gemini_v6.py    <- Tests de integracion con Gemini API
-│   ├── test_config_loader.py<- Tests de config_loader
-│   └── test_obsidian_brain.py <- Tests de memoria y diario en Obsidian
+│   ├── conftest.py          <- Configuración de pytest y fixtures compartidos
+│   ├── test_byok_providers.py  <- Tests del motor BYOK, resolución de claves y ping de conexión
+│   ├── test_commands_v6.py  <- Tests de comandos del sistema operativo y rutas absolutas
+│   ├── test_config_loader.py<- Tests de merge jerárquico y persistencia de configuración
+│   ├── test_gemini_v6.py    <- Tests de integración y limpieza de Markdown para Gemini
+│   ├── test_obsidian_brain.py <- Tests de persistencia de diario y memorias en Markdown/YAML
+│   └── test_voice_v6.py     <- Tests del subsistema de audio, filtros fonéticos y serialización WAV
 │
-├── pyproject.toml           <- Configuracion Ruff (line-length=120), pytest, coverage
-├── requirements-dev.txt     <- Dependencias de desarrollo
-├── CHANGELOG.md             <- Historial de versiones
-├── CONTRIBUTING.md          <- Guia de contribucion
-├── SECURITY.md              <- Politica de seguridad
+├── CHANGELOG.md             <- Registro cronológico de cambios y versiones
+├── CONTRIBUTING.md          <- Guía de contribución y estándares de código
+├── SECURITY.md              <- Políticas de seguridad y tratamiento de credenciales
 │
-├── darius.log               <- Log rotativo (excluido de Git)
-├── chat_history.txt         <- Historial de conversacion (excluido de Git)
-└── apps_cache.json          <- Cache de apps instaladas, TTL 6h (excluido de Git)
+├── darius.log               <- Log rotativo del sistema (excluido de Git)
+├── chat_history.txt         <- Historial local de interacciones (excluido de Git)
+└── apps_cache.json          <- Caché de aplicaciones instaladas en Windows (excluido de Git)
 ```
-
-> **Nota sobre Git:** Las carpetas `.venv/` y `.vscode/` estan en `.gitignore`.
-> Si aparecen rastreadas en el repositorio remoto, eliminarlas del indice con:
-> ```bash
-> git rm -r --cached .venv/
-> git rm -r --cached .vscode/
-> git commit -m "chore: remove .venv and .vscode from tracking"
-> git push
-> ```
 
 ---
 
-## 4. Flujo de datos principal
+## 4. Flujo de Datos Principal
 
 ```
 USUARIO HABLA / ESCRIBE
@@ -107,216 +108,119 @@ USUARIO HABLA / ESCRIBE
 [Modo PTT]   ─────────────────┐
 [Modo NOMBRE] ────────────────┤  -> Google STT (es-ES)  ->  texto transcrito
 [Modo AUTO]  ─────────────────┘
-                                      |
-                         process_recognized_text()
-                           (filtra por nombre si aplica)
-                                      |
-                              execute_command(cmd)
-                               [limpia nombre del cmd]
-                                      |
-               ┌──────────────────────┴────────────────────────┐
-               │ coincide _CMD_PATTERNS?                        │ No
-               v                                                v
-        handler local                                    ask_gemini(cmd)
-        (_cmd_hora, _cmd_abrir,                                  |
-         _cmd_accion -> windows_commands.py...)       ┌─────────┴──────────┐
-               |                                      │ Gemini OK          │ Gemini falla
-               v                                      v                    v
-           talk(respuesta)                      respuesta            _ask_openrouter()
-                |                                    |              (modelo random :free)
-                v                                    |                     |
-         tts_queue.put()                             └─────────────────────┘
-                |                                             |
-         [tts-worker]                                    talk(respuesta)
-       SAPI.SpVoice.Speak()
+                                       |
+                          process_recognized_text()
+                            (filtro fonético por nombre)
+                                       |
+                               execute_command(cmd)
+                                [limpia nombre del comando]
+                                       |
+                ┌──────────────────────┴────────────────────────┐
+                │ ¿Coincide patrón local en _CMD_PATTERNS?       │ No
+                v                                                v
+         Handler local                                    ask_ai(cmd) (ai_client.py)
+         (_cmd_hora, _cmd_abrir,                                 |
+          _cmd_accion -> windows_commands.py,                    |-> Inyección de contexto
+          _cmd_diario, _cmd_recordar -> obsidian_brain.py)       |   desde Obsidian Vault
+                |                                                |
+                v                                      ┌─────────┴──────────┐
+            talk(respuesta)                            │ Proveedor Activo   │ Fallo de cuota / red
+                |                                      │ (Gemini, OpenAI,   │
+                v                                      │  Groq, NIM, Ollama)│
+         tts_queue.put()                               v                    v
+                |                                  respuesta            Fallback defensivo
+         [tts-worker]                                  |              (OpenRouter rotativo)
+       SAPI.SpVoice.Speak()                            └────────────────────┬───────────────┘
+                                                                            |
+                                                                     talk(respuesta)
 ```
 
 ---
 
-## 5. Arquitectura del sistema de IA (Gemini + Fallback)
+## 5. Arquitectura del Motor BYOK (`ai_client.py`)
 
-### 5.1 Gemini (primario)
+### 5.1 Proveedores Soportados y Configuración
 
-- Cliente: `google-genai` SDK, `genai.Client(api_key=...)`
-- Modelo: `gemini-2.5-flash` (configurable en `config.json`)
-- `max_output_tokens`: **800** — suficiente para respuestas completas sin truncar
-- Historial: `conversation_history` como lista de dicts `{role, parts}`, ventana
-  de `GEMINI_HISTORY_TURNS * 2` mensajes
-- System instruction: generada por `_build_system_instruction()` — centralizada
-  y compartida con el fallback
-- Extraccion de texto: fallback progresivo (`response.text` -> `candidates[0].content.parts[0].text`)
-  con validacion de `finish_reason` para detectar respuestas truncadas o bloqueadas
+El motor de IA implementa un despachador unificado que resuelve credenciales de forma jerárquica:
+1. `config.json` (`llm.providers.<provider>.api_key`) — Modificado desde el modal de ajustes.
+2. Variables de entorno (`.env` o variables del sistema).
+3. Valores por defecto (URLs base oficiales y modelos estándar).
 
-### 5.2 OpenRouter (fallback automatico)
+| Proveedor | Identificador | Base URL | Modelo Default | Mecanismo |
+| :--- | :--- | :--- | :--- | :--- |
+| **Google Gemini** | `gemini` | N/A (Google GenAI SDK) | `gemini-2.5-flash` | `genai.Client(api_key=...)` |
+| **OpenAI** | `openai` | `https://api.openai.com/v1` | `gpt-4o-mini` | `_call_openai_compatible()` |
+| **Groq** | `groq` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | `_call_openai_compatible()` |
+| **NVIDIA NIM** | `nvidia_nim` | `https://integrate.api.nvidia.com/v1` | `meta/llama-3.3-70b-instruct` | `_call_openai_compatible()` |
+| **OpenRouter** | `openrouter` | `https://openrouter.ai/api/v1` | `deepseek/deepseek-r1:free` | `_call_openai_compatible()` |
+| **Ollama** | `ollama` | `http://localhost:11434/v1` | `llama3.2` | `_call_openai_compatible()` |
+| **Personalizado** | `custom` | *Configurable por usuario* | *Configurable por usuario* | `_call_openai_compatible()` |
 
-- Activado cuando Gemini lanza cualquier excepcion no critica
-- Funcion: `_ask_openrouter(prompt, system_instruction)` — nivel modulo (no clase)
-- Protocolo: REST a `https://openrouter.ai/api/v1/chat/completions` via `urllib`
-  (sin dependencias extra, usa stdlib)
-- Timeout: **20 segundos** por modelo (captura explicita de `TimeoutError`)
-- Validacion de respuesta: comprueba que `choices` no este vacio y que `content`
-  tenga texto antes de retornar — evita respuestas silenciosamente vacias
-- Modelos: lista `_OPENROUTER_MODELS` barajada aleatoriamente en cada intento
-- Reintentos: itera la lista completa antes de rendirse
-- Config requerida: `OPENROUTER_API_KEY` en `.env`
+### 5.2 Llamador Universal OpenAI-Compatible (`_call_openai_compatible`)
 
-**Lista de modelos fallback (actualizable sin tocar logica):**
+- Implementado mediante la biblioteca estándar de Python (`urllib.request`), sin dependencias pesadas.
+- Configuración de headers estándar (`Authorization: Bearer <KEY>`, `Content-Type: application/json`).
+- Para **Ollama**, envía una clave ficticia `ollama` para satisfacer el protocolo sin requerir autenticación real.
+- Parámetros: `temperature: 0.7`, `max_tokens: 800`.
+- Timeout estricto de 30 segundos por llamada para evitar bloqueos del hilo de ejecución.
+
+### 5.3 Diagnóstico y Prueba de Conexión (`test_provider_connection`)
+
+Función asíncrona/diagnóstica que ejecuta una consulta mínima de 1 token (*"ping"*) hacia el endpoint configurado, midiendo la latencia de ida y vuelta:
+
 ```python
-_OPENROUTER_MODELS = [
-    "nvidia/nemotron-3-super:free",
-    "meta-llama/llama-3-8b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "arcee-ai/arcee-trinity:free",
-    "google/gemma-3-4b-it:free",
-    "microsoft/phi-3-mini-128k-instruct:free",
-    "qwen/qwen3-8b:free",
-]
+success, latency_ms, message = test_provider_connection(
+    provider="groq",
+    api_key="...",
+    base_url="https://api.groq.com/openai/v1",
+    model="llama-3.3-70b-versatile",
+)
 ```
 
-Para agregar un modelo: simplemente anadir el string a la lista.
+### 5.4 Inyección Contextual de Obsidian
 
-### 5.3 Como Darius decide que modelo usar (arbol de decision)
-
-```
-Usuario envia prompt -> no coincide ningun patron local
-        |
-        v
-  ask_gemini(prompt)
-        |
-        ├── Gemini responde OK ───────────────────────────────► talk(respuesta)
-        |
-        └── Exception en Gemini
-                |
-                ├── is_auth_error  (API_KEY / UNAUTHENTICATED)
-                │       └─► talk("Error de autenticacion...") — sin fallback
-                |
-                ├── is_network_error  (network / connection / unreachable)
-                │       └─► talk("Sin conexion...") — sin fallback
-                |
-                └── otro error (API, timeout, parse, rate limit)
-                        └─► _ask_openrouter(prompt, system_instruction)
-                                |
-                                ├── Exito ──► talk(respuesta)
-                                │
-                                └── Falla en todos los modelos
-                                        └─► talk("No pude obtener respuesta...")
-```
+Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_build_system_instruction(prompt)` consulta la bóveda local (`obsidian_brain.get_memory_context(prompt)`) e inyecta notas relevantes en el bloque de instrucciones del sistema, garantizando continuidad cognitiva entre todos los modelos.
 
 ---
 
-## 6. Decisiones arquitectonicas clave
+## 6. Decisiones Arquitectónicas Clave
 
-(En adelante, "D" = Decision, seguido de un titulo descriptivo y su fundamento.)
+### D1 — Motor BYOK Multi-Proveedor con compatibilidad OpenAI
+**Decisión:** Centralizar todas las conexiones LLM en `ai_client.py` con una interfaz común y resolver credenciales desde `config.json` o `.env`. Esto permite al usuario cambiar de proveedor en un clic o usar modelos locales con Ollama sin recompilar ni alterar código.
 
-### D1 — Gemini como IA principal, OpenRouter como fallback
+### D2 — Visualizador Vectorial de 60 FPS con NumPy sobre Canvas
+**Decisión:** Utilizar `numpy.sin()` para generar 3 capas de ondas sinusoidales armónicas con desfase continuo, pre-instanciar los objetos de línea en `tkinter.Canvas` y actualizar sus posiciones exclusivamente mediante `canvas.coords(line_id, *points)`. Se prohíbe el uso de `canvas.delete("all")` para evitar la recolección de basura continua y el parpadeo de pantalla.
 
-**Decision:** Gemini es el motor principal por su calidad superior y menor latencia.
-OpenRouter con modelos gratuitos es el plan B, sin dependencias extra (solo stdlib).
-No se implementa un reintento sobre el mismo modelo fallido — se pasa al siguiente.
+### D3 — Modal de Ajustes GUI (`BYOKSettingsModal`)
+**Decisión:** Un `ctk.CTkToplevel` modal con selector de proveedor, campos para modelo, URL base, clave de API oculta con botón de visibilidad (`👁`) y botón de prueba de conexión en tiempo real. Los cambios se persisten inmediatamente en `config.json` y se aplican en caliente.
 
-### D2 — TTS en hilo separado con cola de mensajes
+### D4 — TTS en Hilo COM Separado con Cola de Mensajes
+**Decisión:** `TTSWorker` corre en su propio hilo invocando `pythoncom.CoInitialize()` y consumiendo una `queue.Queue`. Esto evita que la síntesis de voz congele la interfaz gráfica o bloquee la captura de audio.
 
-**Decision:** `TTSWorker` corre en su propio thread con `pythoncom.CoInitialize()` y
-una `queue.Queue`. Esto evita que el habla bloquee la UI o el reconocimiento de voz.
-`wait_until_done()` permite pausar la escucha mientras Darius habla.
+### D5 — Mutex Win32 para Instancia Única
+**Decisión:** `win32event.CreateMutex` con identificador global. Si la aplicación ya está abierta, muestra un diálogo informativo y finaliza con `sys.exit(0)`, evitando colisiones de micrófono y archivos.
 
-### D3 — Mutex Win32 para instancia unica
+### D6 — Subprocesos con Rutas Completas y `shell=False`
+**Decisión:** Todos los subprocesos de `windows_commands.py` utilizan `creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` y listas de argumentos validadas. Se prohíbe `shell=True` para eliminar riesgos de inyección de comandos.
 
-**Decision:** `win32event.CreateMutex` con nombre global. Si ya existe, muestra un
-messagebox y sale con `sys.exit(0)`. Simple, nativo, no requiere archivo PID.
+### D7 — Memoria y Persistencia Local en Bóveda de Obsidian
+**Decisión:** Las memorias, diarios y preferencias se guardan en la bóveda local de Obsidian en formato Markdown plano con frontmatter YAML (`obsidian_brain.py`), garantizando privacidad, portabilidad y propiedad total de los datos por parte del usuario.
 
-### D4 — DETACHED_PROCESS para comandos del SO
-
-**Decision:** Todos los subprocesos de `windows_commands.py` usan
-`creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP`. Esto evita que el
-proceso hijo herede la consola de Darius y compita por el foco de audio o ventana.
-Rutas completas (_PS, _CMD, _MMC, _CONTROL) via `os.environ["SystemRoot"]`.
-
-### D5 — config_loader con merge jerárquico local (config.json + defaults)
-
-**Decision:** La configuracion se construye como merge jerarquico entre:
-1. `_DEFAULTS` (hardcodeado en `config_loader.py`)
-2. `config.json` local (valores editables por el usuario)
-Propiedades de `cfg` usan snake_case (`cfg.assistant_name`, `cfg.gemini_model`, `cfg.obsidian_vault_path`).
-
-### D6 — No se usa `shell=True` (seguridad)
-
-**Decision:** `shell=False` siempre que sea posible. Los comandos PowerShell/CMD
-se pasan como listas de argumentos. En `_launch()` (linea 882) se usa
-`["cmd", "/c", cmd]` en vez de `cmd` directamente, para evitar inyeccion de
-comandos via nombres de archivo maliciosos.
-
-### D7 — Memoria y persistencia local en Obsidian Vault
-
-**Decision:** Darius funciona de manera 100% nativa y privada en Windows. Las memorias,
-hechos y notas del diario se guardan en la bóveda local de Obsidian en formato Markdown
-con frontmatter YAML (`obsidian_brain.py`), permitiendo al usuario revisar, buscar y
-conectar sus datos en Obsidian sin intermediarios en la nube.
-
-### D8 — Ruff con reglas estrictas, 0 errores
-
-**Decision:** Se mantiene `ruff check` en CI con `line-length=120`. Todo el codigo
-pasa sin errores ni advertencias. Excepciones documentadas con `# noqa`:
-- `S310` en urlopen con URLs hardcodeadas (OpenRouter, YouTube)
-- `S603` en subprocess donde el input proviene de un dict controlado
-- `S606` en `os.startfile()` (API correcta de Windows)
-- `S607` en `nircmd.exe` (tercero, sin ruta fija)
-- `E501` en data dictionary de `windows_commands.py`
+### D8 — Calidad de Código Estricta con Ruff
+**Decisión:** El pipeline de integración continua valida el 100% del código con `ruff check .` bajo límite de línea de 120 caracteres. No se permiten errores de linter en el repositorio.
 
 ---
 
-## 7. Modos de escucha (PTT / NOMBRE / AUTO)
+## 7. Modos de Activación de Voz
 
-### Modo PTT (Push-to-Talk)
-- Activacion: mantener presionada una tecla (`LISTEN_KEY`, default `right ctrl`)
-- Mientras se mantiene presionada: graba audio continuamente en buffer
-- Al soltar: envia a Google STT y procesa
-- Visual: icono verde con indicador de habla
-- Ventaja: sin falsos positivos, control total del usuario
-
-### Modo NOMBRE
-- Darius ignora todo el audio hasta que detecta su nombre
-- Deteccion: `check_name_in_text()` — busqueda exacta + fuzzy con `SequenceMatcher`
-  (umbral `NAME_SIMILARITY_CUTOFF`, default 0.60)
-- Despues del nombre: procesa el resto del texto como comando
-- Si el texto tiene muchas palabras (≥ `MIN_WORDS_WITHOUT_NAME`, default 99):
-  asume que es una conversacion con Gemini y no requiere nombre
-
-### Modo AUTO
-- Combina NOMBRE + envio directo a Gemini
-- Si hay nombre: procesa comando local
-- Si no hay nombre: envia directo a Gemini como conversacion
-- Util para charlas rapidas sin necesidad de activacion explicita
-
-### Logica de `process_recognized_text()`:
-```python
-# En cada modo:
-#   - PTT: todo el texto es comando
-#   - NOMBRE: solo si detecta nombre; puede ir directamente a Gemini
-#   - AUTO: prioriza comandos locales, resto a Gemini
-#   - Si es nombre exacto (p.ej. "darius" solo): Darius responde "Dime"
-```
-
----
-
-## 8. Base de datos de aplicaciones (apps_cache.json)
-
-Darius mantiene un cache local de aplicaciones instaladas para abrirlas por voz.
-
-**Formato:**
-```json
-{
-    "chrome": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    "spotify": "C:\\Users\\oscar\\AppData\\Roaming\\Spotify\\Spotify.exe",
-    "vscode": "C:\\Users\\oscar\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
-    "_meta": {
-        "cached_at": "2026-04-05T12:00:00",
-        "version": 6
-    }
-}
-```
-
-- Carga perezosa: solo escanea `%ProgramData%\Microsoft\Windows\Start Menu` al
-  arrancar si el cache tiene mas de `APP_CACHE_HOURS` horas.
-- No bloquea el arranque: si el scan falla, se usa el cache existente.
-- `find_app(name)`: hace fuzzy match del nombre contra las keys del cache.
+- **Modo PTT (Push-to-Talk):**
+  - Mantiene presionada la tecla configurada (`LISTEN_KEY`, por defecto `right ctrl`).
+  - Graba audio continuamente en memoria y lo envía a STT al soltar la tecla.
+  - Cero falsos positivos; recomendado para entornos ruidosos.
+- **Modo NOMBRE:**
+  - Monitorea el audio en segundo plano y analiza el texto transcrito con `voice_filter.check_name_in_text()`.
+  - Utiliza comparación fonética difusa (`SequenceMatcher`) con umbral configurable (`NAME_SIMILARITY_CUTOFF = 0.60`).
+  - Al detectar el nombre ("Darius"), procesa el resto de la frase como comando.
+- **Modo AUTO:**
+  - Escucha continua que procesa de inmediato cualquier frase capturada.
+  - Si coincide con un comando del sistema o de Obsidian, lo ejecuta localmente; de lo contrario, lo envía al motor de IA activo.

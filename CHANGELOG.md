@@ -1,5 +1,29 @@
 # Changelog
 
+## [6.6.0] - 2026-09-19
+
+### Agregado
+- **Motor BYOK (*Bring Your Own Key*) Multi-Proveedor (`ai_client.py`):**
+  - Soporte para 7 proveedores de IA: Google Gemini, OpenAI / ChatGPT, OpenRouter, NVIDIA NIM, Groq Cloud, Ollama (ejecución local en `http://localhost:11434/v1`) y endpoints compatibles con OpenAI.
+  - Llamador universal `_call_openai_compatible()` implementado sobre la biblioteca estándar `urllib`, sin dependencias externas pesadas.
+  - Función de diagnóstico `test_provider_connection()` con prueba de latencia en vivo y verificación de estado.
+  - Resolución jerárquica de claves y parámetros: `config.json` (ajustes de usuario) > `.env` (variables de entorno) > defaults.
+- **Modal Gráfico de Configuración BYOK (`byok_settings.py`):**
+  - Ventana interactiva `BYOKSettingsModal` (`ctk.CTkToplevel`) accesible desde el botón `⚙ Configuración` de la barra superior.
+  - Selector de proveedor activo, catálogo de modelos recomendados con entrada libre, configuración de URL base y campo de clave de API enmascarada con alternador de visibilidad.
+  - Herramienta de prueba de conexión en tiempo real con indicador visual y reporte de latencia en milisegundos.
+- **Visualizador Vectorial de Audio a 60 FPS (`HighPerfWaveVisualizer` en `main.py`):**
+  - Generación de 3 capas de ondas sinusoidales armónicas con desfase continuo aceleradas con **NumPy** sobre `tkinter.Canvas`.
+  - Actualización atómica de coordenadas mediante `canvas.coords()` que prescinde de `delete("all")`, eliminando el parpadeo de pantalla y las pausas por recolección de basura.
+  - Habilitación de escalado High-DPI en Windows (`enable_dpi_awareness`).
+- **Suite de Pruebas del Motor BYOK (`tests/test_byok_providers.py`):**
+  - 16 pruebas unitarias e integración que cubren la resolución de credenciales, emulación de llamadas compatibles con OpenAI, clasificación de errores y pruebas de conexión simuladas.
+
+### Mejorado
+- Rediseño de la interfaz gráfica aplicando la paleta Slate/Zinc (`#09090b`, `#27272a`, `#3b82f6`) con mayor contraste y legibilidad.
+- Inyección de contexto de la bóveda de Obsidian estandarizada para todos los proveedores de IA.
+- Sincronización completa de la documentación técnica y especificaciones de arquitectura.
+
 ## [6.5.0] - 2026-09-19
 
 ### Agregado
@@ -23,54 +47,53 @@
 ## [6.3.0] - 2026-07-21
 
 ### Corregido
-- Rotación automática de `chat_history.txt` (máx 10.000 líneas, poda al 80% del límite)
-- TTL de `apps_cache.json` ahora usa UTC consistente en toda la app
-- Race condition en `_pending_action` protegida con `threading.RLock()`
-- `GEMINI_MAX_TOKENS` sincronizado entre `config_loader.py` (default 800) y tests
+- Rotación automática de `chat_history.txt` (máx 10.000 líneas, poda al 80% del límite).
+- TTL de `apps_cache.json` ahora usa UTC consistente en toda la app.
+- Race condition en `_pending_action` protegida con `threading.RLock()`.
+- `GEMINI_MAX_TOKENS` sincronizado entre `config_loader.py` (default 800) y tests.
 
 ### Agregado
-- Indicador de progreso en escaneo de aplicaciones (`rglob("*.exe")`)
-- `Dockerfile` multi-etapa para Railway
-- Tests unitarios para `supabase_client.py` y `config_loader.py`
-- Test de verificación de patrones `_CMD_PATTERNS` vs `test_commands_v6.py`
-- `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`
+- Indicador de progreso en escaneo de aplicaciones (`rglob("*.exe")`).
+- `Dockerfile` multi-etapa para Railway.
+- Tests unitarios para `config_loader.py`.
+- Test de verificación de patrones `_CMD_PATTERNS` vs `test_commands_v6.py`.
+- `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`.
 
 ### Mejorado
-- CI/CD: Ruff + pytest + coverage + gitleaks + pip-audit
+- CI/CD: Ruff + pytest + coverage + gitleaks + pip-audit.
 
 ## [6.2.0] - 2026-06
 
 ### Corregido
-- Subprocess `shell=True` reemplazado por listas de args (5 ocurrencias)
-- `os.system()` reemplazado por `subprocess.run()`
-- Defaults duplicados entre `app.py` y `config_loader.py` eliminados
+- Subprocess `shell=True` reemplazado por listas de args (5 ocurrencias).
+- `os.system()` reemplazado por `subprocess.run()`.
+- Defaults duplicados entre `app.py` y `config_loader.py` eliminados.
 
 ### Agregado
-- `pyproject.toml` con Ruff, pytest, y pytest-cov
-- `requirements-dev.txt`
-- Validación de tipos en schema de `config.json`
-- Tests organizados en `tests/` con `conftest.py` + markers de plataforma
+- `pyproject.toml` con Ruff, pytest, y pytest-cov.
+- `requirements-dev.txt`.
+- Validación de tipos en schema de `config.json`.
+- Tests organizados en `tests/` con `conftest.py` + markers de plataforma.
 
 ### Refactorizado
-- `main.py` → extraídos `ai_client.py` + `tts_worker.py` (210 líneas menos)
+- `main.py` → extraídos `ai_client.py` + `tts_worker.py` (210 líneas menos).
 
 ## [6.1.0] - 2026-05
 
 ### Corregido
-- BUG 1: cutoff fuzzy subido (0.52→0.75) en `windows_commands.py`
-- BUG 2: `execute_command` limpia nombre antes de evaluar patrones
-- BUG 3: regex de apagar/reiniciar ampliados
-- BUG 4: `_cmd_accion` ya no captura preguntas genéricas
+- BUG 1: cutoff fuzzy subido (0.52→0.75) en `windows_commands.py`.
+- BUG 2: `execute_command` limpia nombre antes de evaluar patrones.
+- BUG 3: regex de apagar/reiniciar ampliados.
+- BUG 4: `_cmd_accion` ya no captura preguntas genéricas.
 
 ## [6.0.0] - 2026-04
 
 ### Agregado
-- Modos de activación PTT / NOMBRE / AUTO
-- Selector de modo en UI + indicador visual
-- `windows_commands.py` con fuzzy matching semántico
-- Integración con Supabase (chat_history, apps_cache, config compartida)
+- Modos de activación PTT / NOMBRE / AUTO.
+- Selector de modo en UI + indicador visual.
+- `windows_commands.py` con fuzzy matching semántico.
 
 ### Cambios
-- UI migrada de Tkinter a CustomTkinter
-- TTS worker en hilo separado
-- Single-instance mutex con win32event
+- UI migrada de Tkinter a CustomTkinter.
+- TTS worker en hilo separado.
+- Single-instance mutex con win32event.
