@@ -76,7 +76,7 @@ from workspace_manager import (
 
 load_dotenv()
 
-from config_loader import cfg  # noqa: E402
+from config_loader import cfg, get_user_data_dir  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  INSTANCIA ÚNICA
@@ -112,10 +112,10 @@ DEFAULT_LISTEN_MODE    = cfg.default_listen_mode
 NAME_SIMILARITY_CUTOFF = cfg.name_similarity_cutoff
 MIN_WORDS_WITHOUT_NAME = cfg.min_words_without_name
 
-BASE_DIR  = Path(__file__).parent
-LOG_FILE  = BASE_DIR / "darius.log"
-CHAT_FILE       = BASE_DIR / "chat_history.txt"
-APP_CACHE       = BASE_DIR / "apps_cache.json"
+DATA_DIR        = get_user_data_dir()
+LOG_FILE        = DATA_DIR / "darius.log"
+CHAT_FILE       = DATA_DIR / "chat_history.txt"
+APP_CACHE       = DATA_DIR / "apps_cache.json"
 MAX_CHAT_LINES  = 10000
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -356,6 +356,13 @@ class DariusFinal(ctk.CTk):
         self.minsize(500, 850)
         self.configure(fg_color="#090D16")
         self.protocol("WM_DELETE_WINDOW", self.kill_process)
+
+        icon_path = Path(__file__).resolve().parent / "assets" / "darius.ico"
+        if icon_path.exists():
+            try:
+                self.iconbitmap(str(icon_path))
+            except Exception as e:
+                log.debug(f"No se pudo cargar iconbitmap: {e}")
 
         self.running              = True
         self.is_listening         = False
@@ -784,9 +791,12 @@ class DariusFinal(ctk.CTk):
             self.llm_pill.configure(text=self._llm_badge_text())
         if hasattr(self, "tts_pill"):
             self.tts_pill.configure(text=self._tts_badge_text())
+        if hasattr(self, "tts_worker"):
+            self.tts_worker.engine = cfg.tts_engine
         prov_name = cfg.active_provider.upper()
-        self.set_status(f"IA: {prov_name}", "#38BDF8")
-        self.talk(f"Configuración de IA actualizada. Proveedor activo: {prov_name}.")
+        tts_name = cfg.tts_engine.upper()
+        self.set_status(f"IA: {prov_name} • TTS: {tts_name}", "#38BDF8")
+        self.talk(f"Configuración actualizada. Proveedor: {prov_name}, Motor de voz: {tts_name}.")
 
     def _on_text_submit(self, event=None):
         text = self.text_input.get().strip()

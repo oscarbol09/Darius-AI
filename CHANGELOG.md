@@ -12,16 +12,20 @@
   - Snap automático y apertura dirigida de navegadores y dashboards a pantallas secundarias específicas.
   - Enfoque nativo de instancias activas de Cursor IDE y VS Code (`QueryFullProcessImageNameW` + `AttachThreadInput`), evitando la duplicación de procesos y con alternancia a pantalla completa (F11).
   - Orquestación de rutinas automáticas: *Protocolo Darius*, *Modo Desarrollo*, *Modo Trading* y *Modo Concentración*.
-- **Motor TTS ElevenLabs con Caché Local Zero-Latency (`elevenlabs_tts_engine.py` & `tts_cache.py`):**
-  - Síntesis de voz ultra-realista con modelos multilingües de ElevenLabs y streaming de audio PCM a 24 kHz.
-  - Sistema de almacenamiento en disco con hashes SHA-256 (`audio_cache/`) para reproducir frases recurrentes con 0ms de latencia de red y 0 consumo de tokens de API.
-- **Nuevos Comandos de Voz y UI:**
-  - Nuevos patrones de voz en `windows_commands.py`: "iniciar protocolo darius", "modo desarrollo", "modo trading", "enfocar cursor", "ver monitores".
-  - Nuevos indicadores de telemetría en la interfaz gráfica: Badges de Monitores, Toggle interactivo de Doble Aplauso y Motor TTS activo.
+- **Modal Gráfico Dual de Configuración de IA y Voz (`byok_settings.py`):**
+  - Interfaz organizada por pestañas: `🤖 MODELO DE IA (BYOK)` y `🔊 VOZ Y SÍNTESIS (TTS)`.
+  - Integración completa de parámetros de ElevenLabs en GUI (API Key enmascarada con botón `👁`, Voice ID con presets populares, Model ID, alternador de caché en disco y botón de prueba auditiva en vivo `🔊 PROBAR VOZ`).
+  - Persistencia atómica y unificada en `config.json` sin requerir que los usuarios editen archivos `.env` manualmente.
+- **Empaquetado Nativo `.EXE` y Distribución Standalone (`build_nuitka.py` & `installer.iss`):**
+  - Compilación a binario nativo en C mediante **Nuitka**, eliminando falsos positivos en antivirus (Windows Defender) y reduciendo el tiempo de arranque.
+  - Script de instalación para **Inno Setup** que instala en `{localappdata}\Programs\DariusAI` sin requerir permisos de administrador.
+  - Soporte de adaptación para cualquier equipo: resolución automática de datos de usuario (`config.json`, logs, cachés) en `%APPDATA%\DariusAI` en modo congelado (`sys.frozen`).
+  - Generador de icono de aplicación multi-resolución en `assets/darius.ico`.
 - **Suites de Pruebas Unitarias:**
   - `tests/test_acoustic_trigger.py`: Pruebas de RMS, resolución de dispositivos y ciclo de vida.
   - `tests/test_workspace_manager.py`: Pruebas de detección de monitores, snapping y rutinas compuestas.
   - `tests/test_tts_cache.py`: Pruebas de hashing SHA-256 determinista y guardado/reproducción WAV.
+  - `tests/test_settings_tts.py`: Pruebas de persistencia de TTS/ElevenLabs y resolución de directorios `%APPDATA%`.
 
 ## [6.6.0] - 2026-09-19
 

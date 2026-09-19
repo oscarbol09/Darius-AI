@@ -20,15 +20,15 @@ from pathlib import Path
 
 import numpy as np
 
-log = logging.getLogger("DARIUS.TTSCache")
+from config_loader import get_user_data_dir
 
-_BASE_DIR = Path(__file__).resolve().parent
+log = logging.getLogger("DARIUS.TTSCache")
 
 
 def get_tts_cache_dir() -> Path:
     """Retorna el directorio de caché de audio, creándolo si no existe."""
     override = (os.environ.get("DARIUS_TTS_CACHE_DIR") or "").strip()
-    cache_dir = Path(override).expanduser().resolve() if override else _BASE_DIR / ".cache" / "darius_tts"
+    cache_dir = Path(override).expanduser().resolve() if override else get_user_data_dir() / "audio_cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     return cache_dir
 

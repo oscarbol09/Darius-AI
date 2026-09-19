@@ -24,14 +24,18 @@ Darius AI se basa en dos pilares de ingeniería:
   - Colocación y ajuste de navegadores y ventanas en monitores específicos (`snap_window_to_monitor`).
   - Enfoque nativo de IDEs (`Cursor.exe`, `Code.exe`) mediante `AttachThreadInput` y `SetForegroundWindow` para evitar procesos duplicados.
   - Rutinas automatizadas: **"Protocolo Darius"** (preparación y bienvenida completa), **"Modo Desarrollo"** (IDE monitor 1 + Docs monitor 2) y **"Modo Trading"** (TradingView + Finviz/Binance).
-- **Motor TTS ElevenLabs con Caché SHA-256 en Disco:**
+- **Motor TTS ElevenLabs y Configuración Gráfica Total:**
   - Síntesis neural de alta fidelidad con streaming PCM 24kHz y fallback a REST.
   - Almacenamiento local en disco (`audio_cache/`) indexado por hash SHA-256: las frases de estado y saludos recurrentes se reproducen al instante (0 ms de latencia) y con 0 consumo de cuota de API.
-  - Despachador multi-motor dinámico: ElevenLabs > Edge-TTS > SAPI5 local.
-- **Arquitectura BYOK Multi-Proveedor:**
-  - Soporte nativo y compatible para 7 motores: **Google Gemini**, **OpenAI / ChatGPT**, **OpenRouter**, **NVIDIA NIM**, **Groq Cloud**, **Ollama** (ejecución local en `http://localhost:11434/v1`) y cualquier endpoint compatible con el protocolo OpenAI.
-  - Modal gráfico de configuración (`⚙`) con selector de modelo, edición de URL base, campo de clave de API enmascarada y prueba de conexión en tiempo real con medición de latencia en milisegundos.
-  - Resolución jerárquica de credenciales: Configuración en GUI (`config.json`) > Variables de entorno (`.env`) > Valores por defecto.
+  - Despachador multi-motor dinámico: ElevenLabs > Edge-TTS > SAPI5 local (SAPI5 funciona offline sin configuración previa).
+- **Modal Gráfico Dual de Configuración (`⚙ Configuración`):**
+  - **Pestaña 1 (Modelo de IA - BYOK):** Soporte para 7 motores (Gemini, OpenAI, Groq, NVIDIA NIM, OpenRouter, Ollama, Personalizado) con ping de latencia en vivo.
+  - **Pestaña 2 (Voz y Síntesis - TTS):** Selección de motor (SAPI5, Edge-TTS, ElevenLabs), campo de API Key enmascarado con alternador `👁`, catálogo de voces (Adam, Rachel, Antoni, etc.), modelo neural, alternador de caché local y botón de prueba auditiva en vivo (`🔊 PROBAR VOZ`).
+  - Cero necesidad de editar archivos `.env` o JSON manualmente: todo se gestiona y persiste desde la interfaz visual.
+- **Empaquetado Nativo `.EXE` para Usuarios Finales:**
+  - Compilación nativa en C con **Nuitka** (0 dependencias de Python para el usuario final, 0 falsos positivos de antivirus).
+  - Instalador ligero con **Inno Setup** que instala en el perfil del usuario (`%LOCALAPPDATA%`) sin requerir permisos de administrador.
+  - Separación de datos: toda la persistencia mutable (`config.json`, logs, cachés) se aísla automáticamente en `%APPDATA%\DariusAI`.
 - **Cerebro y Memoria en Bóveda de Obsidian:**
   - **Diario Personal:** Comandos de voz directos (*"Anota en mi diario que..."*) que registran entradas con marca de tiempo en la nota diaria (`Diario/YYYY-MM-DD.md`).
   - **Memorias Permanentes:** Almacena hechos, preferencias y datos de contexto (*"Recuerda que..."*) en archivos Markdown estructurados con frontmatter YAML (`Darius/Memorias/`).
@@ -75,33 +79,45 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-### 3. Iniciar el asistente y configurar tu proveedor (BYOK)
-
+### 3. Iniciar el asistente y configurar tu proveedor e IA y Voz
 ```powershell
 python main.py
 ```
 
 Al abrir Darius AI:
 1. Haz clic en el botón **⚙ Configuración** en la esquina superior derecha.
-2. Selecciona tu proveedor preferido (**Gemini**, **OpenAI**, **Groq**, **NVIDIA NIM**, **OpenRouter**, **Ollama** o **Personalizado**).
-3. Introduce tu clave de API (para Ollama no es necesaria) o personaliza la URL base y el modelo.
-4. Presiona **Probar Conexión** para verificar el estado y la latencia.
-5. Haz clic en **Guardar**.
+2. **Pestaña 🤖 Modelo de IA (BYOK):**
+   - Selecciona tu proveedor preferido (**Gemini**, **OpenAI**, **Groq**, **NVIDIA NIM**, **OpenRouter**, **Ollama** o **Personalizado**).
+   - Introduce tu clave de API (no requerida para Ollama) y presiona **Probar Conexión** para medir la latencia.
+3. **Pestaña 🔊 Voz y Síntesis (TTS):**
+   - Selecciona el motor (**SAPI5 nativo offline**, **Edge-TTS neural**, o **ElevenLabs**).
+   - Si eliges ElevenLabs, ingresa tu API Key, selecciona tu voz favorita (Adam, Rachel, Antoni, etc.) y prueba el audio en vivo con **🔊 Probar Voz**.
+4. Haz clic en **Guardar** para aplicar los cambios de inmediato.
 
-Alternativamente, puedes configurar tus claves en un archivo `.env`:
+---
+
+## Compilación y Empaquetado a Binario Standalone (.EXE)
+
+Darius AI cuenta con un sistema de compilación automatizado a C nativo mediante **Nuitka**, lo que permite distribuirlo a usuarios que no tienen Python instalado:
 
 ```powershell
-Copy-Item .env.example .env
+# 1. Instalar dependencias de compilación
+pip install nuitka zstandard
+
+# 2. Compilar binario nativo standalone
+python build_nuitka.py
 ```
 
-```env
-GEMINI_API_KEY=tu_clave_de_google_ai_studio
-OPENAI_API_KEY=tu_clave_de_openai
-GROQ_API_KEY=tu_clave_de_groq
-NVIDIA_API_KEY=tu_clave_de_nvidia_nim
-OPENROUTER_API_KEY=tu_clave_de_openrouter
-ELEVENLABS_API_KEY=tu_clave_de_elevenlabs
+El script genera la carpeta `dist/DariusAI.dist/` que contiene `DariusAI.exe`, sus recursos y librerías DLL empaquetadas.
+
+### Crear el Instalador de Windows (Inno Setup)
+Si tienes instalado [Inno Setup 6](https://jrsoftware.org/isdl.php), compila el script para generar el instalador final:
+
+```powershell
+iscc installer.iss
 ```
+
+Esto generará `Output/DariusAI-Setup-v7.0.0.exe`, un instalador ligero que se instala en el directorio de usuario (`%LOCALAPPDATA%\Programs\DariusAI`) sin solicitar permisos de administrador.
 
 ### 4. Configurar la Bóveda de Obsidian y Espacio de Trabajo (Opcional)
 

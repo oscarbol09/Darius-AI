@@ -85,11 +85,15 @@ Darius-AI/
 ├── voice_filter.py          <- Filtro y matching fonético de nombre en texto
 ├── stt_engine.py            <- Motor STT con soporte para calibración y backends
 │
+├── assets/                  <- Recursos gráficos (icono multi-resolución darius.ico, generador)
+├── build_nuitka.py          <- SCRIPT DE COMPILACIÓN — Generación de binario nativo C standalone con Nuitka
+├── installer.iss            <- SCRIPT DE INSTALADOR — Generador de setup Windows con Inno Setup
 ├── tests/
 │   ├── conftest.py          <- Configuración de pytest y fixtures compartidos
 │   ├── test_acoustic_trigger.py <- Tests de detección de aplausos, RMS mono y piso de ruido adaptativo
 │   ├── test_workspace_manager.py <- Tests de geometría multi-monitor, snapping de ventanas y rutinas
 │   ├── test_tts_cache.py    <- Tests de persistencia, hashing SHA-256 y atomicidad de caché WAV
+│   ├── test_settings_tts.py <- Tests de persistencia y configuración GUI de TTS y ElevenLabs
 │   ├── test_byok_providers.py  <- Tests del motor BYOK, resolución de claves y ping de conexión
 │   ├── test_commands_v6.py  <- Tests de comandos del sistema operativo y rutas absolutas
 │   ├── test_config_loader.py<- Tests de merge jerárquico y persistencia de configuración
@@ -101,10 +105,10 @@ Darius-AI/
 ├── CONTRIBUTING.md          <- Guía de contribución y estándares de código
 ├── SECURITY.md              <- Políticas de seguridad y tratamiento de credenciales
 │
-├── darius.log               <- Log rotativo del sistema (excluido de Git)
-├── chat_history.txt         <- Historial local de interacciones (excluido de Git)
-├── apps_cache.json          <- Caché de aplicaciones instaladas en Windows (excluido de Git)
-└── audio_cache/             <- Caché local en disco de audios sintetizados WAV (excluido de Git)
+├── darius.log               <- Log rotativo del sistema (%APPDATA%\DariusAI en frozen / local en dev)
+├── chat_history.txt         <- Historial local de interacciones
+├── apps_cache.json          <- Caché de aplicaciones instaladas en Windows
+└── audio_cache/             <- Caché local en disco de audios sintetizados WAV (SHA-256)
 ```
 
 ---
@@ -227,6 +231,12 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 
 ### D11 — Caché de Audio en Disco con Hash SHA-256 (`TTSDiskCache`)
 **Decisión:** Almacenar respuestas de voz sintetizadas en `audio_cache/` indexadas por hash SHA-256 truncado a 24 caracteres de la tupla normalizada `(text|voice|model|format)`. Frases recurrentes de estado y saludos ("Buenos días, Óscar", "Protocolo Darius activado", "Monitores listos") se reproducen al instante (0 ms de latencia) y con 0 consumo de cuota de API en ElevenLabs.
+
+### D12 — Compilación Nativa C Standalone con Nuitka e Instalador Inno Setup
+**Decisión:** Compilar la aplicación a binario nativo de Windows mediante **Nuitka** (`build_nuitka.py`) con plugins de CustomTkinter y SoundDevice, generando un ejecutable optimizado que elimina falsos positivos en antivirus (Windows Defender) y arranca en milisegundos. Para aislar los datos mutables del usuario, `config_loader.get_user_data_dir()` redirige la persistencia (`config.json`, logs, cachés) a `%APPDATA%\DariusAI` en modo congelado (`sys.frozen`), protegiendo la carpeta de instalación de bloqueos de permisos de UAC. El instalador con **Inno Setup** (`installer.iss`) instala en `{localappdata}\Programs\DariusAI` sin requerir elevación de administrador.
+
+### D13 — Modal Gráfico Dual (LLM + TTS/ElevenLabs) con Prueba en Vivo
+**Decisión:** Integrar toda la configuración de motores de síntesis vocal (SAPI5, Edge-TTS, ElevenLabs) directamente en la interfaz gráfica (`byok_settings.py`), incluyendo clave de API enmascarada, selector de Voice ID, modelo neural, alternador de caché y botón de prueba auditiva en vivo (`🔊 PROBAR VOZ`). Los usuarios nunca necesitan manipular archivos `.env` ni editar JSON manualmente.
 
 ---
 

@@ -17,12 +17,41 @@ Uso en main.py:
 
 import json
 import logging
+import os
+import sys
 from pathlib import Path
 
 log = logging.getLogger("DARIUS.Config")
 
+
+def get_user_data_dir() -> Path:
+    """
+    Retorna el directorio para almacenar datos mutables del usuario.
+    Si se ejecuta empaquetado (sys.frozen), usa %APPDATA%/DariusAI.
+    Si se ejecuta desde el código fuente, usa el directorio raíz del proyecto.
+    """
+    if getattr(sys, "frozen", False):
+        appdata = os.getenv("APPDATA") or os.path.expanduser("~")
+        data_dir = Path(appdata) / "DariusAI"
+    else:
+        data_dir = Path(__file__).resolve().parent
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
+
+
+def get_app_resource_dir() -> Path:
+    """
+    Retorna el directorio de recursos de solo lectura empaquetados con la aplicación.
+    """
+    if getattr(sys, "frozen", False):
+        if hasattr(sys, "_MEIPASS"):
+            return Path(sys._MEIPASS)  # PyInstaller
+        return Path(sys.executable).resolve().parent  # Nuitka / Onedir
+    return Path(__file__).resolve().parent
+
+
 _BASE_DIR = Path(__file__).parent
-_CONFIG_FILE = _BASE_DIR / "config.json"
+_CONFIG_FILE = get_user_data_dir() / "config.json"
 
 # Valores por defecto: garantizan arranque seguro aunque falte config.json
 _DEFAULTS: dict = {
@@ -554,17 +583,26 @@ def _load() -> _Config:
             # Quitar clave de comentario antes del merge
             user_data.pop("_comment", None)
             data = _deep_merge(_DEFAULTS, user_data)
-            log.info(f"[Config] Cargado desde {_CONFIG_FILE.name}")
+            log.info(f"[Config] Cargado desde {_CONFIG_FILE}")
         except Exception as e:
             log.warning(f"[Config] Error leyendo config.json, usando defaults: {e}")
     else:
-        # Primera ejecución: crear config.json para que el usuario pueda editarlo
+        # Primera ejecución: si existe plantilla en los recursos empaquetados, úsala
+        template_file = get_app_resource_dir() / "config.json"
+        if template_file.exists() and template_file != _CONFIG_FILE:
+            try:
+                template_data = json.loads(template_file.read_text(encoding="utf-8"))
+                template_data.pop("_comment", None)
+                data = _deep_merge(_DEFAULTS, template_data)
+            except Exception as e:
+                log.warning(f"[Config] Error leyendo plantilla bundled config.json: {e}")
         try:
+            _CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
             _CONFIG_FILE.write_text(
-                json.dumps(_DEFAULTS, ensure_ascii=False, indent=2),
+                json.dumps(data, ensure_ascii=False, indent=2),
                 encoding="utf-8",
             )
-            log.info("[Config] config.json creado con valores por defecto.")
+            log.info(f"[Config] config.json inicializado en {_CONFIG_FILE}")
         except Exception as e:
             log.warning(f"[Config] No se pudo crear config.json: {e}")
 
