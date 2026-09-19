@@ -44,15 +44,15 @@ jobs:
         run: ruff check --output-format=github .
 
   # =========================================================================
-  # GATE 2: Auditoría de Seguridad y Secretos
+  # GATE 2: Detección de Secretos (Gitleaks)
   # =========================================================================
-  security:
-    name: Seguridad y Secretos (Gitleaks + pip-audit)
+  security-secrets:
+    name: Escaneo de Secretos (Gitleaks)
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - name: Checkout completo (historial para escaneo)
+      - name: Checkout completo del repositorio
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -62,26 +62,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configurar Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Instalar dependencias y pip-audit
-        run: |
-          python -m pip install --upgrade pip
-          pip install pip-audit
-
-      - name: Auditoría de vulnerabilidades en dependencias
-        run: pip-audit --desc on -r requirements.txt
-
   # =========================================================================
-  # GATE 3: Matriz de Pruebas en Windows Nativo (Win32 / SAPI / Audio / Brain)
+  # GATE 3: Matriz de Pruebas y Auditoría de Seguridad en Windows Nativo
   # =========================================================================
   test-windows:
-    name: Tests Windows (Python ${{ matrix.python-version }})
-    needs: [quality]
+    name: Windows Nativo (Python ${{ matrix.python-version }})
+    needs: [quality, security-secrets]
     runs-on: windows-latest
     timeout-minutes: 10
 
@@ -105,6 +91,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
+          pip install pip-audit
+
+      - name: Auditoría de vulnerabilidades en dependencias (pip-audit)
+        run: pip-audit --desc on -r requirements.txt
 
       - name: Ejecutar pruebas unitarias con cobertura
         run: >
