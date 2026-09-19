@@ -67,14 +67,14 @@ Darius-AI/
 ├── tts_worker.py            <- Worker TTS (SAPI) en hilo propio
 ├── edge_tts_engine.py       <- Motor TTS alternativo con edge-tts
 ├── stt_engine.py            <- Motor STT con backends intercambiables
-├── supabase_client.py       <- Cliente Supabase (persistencia y backup opcional)
+├── obsidian_brain.py        <- Cerebro y memoria en Obsidian Vault (Markdown + YAML)
 │
 ├── tests/
 │   ├── test_commands_v6.py  <- Tests de comandos del SO
 │   ├── test_voice_v6.py     <- Tests del subsistema de voz
 │   ├── test_gemini_v6.py    <- Tests de integracion con Gemini API
 │   ├── test_config_loader.py<- Tests de config_loader
-│   └── test_supabase_client.py <- Tests de supabase_client
+│   └── test_obsidian_brain.py <- Tests de memoria y diario en Obsidian
 │
 ├── pyproject.toml           <- Configuracion Ruff (line-length=120), pytest, coverage
 ├── requirements-dev.txt     <- Dependencias de desarrollo
@@ -232,14 +232,12 @@ messagebox y sale con `sys.exit(0)`. Simple, nativo, no requiere archivo PID.
 proceso hijo herede la consola de Darius y compita por el foco de audio o ventana.
 Rutas completas (_PS, _CMD, _MMC, _CONTROL) via `os.environ["SystemRoot"]`.
 
-### D5 — config_loader con merge de 3 fuentes (local > defaults < Supabase)
+### D5 — config_loader con merge jerárquico local (config.json + defaults)
 
-**Decision:** La configuracion se construye como merge jerarquico:
+**Decision:** La configuracion se construye como merge jerarquico entre:
 1. `_DEFAULTS` (hardcodeado en `config_loader.py`)
-2. `config.json` local (valores del usuario)
-3. Supabase (tabla `config`) — si esta disponible, tiene prioridad y se cachea
-   en `config.json` para arranques offline.
-Propiedades de `cfg` usan snake_case (`cfg.assistant_name`, `cfg.gemini_model`).
+2. `config.json` local (valores editables por el usuario)
+Propiedades de `cfg` usan snake_case (`cfg.assistant_name`, `cfg.gemini_model`, `cfg.obsidian_vault_path`).
 
 ### D6 — No se usa `shell=True` (seguridad)
 
@@ -248,12 +246,12 @@ se pasan como listas de argumentos. En `_launch()` (linea 882) se usa
 `["cmd", "/c", cmd]` en vez de `cmd` directamente, para evitar inyeccion de
 comandos via nombres de archivo maliciosos.
 
-### D7 — Sin base de datos local; Supabase es opcional
+### D7 — Memoria y persistencia local en Obsidian Vault
 
-**Decision:** Darius funciona completamente offline sin Supabase. Si
-`SUPABASE_URL`/`SUPABASE_KEY` no estan en `.env`, `get_supabase()` retorna `None`
-y todo el sistema sigue funcionando en modo local. Si esta configurado, permite
-respaldar historial y configuraciones en la nube.
+**Decision:** Darius funciona de manera 100% nativa y privada en Windows. Las memorias,
+hechos y notas del diario se guardan en la bóveda local de Obsidian en formato Markdown
+con frontmatter YAML (`obsidian_brain.py`), permitiendo al usuario revisar, buscar y
+conectar sus datos en Obsidian sin intermediarios en la nube.
 
 ### D8 — Ruff con reglas estrictas, 0 errores
 

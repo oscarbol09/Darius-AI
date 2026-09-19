@@ -1,5 +1,17 @@
 # Changelog
 
+## [6.5.0] - 2026-09-19
+
+### Agregado
+- Módulo `obsidian_brain.py` para integración directa de memoria y notas en Obsidian Vault (Markdown + YAML frontmatter).
+- Comandos por voz para inserción en diario personal (`Diario/YYYY-MM-DD.md`) y guardado de memorias persistentes.
+- Inyección contextual de notas de Obsidian en el prompt del sistema de Google Gemini.
+- Suite de pruebas unitarias para el motor de Obsidian (`test_obsidian_brain.py`).
+
+### Eliminado
+- Eliminación total de dependencias y código de Supabase (`supabase_client.py`, `test_supabase_client.py`).
+- Persistencia de configuración y caché 100% local en disco.
+
 ## [6.4.0] - 2026-09-19
 
 ### Cambios
