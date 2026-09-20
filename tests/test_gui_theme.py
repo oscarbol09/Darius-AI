@@ -70,3 +70,31 @@ def test_license_file_and_copyright():
     assert "GNU GENERAL PUBLIC LICENSE" in content
     assert "Version 3" in content
     assert "Copyright (C) 2026 Oscarbol09" in content
+
+
+def test_packaging_and_installer_metadata():
+    """Verifica que los scripts de empaquetado (Nuitka, Inno Setup, pyproject) tengan la autoría correcta."""
+    root = Path(__file__).resolve().parent.parent
+
+    # 1. Nuitka build script
+    nuitka_script = root / "build_nuitka.py"
+    assert nuitka_script.exists()
+    nuitka_content = nuitka_script.read_text(encoding="utf-8")
+    assert "--company-name=Oscarbol09" in nuitka_content
+    assert "Oscarbol09" in nuitka_content
+    assert "Copyright (C) 2026 Oscarbol09" in nuitka_content
+
+    # 2. Inno Setup installer script
+    iss_script = root / "installer.iss"
+    assert iss_script.exists()
+    iss_content = iss_script.read_text(encoding="utf-8")
+    assert '#define MyAppPublisher "Oscarbol09"' in iss_content
+    assert "https://github.com/oscarbol09/Darius-AI" in iss_content
+
+    # 3. pyproject.toml
+    pyproject = root / "pyproject.toml"
+    assert pyproject.exists()
+    pyproject_content = pyproject.read_text(encoding="utf-8")
+    assert 'name = "Oscarbol09"' in pyproject_content
+    assert "https://github.com/oscarbol09/Darius-AI" in pyproject_content
+

@@ -5,7 +5,7 @@
 
 #define MyAppName "Darius AI"
 #define MyAppVersion "7.0.0"
-#define MyAppPublisher "Oscar Bolano"
+#define MyAppPublisher "Oscarbol09"
 #define MyAppURL "https://github.com/oscarbol09/Darius-AI"
 #define MyAppExeName "DariusAI.exe"
 
