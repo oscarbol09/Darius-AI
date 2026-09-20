@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import subprocess
 from typing import Any
@@ -196,6 +197,65 @@ class AgenticBridge:
         )
         return self.execute_powershell(ps_cmd)
 
+    def human_mouse_move(self, x: int, y: int) -> tuple[bool, str]:
+        """Mueve el ratón suavemente con física de curva de Bézier."""
+        try:
+            from human_gui import gui
+            gui.human_mouse_move(x, y)
+            return True, f"Ratón movido a ({x}, {y})."
+        except Exception as exc:
+            return False, f"Error al mover ratón: {exc}"
+
+    def human_click(
+        self,
+        x: int | None = None,
+        y: int | None = None,
+        button: str = "left",
+        double: bool = False,
+    ) -> tuple[bool, str]:
+        """Ejecuta un clic o doble clic con duraciones humanas."""
+        try:
+            from human_gui import gui
+            gui.human_click(x=x, y=y, button=button, double=double)
+            action_name = "Doble clic" if double else f"Clic {button}"
+            coord_str = f" en ({x}, {y})" if x is not None and y is not None else ""
+            return True, f"{action_name}{coord_str} completado."
+        except Exception as exc:
+            return False, f"Error al hacer clic: {exc}"
+
+    def human_type(self, text: str, wpm: int = 70) -> tuple[bool, str]:
+        """Escribe texto en pantalla con cadencia mecanográfica humana."""
+        try:
+            from human_gui import gui
+            gui.human_type(text, wpm=wpm)
+            preview = text[:30] + ("..." if len(text) > 30 else "")
+            return True, f"Texto escrito ({len(text)} caracteres): '{preview}'"
+        except Exception as exc:
+            return False, f"Error al escribir: {exc}"
+
+    def human_hotkey(self, keys: str) -> tuple[bool, str]:
+        """Presiona una combinación de teclas (ej: 'ctrl+c', 'win+r')."""
+        try:
+            from human_gui import gui
+            key_list = [k.strip() for k in re.split(r"[,+\s]+", keys) if k.strip()]
+            gui.human_hotkey(*key_list)
+            return True, f"Atajo ejecutado: {' + '.join(key_list)}"
+        except Exception as exc:
+            return False, f"Error al presionar atajo: {exc}"
+
+    def scrape_web(self, url: str) -> tuple[bool, str]:
+        """Descarga y extrae el texto limpio de una página web en segundo plano."""
+        try:
+            from human_gui import gui
+            res = gui.scrape_web_content(url, max_chars=MAX_OUTPUT_CHARS)
+            if res.get("success"):
+                title = res.get("title", "")
+                content = res.get("content", "")
+                return True, f"Título: {title}\n\nContenido:\n{content}"
+            return False, f"Error de scraping: {res.get('error', 'Fallo desconocido')}"
+        except Exception as exc:
+            return False, f"Error al scrapear {url}: {exc}"
+
     def parse_and_execute_tool(self, tool_name: str, args_str: str = "") -> dict[str, Any]:
         """
         Despachador central de llamadas a herramientas autónomas.
@@ -225,6 +285,27 @@ class AgenticBridge:
             ok, out = self.execute_powershell(args_clean)
         elif tool_clean in ("execute_cmd", "cmd"):
             ok, out = self.execute_cmd(args_clean)
+        elif tool_clean in ("human_type", "escribir", "teclear", "type_text"):
+            ok, out = self.human_type(args_clean)
+        elif tool_clean in ("human_click", "clic", "hacer_clic", "click"):
+            # Extraer posibles coordenadas (x=100, y=200) o argumentos numéricos
+            nums = [int(n) for n in re.findall(r"\b\d+\b", args_clean)]
+            cx = nums[0] if len(nums) >= 1 else None
+            cy = nums[1] if len(nums) >= 2 else None
+            is_right = "right" in args_clean.lower() or "derecho" in args_clean.lower()
+            is_double = "doble" in args_clean.lower() or "double" in args_clean.lower()
+            btn = "right" if is_right else "left"
+            ok, out = self.human_click(x=cx, y=cy, button=btn, double=is_double)
+        elif tool_clean in ("human_mouse_move", "mover_mouse", "mouse_move"):
+            nums = [int(n) for n in re.findall(r"\b\d+\b", args_clean)]
+            if len(nums) >= 2:
+                ok, out = self.human_mouse_move(nums[0], nums[1])
+            else:
+                ok, out = False, f"Se requieren coordenadas (x, y). Recibido: '{args_clean}'"
+        elif tool_clean in ("human_hotkey", "hotkey", "combinacion_teclas", "presionar_teclas"):
+            ok, out = self.human_hotkey(args_clean)
+        elif tool_clean in ("scrape_web", "scrapear", "extraer_web", "leer_web"):
+            ok, out = self.scrape_web(args_clean)
         else:
             ok = False
             out = f"Herramienta desconocida: '{tool_name}'."

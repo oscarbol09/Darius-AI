@@ -177,3 +177,45 @@ class TestToolDispatcher:
 
         assert res["success"] is False
         assert "desconocida" in res["output"].lower()
+
+    @patch("human_gui.gui.human_type", return_value=True)
+    def test_dispatch_human_type(self, mock_type):
+        bridge = AgenticBridge()
+        res = bridge.parse_and_execute_tool("human_type", "Hola mundo")
+
+        assert res["success"] is True
+        assert "escrito" in res["output"].lower()
+        mock_type.assert_called_once_with("Hola mundo", wpm=70)
+
+    @patch("human_gui.gui.human_click", return_value=True)
+    def test_dispatch_human_click(self, mock_click):
+        bridge = AgenticBridge()
+        res = bridge.parse_and_execute_tool("human_click", "x=400 y=300 derecho doble")
+
+        assert res["success"] is True
+        assert "doble clic" in res["output"].lower()
+        mock_click.assert_called_once_with(x=400, y=300, button="right", double=True)
+
+    @patch("human_gui.gui.human_hotkey", return_value=True)
+    def test_dispatch_human_hotkey(self, mock_hotkey):
+        bridge = AgenticBridge()
+        res = bridge.parse_and_execute_tool("human_hotkey", "ctrl + v")
+
+        assert res["success"] is True
+        assert "ctrl + v" in res["output"].lower()
+        mock_hotkey.assert_called_once_with("ctrl", "v")
+
+    @patch("human_gui.gui.scrape_web_content")
+    def test_dispatch_scrape_web(self, mock_scrape):
+        mock_scrape.return_value = {
+            "success": True,
+            "title": "Blog Tech",
+            "content": "Noticias del día.",
+        }
+        bridge = AgenticBridge()
+        res = bridge.parse_and_execute_tool("scrape_web", "https://blog.tech.com")
+
+        assert res["success"] is True
+        assert "Blog Tech" in res["output"]
+        assert "Noticias del día" in res["output"]
+

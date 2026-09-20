@@ -1405,12 +1405,27 @@ class DariusFinal(ctk.CTk):
         r"\b(qu[eé]\s+(app[s]?\s+|proceso[s]?\s+)?consume[n]?\s+m[aá]s\s+ram|procesos\s+pesados|procesos\s+que\s+m[aá]s\s+consumen(\s+ram)?|top\s+procesos|quien\s+consume\s+m[aá]s\s+(memoria|ram))\b",
         re.IGNORECASE
     )
+    _RE_HUMAN_TYPE = re.compile(
+        r"\b(escribe|teclea|digita|escribe\s+por\s+m[ií])\s+(.+)$",
+        re.IGNORECASE
+    )
+    _RE_HUMAN_CLICK = re.compile(
+        r"\b(haz\s+clic|da\s+clic|clic\s+izquierdo|clic\s+derecho|doble\s+clic|mover\s+mouse)\b",
+        re.IGNORECASE
+    )
+    _RE_SCRAPE_WEB = re.compile(
+        r"\b(extrae|scrapp?ea|analiza|lee|resume)\s+(la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url)?\s*(https?://\S+)\b",
+        re.IGNORECASE
+    )
 
     _CMD_PATTERNS = [
         (_RE_DETENER,                                                             "_cmd_detener"),
         (_RE_HORA,                                                                "_cmd_hora"),
         (_RE_FECHA,                                                               "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
+        (_RE_SCRAPE_WEB,                                                          "_cmd_scrape_web"),
+        (_RE_HUMAN_TYPE,                                                          "_cmd_human_type"),
+        (_RE_HUMAN_CLICK,                                                         "_cmd_human_click"),
         (_RE_DNS,                                                                 "_cmd_flush_dns"),
         (_RE_GH_PRS,                                                              "_cmd_gh_prs"),
         (_RE_GIT_STATUS,                                                          "_cmd_git_status"),
@@ -1517,6 +1532,55 @@ class DariusFinal(ctk.CTk):
             from agentic_bridge import bridge
             ok, out = bridge.get_top_processes(5)
             self.talk(self._format_output_for_tts(out, "Procesos con mayor consumo de RAM"))
+
+    def _cmd_human_type(self, cmd: str):
+        m = self._RE_HUMAN_TYPE.search(cmd)
+        text_to_type = m.group(2).strip() if m else ""
+        if not text_to_type:
+            self.talk("¿Qué texto deseas que escriba?")
+            return
+        self.talk("Escribiendo texto en dos segundos.")
+        def run():
+            time.sleep(2.0)
+            from human_gui import gui
+            gui.human_type(text_to_type)
+            self.talk("Texto escrito correctamente.")
+        threading.Thread(target=run, daemon=True, name="human-type").start()
+
+    def _cmd_human_click(self, cmd: str):
+        is_right = bool(re.search(r"derecho", cmd, re.IGNORECASE))
+        is_double = bool(re.search(r"doble", cmd, re.IGNORECASE))
+        clicks = 2 if is_double else 1
+        button = "right" if is_right else "left"
+        self.talk("Haciendo clic en dos segundos.")
+        def run():
+            time.sleep(2.0)
+            from human_gui import gui
+            gui.human_click(button=button, clicks=clicks)
+            self.talk("Clic ejecutado.")
+        threading.Thread(target=run, daemon=True, name="human-click").start()
+
+    def _cmd_scrape_web(self, cmd: str):
+        m = self._RE_SCRAPE_WEB.search(cmd)
+        url = m.group(3).strip() if m else ""
+        if not url:
+            self.talk("Por favor proporciona una URL válida para analizar.")
+            return
+        self.talk(f"Analizando el contenido de {url}.")
+        def run():
+            from human_gui import gui
+            res = gui.scrape_web_content(url)
+            if not res.get("ok"):
+                self.talk(f"Error al analizar la página: {res.get('error')}")
+                return
+            title = res.get("title", "Página web")
+            content = res.get("content", "")
+            summary_prompt = (
+                f"Resume brevemente y extrae los puntos clave del siguiente contenido web "
+                f"extraído de '{title}' ({url}):\n\n{content[:4000]}"
+            )
+            self.ask_gemini(summary_prompt)
+        threading.Thread(target=run, daemon=True, name="scrape-web").start()
 
     def _cmd_darius_protocol(self, _):
         self.talk("Iniciando Protocolo Darius. Configurando entorno de trabajo y herramientas.")
@@ -1638,6 +1702,9 @@ class DariusFinal(ctk.CTk):
         )
 
     def _cmd_detener(self, _):
+        with contextlib.suppress(Exception):
+            from human_gui import gui
+            gui.abort()
         if hasattr(self, "tts_worker"):
             self.tts_worker.clear_queue()
         with contextlib.suppress(Exception):

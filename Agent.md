@@ -82,6 +82,8 @@ Darius-AI/
 ├── ai_client.py             <- MOTOR BYOK — Clientes Gemini, OpenAI, Groq, NVIDIA NIM, OpenRouter, Ollama
 ├── obsidian_brain.py        <- CEREBRO — Gestión de notas diarias, memorias y búsqueda contextual en Obsidian
 ├── windows_commands.py      <- Catálogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL, python actions)
+├── human_gui.py            <- AUTOMATIZACIÓN GUI — Curvas de Bézier cúbicas, tipeo estocástico Unicode y scraper web nativo
+├── agentic_bridge.py       <- PUENTE AGÉNTICO — Loop de ejecución de herramientas autónomas y fast-path CLI
 ├── voice_filter.py          <- Filtro y matching fonético de nombre en texto
 ├── stt_engine.py            <- Motor STT con soporte para calibración y backends
 │
@@ -90,6 +92,8 @@ Darius-AI/
 ├── installer.iss            <- SCRIPT DE INSTALADOR — Generador de setup Windows con Inno Setup
 ├── tests/
 │   ├── conftest.py          <- Configuración de pytest y fixtures compartidos
+│   ├── test_human_gui.py    <- Tests de trayectorias de Bézier, failsafe Win32 y scraper web
+│   ├── test_agentic_bridge.py <- Tests del motor de herramientas autónomas y tool execution
 │   ├── test_acoustic_trigger.py <- Tests de detección de aplausos, RMS mono y piso de ruido adaptativo
 │   ├── test_workspace_manager.py <- Tests de geometría multi-monitor, snapping de ventanas y rutinas
 │   ├── test_tts_cache.py    <- Tests de persistencia, hashing SHA-256 y atomicidad de caché WAV
@@ -246,6 +250,13 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 1. **Fast-Path Router Local (0 ms):** Enrutamiento por expresiones regulares en `main.py` y `windows_commands.py` para comandos frecuentes de red (`ipconfig /flushdns`, renovación de IP), utilidades de desarrollador (`gh pr list`, `git status`) y diagnósticos de RAM (`Get-Process`).
 2. **Autonomous Tool Loop Multi-Proveedor:** Los modelos LLM (Gemini, OpenAI, Groq, OpenRouter, Ollama) pueden invocar herramientas del sistema operativo o CLIs activos emitiendo la etiqueta estructurada de acción. Darius intercepta la llamada, ejecuta el binario local herméticamente con timeout de 8-10s y reinyecta la salida de consola al modelo para que sintetice una respuesta verbal ejecutiva.
 3. **Protocolo de Confirmación para Acciones Destructivas:** Las operaciones de solo lectura y diagnóstico se ejecutan de inmediato sin fricción; las operaciones modificadoras o destructivas (merges de PRs, borrado de archivos, reseteos forzados) activan un diálogo de confirmación por voz antes de proceder.
+
+### D16 — Automatización de GUI Antropomórfica ("Computer Use") y Web Scraper Zero-Dependency
+**Decisión:** Implementar automatización del cursor del mouse, clics, hotkeys, digitación de teclado y extracción de páginas web mediante `human_gui.py` usando exclusivamente la Win32 API (`ctypes.windll.user32`) y la librería estándar (`urllib.request`, `html.parser`), sin dependencias pesadas ni binarios de terceros (evitando `pyautogui`, `selenium`, `playwright`).
+1. **Trayectorias de Bézier Cúbicas y Física Fitts:** Los desplazamientos del cursor calculan puntos de control estocásticos ortogonales y aplican perfiles de aceleración/desaceleración senoidales (*Ease-in / Ease-out*), añadiendo micro-jitter de 1-2px para emular fielmente el movimiento neuromuscular humano.
+2. **Digitación con Distribución Gaussiana y Soporte Unicode:** El tipeo utiliza pausas de variabilidad natural estocástica (WPM dinámico) e inyecta eventos `KEYEVENTF_UNICODE` (`0x0004`), garantizando la escritura universal de caracteres acentuados, eñes y caracteres especiales con total independencia del layout del teclado físico.
+3. **Mecanismo de Failsafe de Emergencia:** Se evalúa de manera atómica antes de cada sub-paso de movimiento o pulsación de tecla el cursor en la esquina superior izquierda `(0, 0)` o la bandera de interrupción activada por comando de voz (*"Darius, detente"*), abortando inmediatamente cualquier automatización activa y previniendo bucles incontrolados.
+4. **Scraper Web Resiliente Zero-Dependency:** Extracción de DOM y texto legible con sanitización de scripts, estilos, comentarios y entidades HTML mediante un parser SAX (`HTMLTextExtractor`) y fallback de expresiones regulares, operando de forma hermética con timeout de 10 segundos y User-Agent de navegador moderno.
 
 ---
 

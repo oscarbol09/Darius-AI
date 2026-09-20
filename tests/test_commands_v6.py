@@ -636,12 +636,27 @@ class TestCmdPatterns(unittest.TestCase):
         r"\b(qu[eé]\s+(app[s]?\s+|proceso[s]?\s+)?consume[n]?\s+m[aá]s\s+ram|procesos\s+pesados|procesos\s+que\s+m[aá]s\s+consumen(\s+ram)?|top\s+procesos|quien\s+consume\s+m[aá]s\s+(memoria|ram))\b",
         re.IGNORECASE
     )
+    _RE_HUMAN_TYPE_TEST = re.compile(
+        r"\b(escribe|teclea|digita|escribe\s+por\s+m[ií])\s+(.+)$",
+        re.IGNORECASE
+    )
+    _RE_HUMAN_CLICK_TEST = re.compile(
+        r"\b(haz\s+clic|da\s+clic|clic\s+izquierdo|clic\s+derecho|doble\s+clic|mover\s+mouse)\b",
+        re.IGNORECASE
+    )
+    _RE_SCRAPE_WEB_TEST = re.compile(
+        r"\b(extrae|scrapp?ea|analiza|lee|resume)\s+(la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url)?\s*(https?://\S+)\b",
+        re.IGNORECASE
+    )
 
     # Replica de _CMD_PATTERNS de main.py (los patrones relevantes)
     PATTERNS = [
         (_RE_HORA_TEST,                                                          "hora"),
         (_RE_FECHA_TEST,                                                         "fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "reset"),
+        (_RE_SCRAPE_WEB_TEST,                                                    "scrape_web"),
+        (_RE_HUMAN_TYPE_TEST,                                                    "human_type"),
+        (_RE_HUMAN_CLICK_TEST,                                                   "human_click"),
         (_RE_DNS_TEST,                                                           "flush_dns"),
         (_RE_GH_PRS_TEST,                                                        "gh_prs"),
         (_RE_GIT_STATUS_TEST,                                                    "git_status"),
@@ -683,6 +698,15 @@ class TestCmdPatterns(unittest.TestCase):
         self.assertEqual(self._route("procesos pesados"), "top_processes")
         self.assertEqual(self._route("qué consume más ram"), "top_processes")
         self.assertEqual(self._route("quien consume más memoria"), "top_processes")
+
+    def test_gui_automation_and_scraping_commands(self):
+        self.assertEqual(self._route("escribe hola mundo"), "human_type")
+        self.assertEqual(self._route("teclea git status"), "human_type")
+        self.assertEqual(self._route("haz clic"), "human_click")
+        self.assertEqual(self._route("da clic derecho"), "human_click")
+        self.assertEqual(self._route("doble clic"), "human_click")
+        self.assertEqual(self._route("extrae la página https://example.com"), "scrape_web")
+        self.assertEqual(self._route("analiza https://news.ycombinator.com"), "scrape_web")
 
     def test_hora_commands(self):
         self.assertEqual(self._route("qué hora es"), "hora")
