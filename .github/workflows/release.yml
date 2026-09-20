@@ -1,0 +1,104 @@
+name: Release — Darius AI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Nombre del Tag / Versión (ej. v7.0.0)'
+        required: false
+        default: 'v7.0.0'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  # =========================================================================
+  # GATE 1: Pruebas y Validación de Calidad
+  # =========================================================================
+  verify:
+    name: Verificación y Pruebas Unitarias
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Validar linting con Ruff
+        run: ruff check .
+
+      - name: Ejecutar suite de pruebas unitarias
+        run: pytest tests/ -v -m "not live"
+
+  # =========================================================================
+  # GATE 2: Compilación Nativa Standalone con Nuitka e Instalador Inno Setup
+  # =========================================================================
+  build-and-release:
+    name: Compilación .EXE y Publicación de Release
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Instalar dependencias de ejecución y compilación
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install nuitka>=2.4.0 zstandard ordered-set pillow
+
+      - name: Instalar Inno Setup
+        run: choco install innosetup --no-progress
+
+      - name: Compilar binario nativo standalone con Nuitka
+        run: python build_nuitka.py
+
+      - name: Compilar Instalador de Windows con Inno Setup
+        run: |
+          mkdir dist-installer -Force
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+      - name: Generar paquete portable .ZIP
+        run: |
+          Compress-Archive -Path dist\main.dist\* -DestinationPath dist-installer\DariusAI-v7.0.0-windows-x64-portable.zip -Force
+
+      - name: Publicar GitHub Release y adjuntar binarios
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Darius AI v7.0.0 — Standalone Installer & Acoustic Automation Edition
+          tag_name: ${{ github.ref_name || inputs.tag_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            dist-installer/DariusAI-Setup-v7.0.0.exe
+            dist-installer/DariusAI-v7.0.0-windows-x64-portable.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
