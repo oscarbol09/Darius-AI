@@ -62,8 +62,14 @@ jobs:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
 
-      - name: Configurar Compilador Nativo MSVC C++
+      - name: Configurar Compilador Nativo MSVC C++ (x64)
         uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Optimizar Memoria Virtual de Windows
+        run: |
+          Set-CimInstance -Query "Select * from Win32_PageFileSetting" -Property @{InitialSize = 8192; MaximumSize = 16384} -ErrorAction SilentlyContinue
 
       - name: Configurar Python 3.12
         uses: actions/setup-python@v5
