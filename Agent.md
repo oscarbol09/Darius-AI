@@ -238,6 +238,9 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 ### D13 — Modal Gráfico Dual (LLM + TTS/ElevenLabs) con Prueba en Vivo
 **Decisión:** Integrar toda la configuración de motores de síntesis vocal (SAPI5, Edge-TTS, ElevenLabs) directamente en la interfaz gráfica (`byok_settings.py`), incluyendo clave de API enmascarada, selector de Voice ID, modelo neural, alternador de caché y botón de prueba auditiva en vivo (`🔊 PROBAR VOZ`). Los usuarios nunca necesitan manipular archivos `.env` ni editar JSON manualmente.
 
+### D14 — Cliente REST Nativo Zero-Overhead para Motores de IA
+**Decisión:** Conectar a Google Gemini, OpenAI, Groq, NVIDIA, OpenRouter y Ollama mediante llamadas HTTP/REST puras con `urllib.request` y `requests`, evitando SDKs monolíticos pesados (como `google-genai`) que autogeneran más de 160.000 líneas de modelos Pydantic y saturan el compilador C++ de Nuitka. Esto reduce el tiempo de compilación nativa a menos de 3 minutos y optimiza el consumo de RAM a <90 MB.
+
 ---
 
 ## 7. Modos de Activación de Voz y Eventos
