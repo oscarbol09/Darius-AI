@@ -197,10 +197,53 @@ class TestDispatcherAndFallback:
 
 
 class TestObsidianSystemInstructionIntegration:
-    """Verifica que la memoria contextual de Obsidian se integre en todos los prompts."""
+    """Verifica que la memoria contextual de Obsidian y las herramientas se integren en todos los prompts."""
 
     def test_system_instruction_contains_assistant_and_user(self):
         instruction = _build_system_instruction("recuerda mi proyecto")
         assert cfg.assistant_name in instruction
         assert cfg.user_name in instruction
         assert "español" in instruction
+
+    def test_system_instruction_contains_agentic_tools(self):
+        instruction = _build_system_instruction("limpia el dns")
+        assert "[ACTION: flush_dns()]" in instruction
+        assert "[HERRAMIENTAS Y EJECUCIÓN AUTÓNOMA DEL SISTEMA]" in instruction
+
+
+class TestAgenticToolCallingLoop:
+    """Valida el bucle de ejecución autónoma de herramientas y síntesis de voz."""
+
+    def test_agentic_tool_intercepted_and_synthesized(self):
+        orig_prov = cfg.active_provider
+        try:
+            cfg.set("openai", "llm", "active_provider")
+            with patch("ai_client.ask_openai") as mock_ask, \
+                 patch("agentic_bridge.bridge.flush_dns") as mock_dns:
+                mock_dns.return_value = (True, "Caché DNS vaciada con éxito.")
+                # Primera llamada emite acción, segunda sintetiza
+                mock_ask.side_effect = [
+                    ("[ACTION: flush_dns()]", "OpenAI (gpt-4o-mini)"),
+                    ("Listo Óscar, he limpiado la caché DNS de tu equipo.", "OpenAI (gpt-4o-mini)"),
+                ]
+                text, prov = get_ai_response("limpia el dns de mi red")
+                assert text == "Listo Óscar, he limpiado la caché DNS de tu equipo."
+                assert "[Tool:flush_dns]" in prov
+                mock_dns.assert_called_once()
+                assert mock_ask.call_count == 2
+        finally:
+            cfg.set(orig_prov, "llm", "active_provider")
+
+    def test_agentic_tool_passes_normal_text(self):
+        orig_prov = cfg.active_provider
+        try:
+            cfg.set("openai", "llm", "active_provider")
+            with patch("ai_client.ask_openai") as mock_ask:
+                mock_ask.return_value = ("Hola, ¿cómo estás?", "OpenAI (gpt-4o-mini)")
+                text, prov = get_ai_response("Hola")
+                assert text == "Hola, ¿cómo estás?"
+                assert "[Tool:" not in prov
+                assert mock_ask.call_count == 1
+        finally:
+            cfg.set(orig_prov, "llm", "active_provider")
+

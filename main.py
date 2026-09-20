@@ -1389,12 +1389,32 @@ class DariusFinal(ctk.CTk):
         r"\b(c[aá]llate|silencio|detente|detener(se)?|parar?|cancela[r]?|alto|basta|para\s+ya|det[eé]n(te)?|stop)\b",
         re.IGNORECASE
     )
+    _RE_DNS = re.compile(
+        r"\b(limpia[r]?|borra[r]?|vacia[r]?|flashe?a[r]?|resetea[r]?)\s+(el\s+|la\s+)?(cach[eé]\s+)?dns(\s+(del?\s+)?(sistema|internet|pc|red))?\b",
+        re.IGNORECASE
+    )
+    _RE_GH_PRS = re.compile(
+        r"\b(ver|consultar|mostrar|lista[r]?)\s+(los\s+)?(prs?|pull\s+requests?)(\s+(de\s+)?github)?\b",
+        re.IGNORECASE
+    )
+    _RE_GIT_STATUS = re.compile(
+        r"\b(ver\s+|consultar\s+|mostrar\s+)?(estado\s+de\s+git|git\s+status|cambios\s+en\s+git|c[oó]mo\s+est[aá]\s+el\s+repo(sitorio)?)\b",
+        re.IGNORECASE
+    )
+    _RE_TOP_PROCESSES = re.compile(
+        r"\b(qu[eé]\s+(app[s]?\s+|proceso[s]?\s+)?consume[n]?\s+m[aá]s\s+ram|procesos\s+pesados|procesos\s+que\s+m[aá]s\s+consumen(\s+ram)?|top\s+procesos|quien\s+consume\s+m[aá]s\s+(memoria|ram))\b",
+        re.IGNORECASE
+    )
 
     _CMD_PATTERNS = [
         (_RE_DETENER,                                                             "_cmd_detener"),
         (_RE_HORA,                                                                "_cmd_hora"),
         (_RE_FECHA,                                                               "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
+        (_RE_DNS,                                                                 "_cmd_flush_dns"),
+        (_RE_GH_PRS,                                                              "_cmd_gh_prs"),
+        (_RE_GIT_STATUS,                                                          "_cmd_git_status"),
+        (_RE_TOP_PROCESSES,                                                       "_cmd_top_processes"),
         (_RE_DARIUS_PROTOCOL,                                                     "_cmd_darius_protocol"),
         (_RE_WORKSPACE_DEV,                                                       "_cmd_workspace_dev"),
         (_RE_WORKSPACE_TRADING,                                                   "_cmd_workspace_trading"),
@@ -1460,6 +1480,43 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_reset(self, _):
         self.reset_conversation()
+
+    def _cmd_flush_dns(self, _):
+        entry = wincmd_resolve_action("limpiar cache dns")
+        if entry:
+            self._execute_action(entry)
+        else:
+            self.talk("Vaciando caché DNS de Windows.")
+            from agentic_bridge import bridge
+            ok, out = bridge.flush_dns()
+            self.talk("Caché DNS vaciada correctamente." if ok else f"Error: {out}")
+
+    def _cmd_gh_prs(self, _):
+        entry = wincmd_resolve_action("ver prs de github")
+        if entry:
+            self._execute_action(entry)
+        else:
+            from agentic_bridge import bridge
+            ok, out = bridge.execute_gh("pr list")
+            self.talk(self._format_output_for_tts(out, "Pull Requests de GitHub"))
+
+    def _cmd_git_status(self, _):
+        entry = wincmd_resolve_action("ver estado de git")
+        if entry:
+            self._execute_action(entry)
+        else:
+            from agentic_bridge import bridge
+            ok, out = bridge.execute_git("status --short")
+            self.talk(self._format_output_for_tts(out, "Estado de Git"))
+
+    def _cmd_top_processes(self, _):
+        entry = wincmd_resolve_action("procesos que mas consumen")
+        if entry:
+            self._execute_action(entry)
+        else:
+            from agentic_bridge import bridge
+            ok, out = bridge.get_top_processes(5)
+            self.talk(self._format_output_for_tts(out, "Procesos con mayor consumo de RAM"))
 
     def _cmd_darius_protocol(self, _):
         self.talk("Iniciando Protocolo Darius. Configurando entorno de trabajo y herramientas.")

@@ -241,6 +241,12 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 ### D14 — Cliente REST Nativo Zero-Overhead para Motores de IA
 **Decisión:** Conectar a Google Gemini, OpenAI, Groq, NVIDIA, OpenRouter y Ollama mediante llamadas HTTP/REST puras con `urllib.request` y `requests`, evitando SDKs monolíticos pesados (como `google-genai`) que autogeneran más de 160.000 líneas de modelos Pydantic y saturan el compilador C++ de Nuitka. Esto reduce el tiempo de compilación nativa a menos de 3 minutos y optimiza el consumo de RAM a <90 MB.
 
+### D15 — Motor Autónomo Agentic Bridge y Fast-Path Router para Herramientas Locales
+**Decisión:** Dotar a Darius AI de capacidad de acción autónoma mediante `agentic_bridge.py` y un protocolo de Tool Calling agnóstico del proveedor (`[ACTION: tool_name(args)]`).
+1. **Fast-Path Router Local (0 ms):** Enrutamiento por expresiones regulares en `main.py` y `windows_commands.py` para comandos frecuentes de red (`ipconfig /flushdns`, renovación de IP), utilidades de desarrollador (`gh pr list`, `git status`) y diagnósticos de RAM (`Get-Process`).
+2. **Autonomous Tool Loop Multi-Proveedor:** Los modelos LLM (Gemini, OpenAI, Groq, OpenRouter, Ollama) pueden invocar herramientas del sistema operativo o CLIs activos emitiendo la etiqueta estructurada de acción. Darius intercepta la llamada, ejecuta el binario local herméticamente con timeout de 8-10s y reinyecta la salida de consola al modelo para que sintetice una respuesta verbal ejecutiva.
+3. **Protocolo de Confirmación para Acciones Destructivas:** Las operaciones de solo lectura y diagnóstico se ejecutan de inmediato sin fricción; las operaciones modificadoras o destructivas (merges de PRs, borrado de archivos, reseteos forzados) activan un diálogo de confirmación por voz antes de proceder.
+
 ---
 
 ## 7. Modos de Activación de Voz y Eventos

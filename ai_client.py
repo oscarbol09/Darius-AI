@@ -17,6 +17,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -196,7 +197,7 @@ def _get_system_time_context() -> str:
 
 
 def _build_system_instruction(prompt: str = "") -> str:
-    """Construye las directrices de personalidad de Darius con tiempo local y memoria de Obsidian."""
+    """Construye directrices de personalidad de Darius con tiempo local, Obsidian y herramientas."""
     time_context = _get_system_time_context()
     base = (
         f"Eres {cfg.assistant_name}, un asistente de inteligencia artificial "
@@ -204,7 +205,20 @@ def _build_system_instruction(prompt: str = "") -> str:
         "Respondes siempre en español de forma natural, fluida y directa. "
         "Evitas respuestas excesivamente largas a menos que el tema lo requiera. "
         "Si no sabes algo, dilo honestamente.\n\n"
-        f"{time_context}"
+        f"{time_context}\n\n"
+        "[HERRAMIENTAS Y EJECUCIÓN AUTÓNOMA DEL SISTEMA]\n"
+        "Tienes acceso a herramientas locales para interactuar con Windows, GitHub y Git:\n"
+        "- [ACTION: flush_dns()] -> Limpia y vacía la caché de resolución DNS de Windows.\n"
+        "- [ACTION: top_processes(count=5)] -> Consulta los procesos con mayor consumo de RAM.\n"
+        "- [ACTION: system_summary()] -> Diagnóstico rápido de CPU, RAM libre y disco C:.\n"
+        "- [ACTION: execute_gh(args)] -> GitHub CLI. Ej: execute_gh(pr list --repo user/repo).\n"
+        "- [ACTION: execute_git(args)] -> Git local. Ej: execute_git(status --short).\n"
+        "- [ACTION: execute_powershell(command)] -> PowerShell de forma no interactiva.\n\n"
+        "REGLAS DE EJECUCIÓN:\n"
+        "1. Si el usuario solicita consultar información del sistema, PRs de GitHub, Git, o ejecutar acciones "
+        "(como vaciar DNS o ver procesos), EMITE ÚNICAMENTE: `[ACTION: nombre_herramienta(args)]`.\n"
+        "2. No des tutoriales ni instrucciones hipotéticas; ejecuta la herramienta.\n"
+        "3. Con el resultado de la herramienta, sintetiza una respuesta concisa y ejecutiva en español."
     )
     try:
         from obsidian_brain import brain
@@ -466,6 +480,57 @@ def ask_custom(prompt: str, history: list[dict] | None = None) -> tuple[str, str
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  MOTOR DE TOOL CALLING AUTÓNOMO (AGENTIC LOOP)
+# ─────────────────────────────────────────────────────────────────────────────
+
+ACTION_REGEX = re.compile(r"\[ACTION:\s*([a-zA-Z0-9_-]+)(?:\(([\s\S]*?)\))?\s*\]")
+
+
+def _resolve_agentic_tool_loop(
+    raw_text: str,
+    provider_name: str,
+    caller_fn,
+    original_prompt: str,
+    history: list[dict] | None = None,
+) -> tuple[str, str]:
+    """
+    Si la respuesta del modelo contiene una invocación de herramienta [ACTION: ...],
+    la ejecuta de inmediato mediante AgenticBridge, reinyecta la salida al LLM y
+    retorna la respuesta ejecutiva sintetizada.
+    """
+    match = ACTION_REGEX.search(raw_text)
+    if not match:
+        return raw_text, provider_name
+
+    tool_name = match.group(1).strip()
+    tool_args = match.group(2).strip() if match.group(2) else ""
+    log.info(f"[AgenticLoop] Acción detectada: {tool_name}({tool_args}) desde {provider_name}")
+
+    try:
+        from agentic_bridge import bridge
+
+        tool_res = bridge.parse_and_execute_tool(tool_name, tool_args)
+        status_desc = "éxito" if tool_res["success"] else "falló"
+
+        followup_prompt = (
+            f"[RESULTADO DE HERRAMIENTA LOCAL '{tool_name}' ({status_desc})]\n"
+            f"{tool_res['output']}\n\n"
+            f"Instrucción para {cfg.assistant_name}: Sintetiza de forma verbal, clara, natural y concisa "
+            f"para {cfg.user_name} lo encontrado o ejecutado. No menciones etiquetas de acción [ACTION]."
+        )
+
+        augmented_history = list(history or [])
+        augmented_history.append({"role": "model", "content": raw_text})
+
+        synthesized_text, sub_provider = caller_fn(followup_prompt, augmented_history)
+        clean_synth = ACTION_REGEX.sub("", synthesized_text).strip()
+        return clean_synth or synthesized_text, f"{sub_provider} [Tool:{tool_name}]"
+    except Exception as exc:
+        log.warning(f"[AgenticLoop] Error en ciclo de herramienta: {exc}")
+        return raw_text, provider_name
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  DISPATCHER PRINCIPAL CON FALLBACK DEFENSIVO
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -487,7 +552,8 @@ def get_ai_response(prompt: str, history: list[dict] | None = None) -> tuple[str
     primary_fn = provider_callers.get(active, ask_gemini)
 
     try:
-        return primary_fn(prompt, history)
+        raw_text, provider = primary_fn(prompt, history)
+        return _resolve_agentic_tool_loop(raw_text, provider, primary_fn, prompt, history)
     except Exception as primary_exc:
         log.warning(f"Proveedor principal '{active}' falló: {primary_exc}")
 
@@ -499,7 +565,8 @@ def get_ai_response(prompt: str, history: list[dict] | None = None) -> tuple[str
         if active != "openrouter" and openrouter_key:
             try:
                 log.info("Intentando fallback con OpenRouter...")
-                return ask_openrouter(prompt, history)
+                raw_text, provider = ask_openrouter(prompt, history)
+                return _resolve_agentic_tool_loop(raw_text, provider, ask_openrouter, prompt, history)
             except Exception as fb_exc:
                 log.warning(f"Fallback OpenRouter falló: {fb_exc}")
 
@@ -508,7 +575,8 @@ def get_ai_response(prompt: str, history: list[dict] | None = None) -> tuple[str
         if active != "gemini" and gemini_key:
             try:
                 log.info("Intentando fallback con Gemini...")
-                return ask_gemini(prompt, history)
+                raw_text, provider = ask_gemini(prompt, history)
+                return _resolve_agentic_tool_loop(raw_text, provider, ask_gemini, prompt, history)
             except Exception as gemini_exc:
                 log.warning(f"Fallback Gemini falló: {gemini_exc}")
 

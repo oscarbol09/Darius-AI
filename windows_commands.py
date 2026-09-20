@@ -473,8 +473,33 @@ SYSTEM_ACTIONS: dict[str, dict] = {
     },
     "limpiar cache dns": {
         "action": {"type": "cmd", "run": "ipconfig /flushdns"},
-        "aliases": ["flush dns", "borrar cache dns", "vaciar cache dns", "limpiar dns", "resetear dns"],
-        "desc": "Limpiar caché DNS"
+        "aliases": [
+            "flush dns", "borrar cache dns", "vaciar cache dns", "limpiar dns", "resetear dns",
+            "limpia el cache dns", "limpia la cache dns", "limpia el cache dns del internet",
+            "limpia la cache dns de internet", "limpia la dns del internet", "limpiar el cache dns del internet",
+            "limpia la dns", "limpia el dns", "vaciar dns", "vacia la dns", "vacia el dns", "borrar dns",
+            "borra la dns", "flashea el dns", "flashear dns", "resetea el dns"
+        ],
+        "desc": "Limpiar caché DNS",
+        "return_output": True
+    },
+    "ver prs de github": {
+        "action": {"type": "cmd", "run": "gh pr list"},
+        "aliases": ["ver prs", "ver pull requests", "consultar prs", "prs de github", "pull requests abiertos", "mis prs"],
+        "desc": "Ver Pull Requests de GitHub",
+        "return_output": True
+    },
+    "ver estado de git": {
+        "action": {"type": "cmd", "run": "git status --short"},
+        "aliases": ["estado de git", "git status", "como esta el repo", "cambios de git", "estado del repositorio"],
+        "desc": "Ver estado del repositorio Git",
+        "return_output": True
+    },
+    "procesos que mas consumen": {
+        "action": {"type": "powershell", "run": "Get-Process | Sort-Object WorkingSet64 -Descending | Select-Object -First 5 ProcessName, @{N='RAM(MB)';E={[math]::Round($_.WorkingSet64/1MB,1)}} | Format-Table -AutoSize | Out-String"},
+        "aliases": ["procesos pesados", "que consume mas ram", "procesos que mas consumen ram", "aplicaciones pesadas", "quien consume mas memoria", "apps que consumen mas ram"],
+        "desc": "Ver procesos que más memoria RAM consumen",
+        "return_output": True
     },
     "renovar ip": {
         "action": {"type": "cmd", "run": "ipconfig /release && ipconfig /renew"},

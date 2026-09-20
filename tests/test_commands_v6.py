@@ -246,6 +246,34 @@ class TestWinCmdTypeB(unittest.TestCase):
         self.assertIsNotNone(entry)
         self.assertEqual(entry["canonical"], "limpiar archivos temporales")
 
+    def test_resolve_limpiar_cache_dns_variations(self):
+        variations = [
+            "limpiar cache dns",
+            "limpia el cache dns",
+            "limpia el cache dns del internet",
+            "limpia la cache dns de internet",
+            "flush dns",
+            "vaciar dns",
+        ]
+        for v in variations:
+            with self.subTest(query=v):
+                entry = resolve_action(v)
+                self.assertIsNotNone(entry, f"'{v}' no resolvió a ninguna acción")
+                self.assertEqual(entry["canonical"], "limpiar cache dns")
+
+    def test_resolve_dev_and_sys_tools(self):
+        prs = resolve_action("ver prs de github")
+        self.assertIsNotNone(prs)
+        self.assertEqual(prs["canonical"], "ver prs de github")
+
+        git_st = resolve_action("ver estado de git")
+        self.assertIsNotNone(git_st)
+        self.assertEqual(git_st["canonical"], "ver estado de git")
+
+        procs = resolve_action("que consume mas ram")
+        self.assertIsNotNone(procs)
+        self.assertEqual(procs["canonical"], "procesos que mas consumen")
+
     def test_resolve_unknown_returns_none(self):
         entry = resolve_action("comando_absolutamente_inexistente_xyzabc")
         self.assertIsNone(entry)
@@ -592,11 +620,32 @@ class TestCmdPatterns(unittest.TestCase):
         re.IGNORECASE
     )
 
+    _RE_DNS_TEST = re.compile(
+        r"\b(limpia[r]?|borra[r]?|vacia[r]?|flashe?a[r]?|resetea[r]?)\s+(el\s+|la\s+)?(cach[eé]\s+)?dns(\s+(del?\s+)?(sistema|internet|pc|red))?\b",
+        re.IGNORECASE
+    )
+    _RE_GH_PRS_TEST = re.compile(
+        r"\b(ver|consultar|mostrar|lista[r]?)\s+(los\s+)?(prs?|pull\s+requests?)(\s+(de\s+)?github)?\b",
+        re.IGNORECASE
+    )
+    _RE_GIT_STATUS_TEST = re.compile(
+        r"\b(ver\s+|consultar\s+|mostrar\s+)?(estado\s+de\s+git|git\s+status|cambios\s+en\s+git|c[oó]mo\s+est[aá]\s+el\s+repo(sitorio)?)\b",
+        re.IGNORECASE
+    )
+    _RE_TOP_PROCESSES_TEST = re.compile(
+        r"\b(qu[eé]\s+(app[s]?\s+|proceso[s]?\s+)?consume[n]?\s+m[aá]s\s+ram|procesos\s+pesados|procesos\s+que\s+m[aá]s\s+consumen(\s+ram)?|top\s+procesos|quien\s+consume\s+m[aá]s\s+(memoria|ram))\b",
+        re.IGNORECASE
+    )
+
     # Replica de _CMD_PATTERNS de main.py (los patrones relevantes)
     PATTERNS = [
         (_RE_HORA_TEST,                                                          "hora"),
         (_RE_FECHA_TEST,                                                         "fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "reset"),
+        (_RE_DNS_TEST,                                                           "flush_dns"),
+        (_RE_GH_PRS_TEST,                                                        "gh_prs"),
+        (_RE_GIT_STATUS_TEST,                                                    "git_status"),
+        (_RE_TOP_PROCESSES_TEST,                                                 "top_processes"),
         (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "youtube"),
         (re.compile(r"\b(busca|buscar|googlea)\b"),                              "buscar"),
         (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),           "abrir"),
@@ -613,6 +662,27 @@ class TestCmdPatterns(unittest.TestCase):
             if pattern.search(cmd):
                 return handler
         return None  # → Gemini
+
+    def test_dns_commands(self):
+        self.assertEqual(self._route("limpia el caché dns del internet"), "flush_dns")
+        self.assertEqual(self._route("vaciar dns"), "flush_dns")
+        self.assertEqual(self._route("limpiar el cache dns"), "flush_dns")
+        self.assertEqual(self._route("borra el dns"), "flush_dns")
+
+    def test_github_prs_commands(self):
+        self.assertEqual(self._route("ver los prs de github"), "gh_prs")
+        self.assertEqual(self._route("consultar pull requests"), "gh_prs")
+        self.assertEqual(self._route("mostrar prs"), "gh_prs")
+
+    def test_git_status_commands(self):
+        self.assertEqual(self._route("ver estado de git"), "git_status")
+        self.assertEqual(self._route("git status"), "git_status")
+        self.assertEqual(self._route("cómo está el repo"), "git_status")
+
+    def test_top_processes_commands(self):
+        self.assertEqual(self._route("procesos pesados"), "top_processes")
+        self.assertEqual(self._route("qué consume más ram"), "top_processes")
+        self.assertEqual(self._route("quien consume más memoria"), "top_processes")
 
     def test_hora_commands(self):
         self.assertEqual(self._route("qué hora es"), "hora")
