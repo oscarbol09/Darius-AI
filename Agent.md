@@ -87,7 +87,8 @@ Darius-AI/
 ├── voice_filter.py          <- Filtro y matching fonético de nombre en texto
 ├── stt_engine.py            <- Motor STT con soporte para calibración y backends
 │
-├── assets/                  <- Recursos gráficos (icono multi-resolución darius.ico, generador)
+├── assets/                  <- Recursos gráficos oficiales (darius.ico, logo.png, logo_icon.png, logo_badge.png, social_preview.png, banner.png, generate_icon.py)
+├── docs/                    <- Documentación y activos visuales web (favicon.png, social_preview.png, banner.png)
 ├── build_nuitka.py          <- SCRIPT DE COMPILACIÓN — Generación de binario nativo C standalone con Nuitka
 ├── installer.iss            <- SCRIPT DE INSTALADOR — Generador de setup Windows con Inno Setup
 ├── tests/

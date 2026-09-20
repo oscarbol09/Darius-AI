@@ -1,12 +1,18 @@
+<p align="center">
+  <img src="assets/social_preview.png" alt="Darius AI — Tu Copiloto en Windows" width="100%" style="border-radius: 12px;" />
+</p>
+
 # Darius AI
 
-[![Release](https://img.shields.io/github/v/release/oscarbol09/Darius-AI?color=blue&label=Versi%C3%B3n)](https://github.com/oscarbol09/Darius-AI/releases/latest)
-[![Windows](https://img.shields.io/badge/Plataforma-Windows%2010%20%7C%2011-0078d4.svg)](https://github.com/oscarbol09/Darius-AI)
-[![Descargar .EXE](https://img.shields.io/badge/Descargar-Instalador%20.EXE-2ea44f.svg)](https://github.com/oscarbol09/Darius-AI/releases/latest)
+<p align="center">
+  <a href="https://github.com/oscarbol09/Darius-AI/releases/latest"><img src="https://img.shields.io/github/v/release/oscarbol09/Darius-AI?color=blue&label=Versi%C3%B3n" alt="Release" /></a>
+  <a href="https://github.com/oscarbol09/Darius-AI"><img src="https://img.shields.io/badge/Plataforma-Windows%2010%20%7C%2011-0078d4.svg" alt="Windows" /></a>
+  <a href="https://github.com/oscarbol09/Darius-AI/releases/latest"><img src="https://img.shields.io/badge/Descargar-Instalador%20.EXE-2ea44f.svg" alt="Descargar .EXE" /></a>
+</p>
 
 > 🚀 **¿Quieres usar Darius AI sin instalar Python?** Descarga el instalador oficial **[DariusAI-Setup-v7.0.0.exe](https://github.com/oscarbol09/Darius-AI/releases/latest)** en la sección de Releases. Se instala en segundos en tu equipo sin requerir permisos de administrador.
 
-Asistente de escritorio por voz y automatización nativa para Windows con arquitectura BYOK (*Bring Your Own Key*), cerebro de memoria en Obsidian y renderizado visual a 60 FPS.
+**Darius AI** es un asistente de escritorio por voz y automatización nativa para Windows con arquitectura BYOK (*Bring Your Own Key*), automatización antropomórfica de GUI (*Computer Use*), cerebro de memoria en Obsidian y renderizado visual a 60 FPS.
 
 ---
 
