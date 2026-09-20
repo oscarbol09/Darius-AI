@@ -259,6 +259,15 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 3. **Mecanismo de Failsafe de Emergencia:** Se evalúa de manera atómica antes de cada sub-paso de movimiento o pulsación de tecla el cursor en la esquina superior izquierda `(0, 0)` o la bandera de interrupción activada por comando de voz (*"Darius, detente"*), abortando inmediatamente cualquier automatización activa y previniendo bucles incontrolados.
 4. **Scraper Web Resiliente Zero-Dependency:** Extracción de DOM y texto legible con sanitización de scripts, estilos, comentarios y entidades HTML mediante un parser SAX (`HTMLTextExtractor`) y fallback de expresiones regulares, operando de forma hermética con timeout de 10 segundos y User-Agent de navegador moderno.
 
+### D17 — Rediseño Orgánico de GUI Split-Pane, Licencia GNU GPL-3.0 y Atribución
+**Decisión:** Transformar la interfaz gráfica de Darius AI de una ventana vertical estilo móvil a una estación de trabajo de escritorio profesional Split-Pane (`880x620`), inspirada en estándares de diseño ergonómico y utilitario (Raycast, Linear, Claude Desktop, y principios de `uupm.cc` / UI UX Pro Max):
+1. **Paleta Semántica 60-30-10 y Tipografía Jerárquica (`gui_theme.py`):** Tokens de diseño Zinc/Slate (`#0B0F19`, `#0F1626`, `#131C2D`), tipografía limpia en Segoe UI y Consolas, y acentos de color intencionales (`#38BDF8`, `#10B981`, `#A855F7`, `#F59E0B`, `#F43F5E`) con contraste validado WCAG 2.2 AA.
+2. **Arquitectura Split-Pane con Vistas Modulares:**
+   - **Sidebar Izquierda Fija (230px):** Marca oficial, navegación por pestañas (`💬 Conversación`, `⚡ Workspaces`, `🧠 Obsidian Brain`, `🛠 Sistema & Audio`), selector de modos de voz PTT/NOMBRE/AUTO, badges de telemetría de sistemas y acceso directo a ajustes.
+   - **Main Studio Derecho Responsivo:** Header superior con visualizador vectorial a 60 FPS integrado (`170x36`), indicador de estado en vivo, botones de control rápido, contenedor dinámico de vistas y dock inferior de comandos.
+3. **Licencia Copyleft Fuerte (GNU GPL-3.0):** Implementación del archivo `LICENSE` bajo la GNU General Public License v3.0 con `Copyright (C) 2026 Oscarbol09`, protegiendo el código contra apropiación o comercialización cerrada de terceros sin costo alguno ($0).
+4. **Atribución de Autoría Discreta:** Enlace permanente y no intrusivo en el pie de la barra lateral (`🛠 Desarrollado por @Oscarbol09 • GPLv3`) enlazado directamente al perfil de GitHub `https://github.com/oscarbol09/Darius-AI`.
+
 ---
 
 ## 7. Modos de Activación de Voz y Eventos

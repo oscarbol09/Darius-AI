@@ -262,6 +262,10 @@ ruff check .
 
 ---
 
-## Licencia
+## Licencia y Autoría
 
-Este proyecto se distribuye bajo la licencia MIT. Consulta el archivo [SECURITY.md](SECURITY.md) para más información sobre el tratamiento de claves y políticas de seguridad.
+Este proyecto es software libre y de código abierto distribuido bajo los términos de la licencia **GNU General Public License v3.0 (GPL-3.0)**. Consulta el archivo [LICENSE](LICENSE) para más detalles.
+
+- **Autor y Desarrollador Principal:** [@Oscarbol09](https://github.com/oscarbol09)
+- **Repositorio Oficial:** [github.com/oscarbol09/Darius-AI](https://github.com/oscarbol09/Darius-AI)
+- **Políticas de Seguridad y Privacidad:** Consulta [SECURITY.md](SECURITY.md) para más información sobre el tratamiento de claves BYOK y almacenamiento local.

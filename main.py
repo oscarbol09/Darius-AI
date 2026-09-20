@@ -45,7 +45,9 @@ import win32com.client
 import win32event
 import winerror
 from dotenv import load_dotenv
+from PIL import Image
 
+import gui_theme as theme
 from acoustic_trigger import AcousticDoubleClapDetector, auto_select_best_mic
 from obsidian_brain import brain
 from tts_worker import TTSWorker
@@ -216,13 +218,12 @@ class HighPerfWaveVisualizer(ctk.CTkFrame):
     para evitar fugas de memoria en el intérprete Tcl y parpadeos visuales.
     """
 
-    def __init__(self, master, width: int = 480, height: int = 80, num_points: int = 120, **kwargs):
+    def __init__(self, master, width: int = 170, height: int = 36, num_points: int = 80, **kwargs):
         super().__init__(
             master,
-            fg_color="#111827",
-            corner_radius=12,
-            border_width=1,
-            border_color="#1E293B",
+            fg_color=theme.BG_HEADER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=0,
             **kwargs
         )
         self.w = width
@@ -234,11 +235,11 @@ class HighPerfWaveVisualizer(ctk.CTkFrame):
             self,
             width=self.w,
             height=self.h,
-            bg="#111827",
+            bg=theme.BG_HEADER,
             highlightthickness=0,
             bd=0
         )
-        self.canvas.pack(fill="both", expand=True, padx=8, pady=4)
+        self.canvas.pack(fill="both", expand=True, padx=4, pady=2)
 
         # Precalcular proyecciones de coordenadas X estáticas
         self.x_screen = np.linspace(0, self.w, self.num_points, dtype=np.float32)
@@ -260,22 +261,22 @@ class HighPerfWaveVisualizer(ctk.CTkFrame):
         # Crear líneas vectoriales una sola vez durante la inicialización
         self.line_tertiary = self.canvas.create_line(
             *self._buf_tertiary.ravel().tolist(),
-            fill="#34D399",  # Emerald sutil
+            fill=theme.ACCENT_EMERALD,
             width=1.0,
             capstyle=tk.ROUND,
             joinstyle=tk.ROUND
         )
         self.line_secondary = self.canvas.create_line(
             *self._buf_secondary.ravel().tolist(),
-            fill="#818CF8",  # Indigo armónico
+            fill=theme.ACCENT_PURPLE,
             width=1.5,
             capstyle=tk.ROUND,
             joinstyle=tk.ROUND
         )
         self.line_primary = self.canvas.create_line(
             *self._buf_primary.ravel().tolist(),
-            fill="#38BDF8",  # Sky-400 primario
-            width=2.5,
+            fill=theme.ACCENT_PRIMARY,
+            width=2.0,
             capstyle=tk.ROUND,
             joinstyle=tk.ROUND
         )
@@ -293,45 +294,45 @@ class HighPerfWaveVisualizer(ctk.CTkFrame):
         cy = self.cy
 
         if state == "LISTENING":
-            amp = float(np.clip(audio_energy / 2500.0 * 28.0 + 4.0, 3.0, 34.0))
+            amp = float(np.clip(audio_energy / 2500.0 * 12.0 + 2.0, 2.0, 14.0))
             y1 = cy + amp * np.sin(2.0 * x + p) * np.cos(0.8 * x - p * 0.4)
             y2 = cy + (amp * 0.65) * np.sin(3.2 * x - p * 1.2 + 1.0)
             y3 = cy + (amp * 0.35) * np.cos(1.5 * x + p * 0.8)
-            self.canvas.itemconfig(self.line_primary, fill="#38BDF8")
-            self.canvas.itemconfig(self.line_secondary, fill="#818CF8")
-            self.canvas.itemconfig(self.line_tertiary, fill="#34D399")
+            self.canvas.itemconfig(self.line_primary, fill=theme.ACCENT_PRIMARY)
+            self.canvas.itemconfig(self.line_secondary, fill=theme.ACCENT_PURPLE)
+            self.canvas.itemconfig(self.line_tertiary, fill=theme.ACCENT_EMERALD)
 
         elif state == "SPEAKING":
-            y1 = cy + 18.0 * np.sin(2.5 * x + p * 1.6) * np.sin(0.7 * x + p * 0.3)
-            y2 = cy + 12.0 * np.cos(3.0 * x - p * 1.3)
-            y3 = cy + 6.0 * np.sin(1.2 * x + p * 0.5)
-            self.canvas.itemconfig(self.line_primary, fill="#38BDF8")
+            y1 = cy + 9.0 * np.sin(2.5 * x + p * 1.6) * np.sin(0.7 * x + p * 0.3)
+            y2 = cy + 6.0 * np.cos(3.0 * x - p * 1.3)
+            y3 = cy + 3.0 * np.sin(1.2 * x + p * 0.5)
+            self.canvas.itemconfig(self.line_primary, fill=theme.ACCENT_PRIMARY)
             self.canvas.itemconfig(self.line_secondary, fill="#60A5FA")
-            self.canvas.itemconfig(self.line_tertiary, fill="#818CF8")
+            self.canvas.itemconfig(self.line_tertiary, fill=theme.ACCENT_PURPLE)
 
         elif state == "THINKING":
-            y1 = cy + 11.0 * np.sin(5.5 * x + p * 2.2) * np.cos(2.0 * x - p)
-            y2 = cy + 8.0 * np.sin(4.0 * x - p * 1.8 + 0.5)
-            y3 = cy + 5.0 * np.cos(2.5 * x + p * 1.2)
-            self.canvas.itemconfig(self.line_primary, fill="#A78BFA")
-            self.canvas.itemconfig(self.line_secondary, fill="#818CF8")
+            y1 = cy + 6.0 * np.sin(5.5 * x + p * 2.2) * np.cos(2.0 * x - p)
+            y2 = cy + 4.0 * np.sin(4.0 * x - p * 1.8 + 0.5)
+            y3 = cy + 2.5 * np.cos(2.5 * x + p * 1.2)
+            self.canvas.itemconfig(self.line_primary, fill=theme.ACCENT_PURPLE)
+            self.canvas.itemconfig(self.line_secondary, fill="#C084FC")
             self.canvas.itemconfig(self.line_tertiary, fill="#F472B6")
 
         elif state == "MUTED":
-            y1 = cy + 0.8 * np.sin(1.0 * x + p * 0.2)
-            y2 = cy + 0.5 * np.cos(1.0 * x + p * 0.2)
+            y1 = cy + 0.5 * np.sin(1.0 * x + p * 0.2)
+            y2 = cy + 0.3 * np.cos(1.0 * x + p * 0.2)
             y3 = cy + np.zeros_like(x)
-            self.canvas.itemconfig(self.line_primary, fill="#64748B")
-            self.canvas.itemconfig(self.line_secondary, fill="#475569")
-            self.canvas.itemconfig(self.line_tertiary, fill="#334155")
+            self.canvas.itemconfig(self.line_primary, fill=theme.TEXT_MUTED)
+            self.canvas.itemconfig(self.line_secondary, fill=theme.BORDER_SUBTLE)
+            self.canvas.itemconfig(self.line_tertiary, fill=theme.BG_SIDEBAR)
 
         else:  # IDLE
-            y1 = cy + 4.5 * np.sin(1.8 * x + p * 0.6)
-            y2 = cy + 2.8 * np.cos(1.2 * x - p * 0.4 + 0.8)
-            y3 = cy + 1.5 * np.sin(0.8 * x + p * 0.3)
-            self.canvas.itemconfig(self.line_primary, fill="#38BDF8")
-            self.canvas.itemconfig(self.line_secondary, fill="#818CF8")
-            self.canvas.itemconfig(self.line_tertiary, fill="#34D399")
+            y1 = cy + 2.5 * np.sin(1.8 * x + p * 0.6)
+            y2 = cy + 1.5 * np.cos(1.2 * x - p * 0.4 + 0.8)
+            y3 = cy + 0.8 * np.sin(0.8 * x + p * 0.3)
+            self.canvas.itemconfig(self.line_primary, fill=theme.ACCENT_PRIMARY)
+            self.canvas.itemconfig(self.line_secondary, fill=theme.ACCENT_PURPLE)
+            self.canvas.itemconfig(self.line_tertiary, fill=theme.ACCENT_EMERALD)
 
         self._buf_primary[:, 1] = y1
         self._buf_secondary[:, 1] = y2
@@ -351,10 +352,10 @@ class DariusFinal(ctk.CTk):
 
     def __init__(self):
         super().__init__()
-        self.title("DARIUS AI — Sistema Operativo Autónomo")
-        self.geometry("540x960")
-        self.minsize(500, 850)
-        self.configure(fg_color="#090D16")
+        self.title(theme.WINDOW_TITLE)
+        self.geometry(f"{theme.WINDOW_WIDTH}x{theme.WINDOW_HEIGHT}")
+        self.minsize(theme.WINDOW_MIN_WIDTH, theme.WINDOW_MIN_HEIGHT)
+        self.configure(fg_color=theme.BG_CANVAS)
         self.protocol("WM_DELETE_WINDOW", self.kill_process)
 
         icon_path = Path(__file__).resolve().parent / "assets" / "darius.ico"
@@ -473,257 +474,825 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def setup_ui(self):
-        # ── 1. HEADER & TELEMETRÍA ──────────────────────────────────────────
-        header_card = ctk.CTkFrame(
-            self, fg_color="#111827", corner_radius=12,
-            border_width=1, border_color="#1E293B"
-        )
-        header_card.pack(pady=(14, 6), padx=16, fill="x")
+        # ── GRID CONFIGURATION ──────────────────────────────────────────────
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=0, minsize=theme.SIDEBAR_WIDTH)
+        self.grid_columnconfigure(1, weight=1)
 
-        title_row = ctk.CTkFrame(header_card, fg_color="transparent")
-        title_row.pack(fill="x", padx=16, pady=(10, 4))
-
-        ctk.CTkLabel(
-            title_row, text="DARIUS AI",
-            font=("Segoe UI", 22, "bold"), text_color="#38BDF8"
-        ).pack(side="left")
-
-        ctk.CTkButton(
-            title_row,
-            text="⚙ AJUSTES IA",
-            width=100,
-            height=26,
-            fg_color="#1F2937",
-            hover_color="#374151",
-            border_color="#38BDF8",
+        # ── 1. LEFT SIDEBAR ─────────────────────────────────────────────────
+        self.sidebar_frame = ctk.CTkFrame(
+            self,
+            width=theme.SIDEBAR_WIDTH,
+            fg_color=theme.BG_SIDEBAR,
+            corner_radius=0,
             border_width=1,
-            text_color="#38BDF8",
-            font=("Segoe UI", 10, "bold"),
-            corner_radius=6,
-            command=self._open_byok_settings,
-        ).pack(side="right", padx=(8, 0))
+            border_color=theme.BORDER_SUBTLE,
+        )
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
+        self.sidebar_frame.grid_propagate(False)
+
+        # 1.1 Brand Header
+        brand_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        brand_frame.pack(fill="x", padx=14, pady=(14, 8))
+
+        brand_icon_row = ctk.CTkFrame(brand_frame, fg_color="transparent")
+        brand_icon_row.pack(fill="x")
+
+        logo_path = Path(__file__).resolve().parent / "assets" / "logo_icon.png"
+        if logo_path.exists():
+            try:
+                pil_logo = Image.open(logo_path)
+                self._sidebar_logo_img = ctk.CTkImage(light_image=pil_logo, dark_image=pil_logo, size=(24, 24))
+                ctk.CTkLabel(brand_icon_row, text="", image=self._sidebar_logo_img).pack(side="left", padx=(0, 8))
+            except Exception as e:
+                log.debug(f"Logo sidebar no disponible: {e}")
+
+        brand_text_col = ctk.CTkFrame(brand_icon_row, fg_color="transparent")
+        brand_text_col.pack(side="left", fill="x", expand=True)
 
         ctk.CTkLabel(
-            title_row, text="v7.0.0 • DARIUS AI • WIN",
-            font=("Segoe UI", 10, "bold"), text_color="#64748B"
-        ).pack(side="right", pady=(4, 0))
-
-        # Fila de badges / telemetría
-        telemetry_row = ctk.CTkFrame(header_card, fg_color="transparent")
-        telemetry_row.pack(fill="x", padx=16, pady=(0, 10))
-
-        # Status Pill con punto de estado
-        status_pill = ctk.CTkFrame(telemetry_row, fg_color="#1F2937", corner_radius=8)
-        status_pill.pack(side="left", padx=(0, 4))
-
-        self.status_dot = ctk.CTkLabel(
-            status_pill, text="●",
-            font=("Segoe UI", 12), text_color="#34D399"
-        )
-        self.status_dot.pack(side="left", padx=(8, 3), pady=2)
-
-        self.status_label = ctk.CTkLabel(
-            status_pill, text="SISTEMA LISTO",
-            font=("Segoe UI", 10, "bold"), text_color="#F8FAFC"
-        )
-        self.status_label.pack(side="left", padx=(0, 8), pady=2)
-
-        # Proveedor de IA Activo Pill
-        self.llm_pill = ctk.CTkLabel(
-            telemetry_row, text=self._llm_badge_text(),
-            font=("Segoe UI", 10, "bold"), text_color="#38BDF8",
-            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
-        )
-        self.llm_pill.pack(side="left", padx=3)
-
-        # Obsidian Pill
-        obsidian_connected = bool(brain.vault_path and Path(brain.vault_path).exists())
-        obsidian_text = "CONECTADO" if obsidian_connected else "LOCAL"
-        obsidian_color = "#34D399" if obsidian_connected else "#94A3B8"
-        self.brain_pill = ctk.CTkLabel(
-            telemetry_row, text=f"🧠 OBSIDIAN: {obsidian_text}",
-            font=("Segoe UI", 10, "bold"), text_color=obsidian_color,
-            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
-        )
-        self.brain_pill.pack(side="left", padx=3)
-
-        # Monitores Pill
-        self.monitors_pill = ctk.CTkLabel(
-            telemetry_row, text=f"🖥 {get_monitor_count()} PANTALLA{'S' if get_monitor_count() > 1 else ''}",
-            font=("Segoe UI", 10, "bold"), text_color="#A78BFA",
-            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
-        )
-        self.monitors_pill.pack(side="left", padx=3)
-
-        # Apps Pill
-        self.apps_pill = ctk.CTkLabel(
-            telemetry_row, text=f"📦 {len(self.installed_apps)} APPS",
-            font=("Segoe UI", 10, "bold"), text_color="#94A3B8",
-            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
-        )
-        self.apps_pill.pack(side="left", padx=3)
-
-        # Aplauso Pill / Botón de Toggle
-        clap_active = hasattr(self, "_clap_detector") and self._clap_detector.is_running()
-        self.clap_btn = ctk.CTkButton(
-            telemetry_row, text=self._clap_badge_text(),
-            font=("Segoe UI", 10, "bold"),
-            text_color="#34D399" if clap_active else "#94A3B8",
-            fg_color="#1F2937", hover_color="#374151",
-            corner_radius=8, width=80, height=24,
-            command=self.toggle_clap_detector,
-        )
-        self.clap_btn.pack(side="left", padx=3)
-
-        # TTS Engine Pill
-        self.tts_pill = ctk.CTkLabel(
-            telemetry_row, text=self._tts_badge_text(),
-            font=("Segoe UI", 10, "bold"), text_color="#FBBF24",
-            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
-        )
-        self.tts_pill.pack(side="left", padx=3)
-
-        # ── 2. VISUALIZADOR VECTORIAL DE ONDAS (60 FPS) ───────────────────────
-        self.visualizer = HighPerfWaveVisualizer(self, width=500, height=80)
-        self.visualizer.pack(pady=4, padx=16, fill="x")
-
-        # ── 3. CONSOLA DE CONVERSACIÓN / ACTIVIDAD ─────────────────────────────
-        chat_card = ctk.CTkFrame(
-            self, fg_color="#111827", corner_radius=12,
-            border_width=1, border_color="#1E293B"
-        )
-        chat_card.pack(pady=6, padx=16, fill="both", expand=True)
-
-        chat_header = ctk.CTkFrame(chat_card, fg_color="transparent")
-        chat_header.pack(fill="x", padx=14, pady=(8, 2))
+            brand_text_col,
+            text="DARIUS AI",
+            font=theme.FONT_TITLE,
+            text_color=theme.ACCENT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x")
 
         ctk.CTkLabel(
-            chat_header, text="CONSOLA DE ACTIVIDAD Y COMANDOS",
-            font=("Segoe UI", 9, "bold"), text_color="#64748B"
-        ).pack(side="left")
+            brand_text_col,
+            text=f"Copiloto Windows • {theme.VERSION_TAG}",
+            font=theme.FONT_CAPTION,
+            text_color=theme.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x")
 
-        self.mode_pill = ctk.CTkLabel(
-            chat_header, text=self._mode_label_text(),
-            font=("Segoe UI", 9, "bold"), text_color="#38BDF8"
-        )
-        self.mode_pill.pack(side="right")
+        # Hairline divider
+        ctk.CTkFrame(self.sidebar_frame, height=1, fg_color=theme.BORDER_SUBTLE).pack(fill="x", padx=12, pady=6)
 
-        self.chat_display = ctk.CTkTextbox(
-            chat_card, font=("Consolas", 11),
-            state="disabled", fg_color="#0B0F19",
-            border_color="#1E293B", border_width=1,
-            scrollbar_button_color="#1F2937",
-            scrollbar_button_hover_color="#38BDF8"
-        )
-        self.chat_display.pack(padx=12, pady=(2, 12), fill="both", expand=True)
-
-        tb = self.chat_display._textbox
-        tb.tag_config("oscar", foreground="#34D399", font=("Consolas", 11, "bold"))
-        tb.tag_config("darius", foreground="#38BDF8", font=("Consolas", 11, "bold"))
-        tb.tag_config("system", foreground="#818CF8", font=("Consolas", 11, "bold"))
-        tb.tag_config("warn", foreground="#FBBF24", font=("Consolas", 11, "bold"))
-        tb.tag_config("oscar_text", foreground="#F1F5F9", font=("Consolas", 11))
-        tb.tag_config("darius_text", foreground="#E2E8F0", font=("Consolas", 11))
-        tb.tag_config("system_text", foreground="#94A3B8", font=("Consolas", 11))
-        tb.tag_config("timestamp", foreground="#64748B", font=("Consolas", 9))
-
-        # ── 4. CAMPO DE ENTRADA Y ENVÍO RÁPIDO ────────────────────────────────
-        input_frame = ctk.CTkFrame(self, fg_color="transparent")
-        input_frame.pack(pady=4, padx=16, fill="x")
-
-        self.text_input = ctk.CTkEntry(
-            input_frame, placeholder_text="Escribe un comando o consulta para Darius…",
-            font=("Segoe UI", 11), fg_color="#1F2937",
-            border_color="#374151", border_width=1,
-            text_color="#F8FAFC", placeholder_text_color="#64748B",
-            height=38, corner_radius=8
-        )
-        self.text_input.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        self.text_input.bind("<Return>", self._on_text_submit)
-
-        ctk.CTkButton(
-            input_frame, text="ENVIAR ▶", width=84, height=38,
-            fg_color="#38BDF8", hover_color="#0284C7",
-            text_color="#090D16", font=("Segoe UI", 11, "bold"),
-            corner_radius=8, command=self._on_text_submit
-        ).pack(side="right")
-
-        # ── 5. BOTONES DE ACCIÓN PRINCIPAL ────────────────────────────────────
-        btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(pady=4, padx=16, fill="x")
-
-        self.start_btn = ctk.CTkButton(
-            btn_frame, text="⚡ INICIALIZAR", fg_color="#38BDF8",
-            hover_color="#0284C7", text_color="#090D16",
-            font=("Segoe UI", 11, "bold"), height=34, corner_radius=8,
-            command=self.start_system
-        )
-        self.start_btn.pack(side="left", fill="x", expand=True, padx=(0, 4))
-
-        self.mute_btn = ctk.CTkButton(
-            btn_frame, text="🔇 SILENCIO", fg_color="#F87171",
-            hover_color="#EF4444", text_color="#090D16",
-            state="disabled", font=("Segoe UI", 11, "bold"),
-            height=34, corner_radius=8, command=self.toggle_mute
-        )
-        self.mute_btn.pack(side="left", fill="x", expand=True, padx=4)
-
-        self.clear_btn = ctk.CTkButton(
-            btn_frame, text="🗑 NUEVA SESIÓN", fg_color="#1F2937",
-            hover_color="#374151", text_color="#F8FAFC",
-            font=("Segoe UI", 11), height=34, corner_radius=8,
-            command=self.reset_conversation
-        )
-        self.clear_btn.pack(side="left", fill="x", expand=True, padx=(4, 0))
-
-        # ── 6. SELECTOR DE MODO DE ACTIVACIÓN ─────────────────────────────────
-        mode_frame = ctk.CTkFrame(
-            self, fg_color="#111827", corner_radius=12,
-            border_width=1, border_color="#1E293B"
-        )
-        mode_frame.pack(pady=(4, 14), padx=16, fill="x")
-
+        # 1.2 Navigation Menu
         ctk.CTkLabel(
-            mode_frame, text="MODO DE ACTIVACIÓN DE VOZ",
-            font=("Segoe UI", 9, "bold"), text_color="#64748B"
-        ).pack(pady=(8, 4))
+            self.sidebar_frame,
+            text="VISTAS",
+            font=theme.FONT_CAPTION_BOLD,
+            text_color=theme.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(2, 4))
 
-        btn_mode_row = ctk.CTkFrame(mode_frame, fg_color="transparent")
-        btn_mode_row.pack(pady=(0, 6), padx=10, fill="x")
+        self._nav_btns = {}
+        views = [
+            ("chat", "💬 Conversación"),
+            ("workspaces", "⚡ Workspaces"),
+            ("obsidian", "🧠 Obsidian Brain"),
+            ("system", "🛠 Sistema & Audio"),
+        ]
+
+        for view_id, label in views:
+            btn = ctk.CTkButton(
+                self.sidebar_frame,
+                text=f"  {label}",
+                font=theme.FONT_NAV,
+                height=32,
+                corner_radius=theme.RADIUS_MD,
+                fg_color=theme.BG_CARD_HOVER if view_id == "chat" else "transparent",
+                hover_color=theme.BG_CARD_HOVER,
+                text_color=theme.ACCENT_PRIMARY if view_id == "chat" else theme.TEXT_SECONDARY,
+                anchor="w",
+                command=lambda v=view_id: self._show_page(v),
+            )
+            btn.pack(fill="x", padx=10, pady=2)
+            self._nav_btns[view_id] = btn
+
+        # Hairline divider
+        ctk.CTkFrame(self.sidebar_frame, height=1, fg_color=theme.BORDER_SUBTLE).pack(fill="x", padx=12, pady=8)
+
+        # 1.3 Telemetry & Mode Selector
+        ctk.CTkLabel(
+            self.sidebar_frame,
+            text="ACTIVACIÓN DE VOZ",
+            font=theme.FONT_CAPTION_BOLD,
+            text_color=theme.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(0, 4))
+
+        mode_row = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        mode_row.pack(fill="x", padx=10, pady=(0, 4))
 
         self._mode_btns = {}
         modes = [
-            (LISTEN_MODE_PTT,  f"🎙 PTT ({LISTEN_KEY.upper()})", "#38BDF8"),
-            (LISTEN_MODE_NAME, f"🔤 NOMBRE («{ASSISTANT_NAME}»)", "#34D399"),
-            (LISTEN_MODE_AUTO, "🔄 AUTO", "#818CF8"),
+            (LISTEN_MODE_PTT, "🎙 PTT", theme.ACCENT_PRIMARY),
+            (LISTEN_MODE_NAME, "🔤 NOM", theme.ACCENT_EMERALD),
+            (LISTEN_MODE_AUTO, "🔄 AUTO", theme.ACCENT_PURPLE),
         ]
         for mode_id, label, active_color in modes:
             is_active = (mode_id == self.listen_mode)
             btn = ctk.CTkButton(
-                btn_mode_row, text=label,
-                fg_color=active_color if is_active else "#1F2937",
+                mode_row,
+                text=label,
+                fg_color=active_color if is_active else theme.BG_PILL,
                 hover_color=active_color,
-                text_color="#090D16" if is_active else "#94A3B8",
-                border_color=active_color if is_active else "#374151",
+                text_color=theme.BG_CANVAS if is_active else theme.TEXT_SECONDARY,
+                border_color=active_color if is_active else theme.BORDER_SUBTLE,
                 border_width=1,
-                font=("Segoe UI", 10, "bold"),
-                height=30, corner_radius=6,
-                command=lambda m=mode_id: self._set_listen_mode(m)
+                font=theme.FONT_CAPTION_BOLD,
+                height=26,
+                corner_radius=theme.RADIUS_SM,
+                command=lambda m=mode_id: self._set_listen_mode(m),
             )
-            btn.pack(side="left", fill="x", expand=True, padx=3)
+            btn.pack(side="left", fill="x", expand=True, padx=2)
             self._mode_btns[mode_id] = (btn, active_color)
 
         self.ptt_hint = ctk.CTkLabel(
-            mode_frame,
-            text=f"💡 Modo PTT: mantén presionado [{LISTEN_KEY.upper()}] mientras hablas",
-            font=("Segoe UI", 10), text_color="#94A3B8"
+            self.sidebar_frame,
+            text=f"Mantén [{LISTEN_KEY.upper()}] presionado",
+            font=theme.FONT_CAPTION,
+            text_color=theme.TEXT_MUTED,
+            anchor="w",
         )
         if self.listen_mode == LISTEN_MODE_PTT:
-            self.ptt_hint.pack(pady=(0, 8))
+            self.ptt_hint.pack(fill="x", padx=14, pady=(0, 4))
+
+        # Telemetry Badges
+        ctk.CTkLabel(
+            self.sidebar_frame,
+            text="ESTADO DE SISTEMAS",
+            font=theme.FONT_CAPTION_BOLD,
+            text_color=theme.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(6, 4))
+
+        telemetry_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        telemetry_frame.pack(fill="x", padx=10, pady=0)
+
+        # Clap trigger button
+        clap_active = hasattr(self, "_clap_detector") and self._clap_detector.is_running()
+        self.clap_btn = ctk.CTkButton(
+            telemetry_frame,
+            text=self._clap_badge_text(),
+            font=theme.FONT_BADGE,
+            text_color=theme.ACCENT_EMERALD if clap_active else theme.TEXT_SECONDARY,
+            fg_color=theme.BG_PILL,
+            hover_color=theme.BG_CARD_HOVER,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            corner_radius=theme.RADIUS_SM,
+            height=24,
+            anchor="w",
+            command=self.toggle_clap_detector,
+        )
+        self.clap_btn.pack(fill="x", pady=2)
+
+        # LLM Pill
+        self.llm_pill = ctk.CTkLabel(
+            telemetry_frame,
+            text=self._llm_badge_text(),
+            font=theme.FONT_BADGE,
+            text_color=theme.ACCENT_PRIMARY,
+            fg_color=theme.BG_PILL,
+            corner_radius=theme.RADIUS_SM,
+            padx=8,
+            pady=3,
+            anchor="w",
+        )
+        self.llm_pill.pack(fill="x", pady=2)
+
+        # Obsidian Pill
+        obsidian_connected = bool(brain.vault_path and Path(brain.vault_path).exists())
+        obsidian_text = "CONECTADO" if obsidian_connected else "LOCAL"
+        obsidian_color = theme.ACCENT_EMERALD if obsidian_connected else theme.TEXT_MUTED
+        self.brain_pill = ctk.CTkLabel(
+            telemetry_frame,
+            text=f"🧠 OBSIDIAN: {obsidian_text}",
+            font=theme.FONT_BADGE,
+            text_color=obsidian_color,
+            fg_color=theme.BG_PILL,
+            corner_radius=theme.RADIUS_SM,
+            padx=8,
+            pady=3,
+            anchor="w",
+        )
+        self.brain_pill.pack(fill="x", pady=2)
+
+        # TTS Pill
+        self.tts_pill = ctk.CTkLabel(
+            telemetry_frame,
+            text=self._tts_badge_text(),
+            font=theme.FONT_BADGE,
+            text_color=theme.ACCENT_AMBER,
+            fg_color=theme.BG_PILL,
+            corner_radius=theme.RADIUS_SM,
+            padx=8,
+            pady=3,
+            anchor="w",
+        )
+        self.tts_pill.pack(fill="x", pady=2)
+
+        # Apps Pill
+        self.apps_pill = ctk.CTkLabel(
+            telemetry_frame,
+            text=f"📦 {len(self.installed_apps)} APPS",
+            font=theme.FONT_BADGE,
+            text_color=theme.TEXT_SECONDARY,
+            fg_color=theme.BG_PILL,
+            corner_radius=theme.RADIUS_SM,
+            padx=8,
+            pady=3,
+            anchor="w",
+        )
+        self.apps_pill.pack(fill="x", pady=2)
+
+        # Monitors Pill
+        self.monitors_pill = ctk.CTkLabel(
+            telemetry_frame,
+            text=f"🖥 {get_monitor_count()} PANTALLA{'S' if get_monitor_count() > 1 else ''}",
+            font=theme.FONT_BADGE,
+            text_color=theme.ACCENT_PURPLE,
+            fg_color=theme.BG_PILL,
+            corner_radius=theme.RADIUS_SM,
+            padx=8,
+            pady=3,
+            anchor="w",
+        )
+        self.monitors_pill.pack(fill="x", pady=2)
+
+        # 1.4 Sidebar Footer (Settings & Author Attribution)
+        footer_spacer = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        footer_spacer.pack(fill="both", expand=True)
+
+        footer_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        footer_frame.pack(fill="x", padx=10, pady=(0, 10))
+
+        # BYOK Settings button
+        ctk.CTkButton(
+            footer_frame,
+            text="⚙ AJUSTES IA / MODELOS",
+            height=28,
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BG_CARD_HOVER,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            text_color=theme.ACCENT_PRIMARY,
+            font=theme.FONT_CAPTION_BOLD,
+            corner_radius=theme.RADIUS_SM,
+            command=self._open_byok_settings,
+        ).pack(fill="x", pady=(0, 6))
+
+        # Author Attribution (Discreet link to Github)
+        ctk.CTkButton(
+            footer_frame,
+            text=f"{theme.AUTHOR_TAG} • GPLv3",
+            height=22,
+            fg_color="transparent",
+            hover_color=theme.BG_CARD_HOVER,
+            text_color=theme.TEXT_MUTED,
+            font=theme.FONT_CAPTION,
+            corner_radius=theme.RADIUS_SM,
+            command=self._open_author_github,
+        ).pack(fill="x")
+
+        # ── 2. RIGHT MAIN STUDIO PANE ───────────────────────────────────────
+        self.main_studio_frame = ctk.CTkFrame(self, fg_color=theme.BG_CANVAS, corner_radius=0)
+        self.main_studio_frame.grid(row=0, column=1, sticky="nsew")
+        self.main_studio_frame.grid_rowconfigure(1, weight=1)
+        self.main_studio_frame.grid_columnconfigure(0, weight=1)
+
+        # 2.1 Top Studio Header
+        header_card = ctk.CTkFrame(
+            self.main_studio_frame,
+            fg_color=theme.BG_HEADER,
+            corner_radius=theme.RADIUS_LG,
+            border_width=1,
+            border_color=theme.BORDER_CARD,
+            height=52,
+        )
+        header_card.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
+
+        # Left: Status Indicator
+        status_box = ctk.CTkFrame(header_card, fg_color="transparent")
+        status_box.pack(side="left", padx=(12, 8), pady=8)
+
+        self.status_dot = ctk.CTkLabel(
+            status_box,
+            text="●",
+            font=("Segoe UI", 13),
+            text_color=theme.ACCENT_EMERALD,
+        )
+        self.status_dot.pack(side="left", padx=(0, 5))
+
+        self.status_label = ctk.CTkLabel(
+            status_box,
+            text="SISTEMA LISTO",
+            font=theme.FONT_SUBTITLE,
+            text_color=theme.TEXT_PRIMARY,
+        )
+        self.status_label.pack(side="left")
+
+        # Center: Waveform Visualizer
+        self.visualizer = HighPerfWaveVisualizer(header_card, width=170, height=36)
+        self.visualizer.pack(side="left", padx=12, pady=6, fill="y")
+
+        # Right: Quick Action Buttons
+        actions_box = ctk.CTkFrame(header_card, fg_color="transparent")
+        actions_box.pack(side="right", padx=(8, 12), pady=8)
+
+        self.clear_btn = ctk.CTkButton(
+            actions_box,
+            text="🗑 LIMPIAR",
+            width=78,
+            height=30,
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BG_CARD_HOVER,
+            text_color=theme.TEXT_PRIMARY,
+            font=theme.FONT_CAPTION_BOLD,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            corner_radius=theme.RADIUS_SM,
+            command=self.reset_conversation,
+        )
+        self.clear_btn.pack(side="right", padx=(4, 0))
+
+        self.mute_btn = ctk.CTkButton(
+            actions_box,
+            text="🔇 SILENCIO",
+            width=82,
+            height=30,
+            fg_color=theme.ACCENT_ROSE,
+            hover_color="#E11D48",
+            text_color=theme.TEXT_PRIMARY,
+            state="disabled",
+            font=theme.FONT_CAPTION_BOLD,
+            corner_radius=theme.RADIUS_SM,
+            command=self.toggle_mute,
+        )
+        self.mute_btn.pack(side="right", padx=4)
+
+        self.start_btn = ctk.CTkButton(
+            actions_box,
+            text="⚡ INICIAR",
+            width=82,
+            height=30,
+            fg_color=theme.ACCENT_PRIMARY,
+            hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.BG_CANVAS,
+            font=theme.FONT_CAPTION_BOLD,
+            corner_radius=theme.RADIUS_SM,
+            command=self.start_system,
+        )
+        self.start_btn.pack(side="right", padx=(0, 4))
+
+        # 2.2 View Container (Stacked Views)
+        self.view_container = ctk.CTkFrame(self.main_studio_frame, fg_color="transparent")
+        self.view_container.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 6))
+        self.view_container.grid_rowconfigure(0, weight=1)
+        self.view_container.grid_columnconfigure(0, weight=1)
+
+        self._pages = {}
+
+        # ── Page: Chat ──
+        page_chat = ctk.CTkFrame(
+            self.view_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=theme.RADIUS_LG,
+            border_width=1,
+            border_color=theme.BORDER_CARD,
+        )
+        page_chat.grid(row=0, column=0, sticky="nsew")
+        self._pages["chat"] = page_chat
+
+        chat_hdr = ctk.CTkFrame(page_chat, fg_color="transparent")
+        chat_hdr.pack(fill="x", padx=12, pady=(8, 2))
+
+        ctk.CTkLabel(
+            chat_hdr,
+            text="HISTORIAL DE ACTIVIDAD & COMANDOS",
+            font=theme.FONT_CAPTION_BOLD,
+            text_color=theme.TEXT_MUTED,
+        ).pack(side="left")
+
+        self.mode_pill = ctk.CTkLabel(
+            chat_hdr,
+            text=self._mode_label_text(),
+            font=theme.FONT_CAPTION_BOLD,
+            text_color=theme.ACCENT_PRIMARY,
+        )
+        self.mode_pill.pack(side="right")
+
+        self.chat_display = ctk.CTkTextbox(
+            page_chat,
+            font=(theme.FONT_MONO_FAMILY, 11),
+            state="disabled",
+            fg_color=theme.BG_CANVAS,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            scrollbar_button_color=theme.BG_SIDEBAR,
+            scrollbar_button_hover_color=theme.ACCENT_PRIMARY,
+        )
+        self.chat_display.pack(padx=10, pady=(2, 10), fill="both", expand=True)
+
+        tb = self.chat_display._textbox
+        tb.tag_config("oscar", foreground=theme.ACCENT_EMERALD, font=(theme.FONT_MONO_FAMILY, 11, "bold"))
+        tb.tag_config("darius", foreground=theme.ACCENT_PRIMARY, font=(theme.FONT_MONO_FAMILY, 11, "bold"))
+        tb.tag_config("system", foreground=theme.ACCENT_PURPLE, font=(theme.FONT_MONO_FAMILY, 11, "bold"))
+        tb.tag_config("warn", foreground=theme.ACCENT_AMBER, font=(theme.FONT_MONO_FAMILY, 11, "bold"))
+        tb.tag_config("oscar_text", foreground=theme.TEXT_PRIMARY, font=(theme.FONT_MONO_FAMILY, 11))
+        tb.tag_config("darius_text", foreground="#E2E8F0", font=(theme.FONT_MONO_FAMILY, 11))
+        tb.tag_config("system_text", foreground=theme.TEXT_SECONDARY, font=(theme.FONT_MONO_FAMILY, 11))
+        tb.tag_config("timestamp", foreground=theme.TEXT_MUTED, font=(theme.FONT_MONO_FAMILY, 9))
+
+        # ── Page: Workspaces ──
+        page_ws = ctk.CTkScrollableFrame(
+            self.view_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=theme.RADIUS_LG,
+            border_width=1,
+            border_color=theme.BORDER_CARD,
+        )
+        self._pages["workspaces"] = page_ws
+
+        ctk.CTkLabel(
+            page_ws,
+            text="ESPACIOS DE TRABAJO AUTOMATIZADOS",
+            font=theme.FONT_SUBTITLE,
+            text_color=theme.ACCENT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(12, 4))
+        ctk.CTkLabel(
+            page_ws,
+            text="Lanza y organiza entornos multitarea en tus monitores con un solo clic.",
+            font=theme.FONT_CAPTION,
+            text_color=theme.TEXT_SECONDARY,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(0, 10))
+
+        ws_grid = ctk.CTkFrame(page_ws, fg_color="transparent")
+        ws_grid.pack(fill="x", padx=10, pady=4)
+        ws_grid.grid_columnconfigure(0, weight=1)
+        ws_grid.grid_columnconfigure(1, weight=1)
+
+        def _create_ws_card(parent, row, col, title, desc, icon, cmd_fn, accent_color):
+            card = ctk.CTkFrame(
+                parent,
+                fg_color=theme.BG_CARD_INNER,
+                corner_radius=theme.RADIUS_MD,
+                border_width=1,
+                border_color=theme.BORDER_SUBTLE,
+            )
+            card.grid(row=row, column=col, padx=6, pady=6, sticky="nsew")
+
+            card_top = ctk.CTkFrame(card, fg_color="transparent")
+            card_top.pack(fill="x", padx=10, pady=(10, 4))
+
+            ctk.CTkLabel(card_top, text=icon, font=("Segoe UI", 16)).pack(side="left", padx=(0, 6))
+            ctk.CTkLabel(card_top, text=title, font=theme.FONT_BODY_BOLD, text_color=accent_color).pack(side="left")
+
+            ctk.CTkLabel(
+                card,
+                text=desc,
+                font=theme.FONT_CAPTION,
+                text_color=theme.TEXT_SECONDARY,
+                wraplength=220,
+                justify="left",
+            ).pack(fill="x", padx=10, pady=(0, 10))
+
+            ctk.CTkButton(
+                card,
+                text="EJECUTAR ▶",
+                height=28,
+                fg_color=theme.BG_CARD,
+                hover_color=accent_color,
+                text_color=theme.TEXT_PRIMARY,
+                font=theme.FONT_CAPTION_BOLD,
+                border_color=theme.BORDER_SUBTLE,
+                border_width=1,
+                corner_radius=theme.RADIUS_SM,
+                command=cmd_fn,
+            ).pack(fill="x", padx=10, pady=(0, 10))
+
+        _create_ws_card(
+            ws_grid, 0, 0, "Protocolo Darius",
+            "Música de bienvenida, Cursor en pantalla principal y Claude en secundario.",
+            "🚀", lambda: self._cmd_darius_protocol(None), theme.ACCENT_PRIMARY,
+        )
+        _create_ws_card(
+            ws_grid, 0, 1, "Modo Desarrollo",
+            "Lanza Cursor AI, Git y terminal de desarrollo listo para programar.",
+            "💻", lambda: self._cmd_workspace_dev(None), theme.ACCENT_EMERALD,
+        )
+        _create_ws_card(
+            ws_grid, 1, 0, "Modo Trading",
+            "Abre gráficos y terminales financieras en monitores configurados.",
+            "📈", lambda: self._cmd_workspace_trading(None), theme.ACCENT_AMBER,
+        )
+        _create_ws_card(
+            ws_grid, 1, 1, "Enfocar Cursor",
+            "Maximiza o enfoca la ventana activa de Cursor en pantalla completa.",
+            "🎯", lambda: self._cmd_focus_cursor(None), theme.ACCENT_PURPLE,
+        )
+        _create_ws_card(
+            ws_grid, 2, 0, "Top Procesos RAM",
+            "Consulta en tiempo real qué aplicaciones consumen más memoria.",
+            "📊", lambda: self._cmd_top_processes(None), theme.TEXT_PRIMARY,
+        )
+        _create_ws_card(
+            ws_grid, 2, 1, "Limpiar Caché DNS",
+            "Vacía y resetea la caché de resolución de nombres DNS de Windows.",
+            "🌐", lambda: self._cmd_flush_dns(None), theme.ACCENT_PRIMARY,
+        )
+
+        # ── Page: Obsidian Brain ──
+        page_obs = ctk.CTkScrollableFrame(
+            self.view_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=theme.RADIUS_LG,
+            border_width=1,
+            border_color=theme.BORDER_CARD,
+        )
+        self._pages["obsidian"] = page_obs
+
+        ctk.CTkLabel(
+            page_obs,
+            text="SEGUNDO CEREBRO • OBSIDIAN VAULT",
+            font=theme.FONT_SUBTITLE,
+            text_color=theme.ACCENT_EMERALD,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(12, 4))
+
+        vault_str = str(brain.vault_path) if brain.vault_path else "No configurado (usando carpeta local)"
+        ctk.CTkLabel(
+            page_obs,
+            text=f"Bóveda: {vault_str}",
+            font=theme.FONT_CAPTION,
+            text_color=theme.TEXT_MUTED,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(0, 10))
+
+        # Quick journal entry frame
+        journal_card = ctk.CTkFrame(
+            page_obs,
+            fg_color=theme.BG_CARD_INNER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
+        )
+        journal_card.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkLabel(
+            journal_card,
+            text="📝 Anotar en Diario / Daily Note",
+            font=theme.FONT_BODY_BOLD,
+            text_color=theme.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(10, 4))
+
+        self._journal_entry = ctk.CTkEntry(
+            journal_card,
+            placeholder_text="Escribe una nota para guardar en tu bitácora de hoy…",
+            font=theme.FONT_BODY,
+            fg_color=theme.BG_INPUT,
+            border_color=theme.BORDER_SUBTLE,
+            text_color=theme.TEXT_PRIMARY,
+            height=34,
+        )
+        self._journal_entry.pack(fill="x", padx=12, pady=4)
+
+        def _save_journal():
+            txt = self._journal_entry.get().strip()
+            if txt:
+                brain.append_daily_note(txt)
+                self._journal_entry.delete(0, "end")
+                self.talk(f"Anotado en tu diario: {txt}")
+
+        ctk.CTkButton(
+            journal_card,
+            text="GUARDAR EN DIARIO 💾",
+            height=28,
+            fg_color=theme.ACCENT_EMERALD,
+            hover_color="#059669",
+            text_color=theme.BG_CANVAS,
+            font=theme.FONT_CAPTION_BOLD,
+            corner_radius=theme.RADIUS_SM,
+            command=_save_journal,
+        ).pack(anchor="e", padx=12, pady=(4, 10))
+
+        # Search Vault card
+        search_card = ctk.CTkFrame(
+            page_obs,
+            fg_color=theme.BG_CARD_INNER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
+        )
+        search_card.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkLabel(
+            search_card,
+            text="🔍 Buscar en Memoria de Obsidian",
+            font=theme.FONT_BODY_BOLD,
+            text_color=theme.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(10, 4))
+
+        search_row = ctk.CTkFrame(search_card, fg_color="transparent")
+        search_row.pack(fill="x", padx=12, pady=4)
+
+        self._obs_search_entry = ctk.CTkEntry(
+            search_row,
+            placeholder_text="Término o tema a buscar…",
+            font=theme.FONT_BODY,
+            fg_color=theme.BG_INPUT,
+            border_color=theme.BORDER_SUBTLE,
+            text_color=theme.TEXT_PRIMARY,
+            height=34,
+        )
+        self._obs_search_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        def _search_obs():
+            q = self._obs_search_entry.get().strip()
+            if q:
+                self._cmd_buscar_notas(f"busca en obsidian {q}")
+
+        ctk.CTkButton(
+            search_row,
+            text="BUSCAR 🔍",
+            width=80,
+            height=34,
+            fg_color=theme.ACCENT_PRIMARY,
+            hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.BG_CANVAS,
+            font=theme.FONT_CAPTION_BOLD,
+            corner_radius=theme.RADIUS_SM,
+            command=_search_obs,
+        ).pack(side="right")
+
+        # ── Page: System & Audio ──
+        page_sys = ctk.CTkScrollableFrame(
+            self.view_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=theme.RADIUS_LG,
+            border_width=1,
+            border_color=theme.BORDER_CARD,
+        )
+        self._pages["system"] = page_sys
+
+        ctk.CTkLabel(
+            page_sys,
+            text="DIAGNÓSTICO & CONTROL DEL SISTEMA",
+            font=theme.FONT_SUBTITLE,
+            text_color=theme.ACCENT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=(12, 4))
+
+        # Audio Volume Control Card
+        vol_card = ctk.CTkFrame(
+            page_sys,
+            fg_color=theme.BG_CARD_INNER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
+        )
+        vol_card.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkLabel(
+            vol_card,
+            text="🔊 Control Rápido de Volumen del Sistema",
+            font=theme.FONT_BODY_BOLD,
+            text_color=theme.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(10, 6))
+
+        vol_btn_row = ctk.CTkFrame(vol_card, fg_color="transparent")
+        vol_btn_row.pack(fill="x", padx=12, pady=(0, 10))
+
+        ctk.CTkButton(
+            vol_btn_row,
+            text="SUBIR VOLUMEN 🔼",
+            font=theme.FONT_CAPTION_BOLD,
+            fg_color=theme.BG_CARD,
+            hover_color=theme.BG_CARD_HOVER,
+            text_color=theme.TEXT_PRIMARY,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            height=30,
+            command=self._cmd_vol_up,
+        ).pack(side="left", fill="x", expand=True, padx=(0, 4))
+
+        ctk.CTkButton(
+            vol_btn_row,
+            text="BAJAR VOLUMEN 🔽",
+            font=theme.FONT_CAPTION_BOLD,
+            fg_color=theme.BG_CARD,
+            hover_color=theme.BG_CARD_HOVER,
+            text_color=theme.TEXT_PRIMARY,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            height=30,
+            command=self._cmd_vol_down,
+        ).pack(side="left", fill="x", expand=True, padx=4)
+
+        ctk.CTkButton(
+            vol_btn_row,
+            text="MUTE AUDIO 🔇",
+            font=theme.FONT_CAPTION_BOLD,
+            fg_color=theme.BG_CARD,
+            hover_color=theme.BG_CARD_HOVER,
+            text_color=theme.ACCENT_ROSE,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            height=30,
+            command=self._cmd_vol_mute,
+        ).pack(side="left", fill="x", expand=True, padx=(4, 0))
+
+        # Apps database card
+        apps_card = ctk.CTkFrame(
+            page_sys,
+            fg_color=theme.BG_CARD_INNER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
+        )
+        apps_card.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkLabel(
+            apps_card,
+            text=f"📦 Catálogo de Aplicaciones ({len(self.installed_apps)} registradas)",
+            font=theme.FONT_BODY_BOLD,
+            text_color=theme.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(10, 4))
+
+        ctk.CTkButton(
+            apps_card,
+            text="🔄 RE-ESCANEAR APLICACIONES DE WINDOWS",
+            height=30,
+            fg_color=theme.BG_CARD,
+            hover_color=theme.BG_CARD_HOVER,
+            text_color=theme.ACCENT_PRIMARY,
+            font=theme.FONT_CAPTION_BOLD,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            corner_radius=theme.RADIUS_SM,
+            command=lambda: threading.Thread(target=self._scan_applications, daemon=True).start(),
+        ).pack(fill="x", padx=12, pady=(0, 10))
+
+        # 2.3 Bottom Command Dock
+        dock_frame = ctk.CTkFrame(
+            self.main_studio_frame,
+            fg_color=theme.BG_CARD,
+            corner_radius=theme.RADIUS_LG,
+            border_width=1,
+            border_color=theme.BORDER_CARD,
+        )
+        dock_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
+
+        self.text_input = ctk.CTkEntry(
+            dock_frame,
+            placeholder_text="Escribe un comando o consulta para Darius…",
+            font=theme.FONT_BODY,
+            fg_color=theme.BG_INPUT,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            text_color=theme.TEXT_PRIMARY,
+            placeholder_text_color=theme.TEXT_MUTED,
+            height=38,
+            corner_radius=theme.RADIUS_MD,
+        )
+        self.text_input.pack(side="left", fill="x", expand=True, padx=(10, 8), pady=8)
+        self.text_input.bind("<Return>", self._on_text_submit)
+
+        ctk.CTkButton(
+            dock_frame,
+            text="ENVIAR ▶",
+            width=86,
+            height=38,
+            fg_color=theme.ACCENT_PRIMARY,
+            hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.BG_CANVAS,
+            font=theme.FONT_SUBTITLE,
+            corner_radius=theme.RADIUS_MD,
+            command=self._on_text_submit,
+        ).pack(side="right", padx=(0, 10), pady=8)
+
+    def _show_page(self, page_id: str):
+        self.current_page = page_id
+        for pid, frame in self._pages.items():
+            if pid == page_id:
+                frame.grid(row=0, column=0, sticky="nsew")
+            else:
+                frame.grid_forget()
+
+        for pid, btn in self._nav_btns.items():
+            is_active = (pid == page_id)
+            btn.configure(
+                fg_color=theme.BG_CARD_HOVER if is_active else "transparent",
+                text_color=theme.ACCENT_PRIMARY if is_active else theme.TEXT_SECONDARY,
+            )
+
+    def _open_author_github(self):
+        with contextlib.suppress(Exception):
+            webbrowser.open_new_tab(theme.AUTHOR_GITHUB_URL)
 
     def _mode_label_text(self) -> str:
         icons = {
-            LISTEN_MODE_PTT:  f"🎙 PTT • [{LISTEN_KEY.upper()}]",
+            LISTEN_MODE_PTT: f"🎙 PTT • [{LISTEN_KEY.upper()}]",
             LISTEN_MODE_NAME: f"🔤 NOMBRE • «{ASSISTANT_NAME}»",
             LISTEN_MODE_AUTO: "🔄 AUTO • Escucha continua",
         }
@@ -734,21 +1303,21 @@ class DariusFinal(ctk.CTk):
         for mode_id, (btn, active_color) in self._mode_btns.items():
             is_active = (mode_id == mode)
             btn.configure(
-                fg_color=active_color if is_active else "#1F2937",
-                text_color="#090D16" if is_active else "#94A3B8",
-                border_color=active_color if is_active else "#374151",
+                fg_color=active_color if is_active else theme.BG_PILL,
+                text_color=theme.BG_CANVAS if is_active else theme.TEXT_SECONDARY,
+                border_color=active_color if is_active else theme.BORDER_SUBTLE,
             )
         if hasattr(self, "mode_pill"):
             self.mode_pill.configure(text=self._mode_label_text())
         if mode == LISTEN_MODE_PTT:
-            self.ptt_hint.pack(pady=(0, 8))
+            self.ptt_hint.pack(fill="x", padx=14, pady=(0, 4))
             if not KEYBOARD_AVAILABLE:
                 self.talk("Advertencia: librería keyboard no instalada. Ejecuta pip install keyboard")
         else:
             with contextlib.suppress(Exception):
                 self.ptt_hint.pack_forget()
         log.info(f"Modo cambiado a: {mode}")
-        self.set_status(f"MODO: {mode.upper()}", "#38BDF8")
+        self.set_status(f"MODO: {mode.upper()}", theme.ACCENT_PRIMARY)
 
     def _llm_badge_text(self) -> str:
         prov = cfg.active_provider.upper()
@@ -1903,6 +2472,9 @@ class DariusFinal(ctk.CTk):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  EXPORT COMPATIBILITY
+# ─────────────────────────────────────────────────────────────────────────────
+_CMD_PATTERNS = DariusFinal._CMD_PATTERNS
 
 if __name__ == "__main__":
     enable_dpi_awareness()
