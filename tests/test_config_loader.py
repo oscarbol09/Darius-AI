@@ -1,8 +1,6 @@
-"""Tests unitarios para config_loader.py"""
+import threading
 
-
-
-from config_loader import _DEFAULTS, _SCHEMA, _deep_merge, _validate_types
+from config_loader import _DEFAULTS, _SCHEMA, _deep_merge, _validate_types, cfg
 
 
 class TestValidateTypes:
@@ -65,17 +63,14 @@ class TestDefaults:
 
 class TestConfigLive:
     def test_cfg_imports_without_error(self):
-        from config_loader import cfg
         assert cfg.assistant_name == "darius"
         assert cfg.gemini_max_tokens == 800
         assert isinstance(cfg.gemini_model, str) and len(cfg.gemini_model) > 0
 
     def test_cfg_get_returns_default_for_missing(self):
-        from config_loader import cfg
         assert cfg.get("nonexistent", default="fallback") == "fallback"
 
     def test_cfg_set_updates_and_persists(self):
-        from config_loader import cfg
         original = cfg.user_name
         cfg.set("TestUser", "assistant", "user_name")
         assert cfg.user_name == "TestUser"
@@ -83,9 +78,6 @@ class TestConfigLive:
         assert original == cfg.user_name
 
     def test_cfg_set_thread_safety(self):
-        import threading
-        from config_loader import cfg
-
         errors = []
 
         def worker(idx):

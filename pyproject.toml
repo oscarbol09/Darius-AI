@@ -17,6 +17,7 @@ select = ["E", "F", "W", "I", "N", "UP", "S", "B", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["S101"]
+"tests/*" = ["S101"]
 "windows_commands.py" = ["E501"]
 
 [tool.pytest.ini_options]
