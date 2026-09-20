@@ -71,6 +71,15 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
+      - name: Cache de Compilación Nuitka
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\Nuitka\Nuitka\Cache
+          key: ${{ runner.os }}-nuitka-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-nuitka-
+
       - name: Instalar dependencias de ejecución y compilación
         run: |
           python -m pip install --upgrade pip
