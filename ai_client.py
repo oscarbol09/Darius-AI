@@ -82,17 +82,86 @@ def resolve_provider_key(provider: str) -> str:
     return ""
 
 
-def get_gemini_client() -> Any | None:
-    """Instancia cliente Google GenAI si la API key está disponible."""
-    api_key = resolve_provider_key("gemini")
-    if not api_key:
-        return None
+def get_gemini_client() -> bool:
+    """Verifica si la API key de Gemini está disponible."""
+    return bool(resolve_provider_key("gemini"))
+
+
+def _call_gemini_rest(
+    api_key: str,
+    model: str,
+    prompt: str,
+    system_instruction: str = "",
+    history: list[dict] | None = None,
+    max_tokens: int = 800,
+    temperature: float = 0.7,
+    timeout: int = 25,
+) -> str:
+    """Llama a la API oficial de Google Gemini vía REST sin dependencias externas pesadas."""
+    clean_model = model.strip() or "gemini-2.5-flash"
+    if "/" in clean_model:
+        clean_model = clean_model.split("/")[-1]
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+
+    contents: list[dict] = []
+    if history:
+        turns = cfg.gemini_history_turns * 2
+        for m in history[-turns:]:
+            role = "user" if m.get("role") in ("user", "human") else "model"
+            text = str(m.get("content", "")).strip()
+            if not text:
+                continue
+            if contents and contents[-1]["role"] == role:
+                contents[-1]["parts"][0]["text"] += f"\n{text}"
+            else:
+                contents.append({"role": role, "parts": [{"text": text}]})
+
+    clean_prompt = prompt.strip()
+    if contents and contents[-1]["role"] == "user":
+        contents[-1]["parts"][0]["text"] += f"\n{clean_prompt}"
+    else:
+        contents.append({"role": "user", "parts": [{"text": clean_prompt}]})
+
+    payload: dict[str, Any] = {
+        "contents": contents,
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "temperature": temperature,
+        },
+    }
+    if system_instruction:
+        payload["system_instruction"] = {
+            "parts": [{"text": system_instruction}]
+        }
+
+    data = json.dumps(payload).encode("utf-8")
+    req = _req.Request(  # noqa: S310
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
     try:
-        from google import genai
-        return genai.Client(api_key=api_key)
-    except Exception as e:
-        log.debug(f"No se pudo inicializar genai.Client: {e}")
-        return None
+        with _req.urlopen(req, timeout=timeout) as resp:  # noqa: S310
+            resp_body = json.loads(resp.read().decode("utf-8"))
+            candidates = resp_body.get("candidates", [])
+            if not candidates:
+                raise RuntimeError("Gemini no devolvió candidatos de respuesta.")
+            content = candidates[0].get("content", {})
+            parts = content.get("parts", [])
+            if not parts:
+                raise RuntimeError("Respuesta de Gemini vacía.")
+            return str(parts[0].get("text", "")).strip()
+    except urllib.error.HTTPError as he:
+        try:
+            err_body = he.read().decode("utf-8")
+            err_json = json.loads(err_body)
+            err_msg = err_json.get("error", {}).get("message", err_body[:200])
+        except Exception:
+            err_msg = str(he)
+        raise RuntimeError(f"HTTP {he.code}: {err_msg}") from he
+    except urllib.error.URLError as ue:
+        raise RuntimeError(f"Fallo de conexión: {ue.reason}") from ue
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -252,55 +321,29 @@ def _call_openai_compatible(
 # ─────────────────────────────────────────────────────────────────────────────
 
 def ask_gemini(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
-    """Consulta a Google Gemini usando la clave configurada o entorno."""
+    """Consulta a Google Gemini usando la clave configurada o entorno vía REST."""
     api_key = resolve_provider_key("gemini")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY no está configurada")
 
-    client = get_gemini_client()
-    if client is not None:
-        from google.genai import types
-        system_instruction = _build_system_instruction(prompt)
-        # Construir contents garantizando alternancia estricta user <-> model
-        contents: list[dict] = []
-        if history:
-            turns = cfg.gemini_history_turns * 2
-            for m in history[-turns:]:
-                role = "user" if m.get("role") in ("user", "human") else "model"
-                text = str(m.get("content", "")).strip()
-                if not text:
-                    continue
-                if contents and contents[-1]["role"] == role:
-                    contents[-1]["parts"][0]["text"] += f"\n{text}"
-                else:
-                    contents.append({"role": role, "parts": [{"text": text}]})
-
-        clean_prompt = prompt.strip()
-        if contents and contents[-1]["role"] == "user":
-            contents[-1]["parts"][0]["text"] += f"\n{clean_prompt}"
-        else:
-            contents.append({"role": "user", "parts": [{"text": clean_prompt}]})
-
-        model = cfg.llm_gemini_model or cfg.gemini_model
-        try:
-            response = client.models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    max_output_tokens=cfg.gemini_max_tokens,
-                    temperature=cfg.gemini_temperature,
-                ),
-            )
-            text = response.text.strip()
-            log.info(f"[Gemini] Respuesta obtenida ({len(text)} chars)")
-            return text, f"Gemini ({model})"
-        except Exception as exc:
-            error_msg = _classify_error_message(exc, "Gemini")
-            log.warning(f"[Gemini] Error: {exc}")
-            raise RuntimeError(error_msg) from exc
-
-    raise RuntimeError("No se pudo inicializar el cliente de Gemini.")
+    system_instruction = _build_system_instruction(prompt)
+    model = cfg.llm_gemini_model or cfg.gemini_model or "gemini-2.5-flash"
+    try:
+        text = _call_gemini_rest(
+            api_key=api_key,
+            model=model,
+            prompt=prompt,
+            system_instruction=system_instruction,
+            history=history,
+            max_tokens=cfg.gemini_max_tokens,
+            temperature=cfg.gemini_temperature,
+        )
+        log.info(f"[Gemini] Respuesta obtenida ({len(text)} chars)")
+        return text, f"Gemini ({model})"
+    except Exception as exc:
+        error_msg = _classify_error_message(exc, "Gemini")
+        log.warning(f"[Gemini] Error: {exc}")
+        raise RuntimeError(error_msg) from exc
 
 
 def ask_openai(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
@@ -495,16 +538,15 @@ def test_provider_connection(
         if p == "gemini":
             if not effective_key:
                 return False, "Falta la API Key de Gemini.", 0.0
-            from google import genai
-            from google.genai import types
-            client = genai.Client(api_key=effective_key)
-            effective_model = model.strip() or cfg.llm_gemini_model or "gemini-3.6-flash"
-            resp = client.models.generate_content(
+            effective_model = model.strip() or cfg.llm_gemini_model or "gemini-2.5-flash"
+            _ = _call_gemini_rest(
+                api_key=effective_key,
                 model=effective_model,
-                contents=[{"role": "user", "parts": [{"text": test_prompt}]}],
-                config=types.GenerateContentConfig(max_output_tokens=10, temperature=0.0),
+                prompt=test_prompt,
+                max_tokens=10,
+                temperature=0.0,
+                timeout=10,
             )
-            _ = resp.text
         elif p == "openai":
             if not effective_key:
                 return False, "Falta la API Key de OpenAI.", 0.0

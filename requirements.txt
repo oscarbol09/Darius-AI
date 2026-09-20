@@ -3,8 +3,7 @@
 #  Instalar con: pip install -r requirements.txt
 # ==============================================================================
 
-# -- IA y LLMs -----------------------------------------------------------------
-google-genai>=1.0.0
+# -- IA y LLMs (Llamadas nativas HTTP/REST de ultra-baja latencia) -------------
 requests>=2.31.0
 
 # -- Variables de entorno ------------------------------------------------------
