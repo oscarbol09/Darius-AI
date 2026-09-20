@@ -648,34 +648,108 @@ class TestCmdPatterns(unittest.TestCase):
         r"\b(extrae|scrapp?ea|analiza|lee|resume)\s+(la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url)?\s*(https?://\S+)\b",
         re.IGNORECASE
     )
+    _RE_DETENER_TEST = re.compile(
+        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar?|cancela[r]?|alto|basta|para\s+ya|det[eé]n(te)?|stop)\b",
+        re.IGNORECASE
+    )
+    _RE_DARIUS_PROTOCOL_TEST = re.compile(
+        r"\b(inicia[r]?|ejecuta[r]?|activa[r]?)?\s*(protocolo\s+darius|protocolo|modo\s+bienvenida|rutina\s+de\s+bienvenida|bienvenida\s+darius)\b",
+        re.IGNORECASE
+    )
+    _RE_WORKSPACE_DEV_TEST = re.compile(
+        r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+desarrollo|modo\s+dev|modo\s+programaci[oó]n|entorno\s+de\s+desarrollo)\b",
+        re.IGNORECASE
+    )
+    _RE_WORKSPACE_TRADING_TEST = re.compile(
+        r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+trading|modo\s+mercados|modo\s+finanzas|pantalla\s+trading)\b",
+        re.IGNORECASE
+    )
+    _RE_CURSOR_TEST = re.compile(
+        r"\b(enfoca[r]?\s+cursor|cursor\s+pantalla\s+completa|maximizar\s+cursor|abrir\s+cursor)\b",
+        re.IGNORECASE
+    )
+    _RE_MONITORES_TEST = re.compile(
+        r"\b(ver\s+monitores|cu[aá]ntos\s+monitores|pantallas\s+conectadas|info\s+monitores)\b",
+        re.IGNORECASE
+    )
+    _RE_DIARIO_TEST = re.compile(
+        r"\b(anota|escribe|guarda)\s+(en\s+mi\s+)?(diario|bit[aá]cora)\b",
+        re.IGNORECASE
+    )
+    _RE_MEMORIA_TEST = re.compile(
+        r"\b(recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian)\b",
+        re.IGNORECASE
+    )
+    _RE_BUSCAR_NOTAS_TEST = re.compile(
+        r"\b(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\b",
+        re.IGNORECASE
+    )
+    _RE_APAGAR_TEST = re.compile(
+        r"\b(apagate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b",
+        re.IGNORECASE
+    )
+    _RE_REINICIAR_TEST = re.compile(
+        r"\b(reinicia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b",
+        re.IGNORECASE
+    )
+    _RE_ACCION_TEST = re.compile(
+        r"\b(ver\s+(mi\s+)?(ip|dns|ram|cpu|disco|espacio|version|serial|modelo|procesador|temperatura|procesos|conexiones|servicios|redes|firewall)|"
+        r"limpiar\s+(dns|cache|disco|temporales|papelera)|"
+        r"vaciar\s+(papelera|reciclaje)|"
+        r"diagnosticar\s+red|reparar\s+red|"
+        r"renovar\s+ip|resetear\s+red|"
+        r"desconectar\s+wifi|"
+        r"activar\s+firewall|desactivar\s+firewall|"
+        r"bloquear\s+(pantalla|pc|equipo|sesion)|"
+        r"suspender\s+(el\s+)?(equipo|pc)|"
+        r"hibernar\s+(el\s+)?(equipo|pc)|"
+        r"cerrar\s+(la\s+)?sesion|"
+        r"probar\s+internet|ping\s+google|hay\s+internet|"
+        r"tiempo\s+encendido|uptime|"
+        r"resumen\s+(del\s+)?sistema|info\s+(del\s+)?sistema|"
+        r"buscar\s+actualizaciones)\b",
+        re.IGNORECASE
+    )
 
     # Replica de _CMD_PATTERNS de main.py (los patrones relevantes)
     PATTERNS = [
-        (_RE_HORA_TEST,                                                          "hora"),
-        (_RE_FECHA_TEST,                                                         "fecha"),
-        (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "reset"),
-        (_RE_SCRAPE_WEB_TEST,                                                    "scrape_web"),
-        (_RE_HUMAN_TYPE_TEST,                                                    "human_type"),
-        (_RE_HUMAN_CLICK_TEST,                                                   "human_click"),
-        (_RE_DNS_TEST,                                                           "flush_dns"),
-        (_RE_GH_PRS_TEST,                                                        "gh_prs"),
-        (_RE_GIT_STATUS_TEST,                                                    "git_status"),
-        (_RE_TOP_PROCESSES_TEST,                                                 "top_processes"),
-        (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "youtube"),
-        (re.compile(r"\b(busca|buscar|googlea)\b"),                              "buscar"),
-        (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),           "abrir"),
-        (re.compile(r"\bsubir\s+volumen\b"),                                     "vol_up"),
-        (re.compile(r"\bbajar\s+volumen\b"),                                     "vol_down"),
-        (re.compile(r"\bsilenciar\b"),                                           "vol_mute"),
-        (re.compile(r"\b(cómo estás|estado del sistema|status)\b"),              "estado"),
-        (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"),        "cerrar"),
+        (_RE_DETENER_TEST,                                                       "_cmd_detener"),
+        (_RE_HORA_TEST,                                                          "_cmd_hora"),
+        (_RE_FECHA_TEST,                                                         "_cmd_fecha"),
+        (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
+        (_RE_SCRAPE_WEB_TEST,                                                    "_cmd_scrape_web"),
+        (_RE_HUMAN_TYPE_TEST,                                                    "_cmd_human_type"),
+        (_RE_HUMAN_CLICK_TEST,                                                   "_cmd_human_click"),
+        (_RE_DNS_TEST,                                                           "_cmd_flush_dns"),
+        (_RE_GH_PRS_TEST,                                                        "_cmd_gh_prs"),
+        (_RE_GIT_STATUS_TEST,                                                    "_cmd_git_status"),
+        (_RE_TOP_PROCESSES_TEST,                                                 "_cmd_top_processes"),
+        (_RE_DARIUS_PROTOCOL_TEST,                                               "_cmd_darius_protocol"),
+        (_RE_WORKSPACE_DEV_TEST,                                                 "_cmd_workspace_dev"),
+        (_RE_WORKSPACE_TRADING_TEST,                                             "_cmd_workspace_trading"),
+        (_RE_CURSOR_TEST,                                                        "_cmd_focus_cursor"),
+        (_RE_MONITORES_TEST,                                                     "_cmd_ver_monitores"),
+        (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "_cmd_youtube"),
+        (re.compile(r"\b(busca|buscar|googlea)\b"),                              "_cmd_buscar"),
+        (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),           "_cmd_abrir"),
+        (re.compile(r"\bsubir\s+volumen\b"),                                     "_cmd_vol_up"),
+        (re.compile(r"\bbajar\s+volumen\b"),                                     "_cmd_vol_down"),
+        (re.compile(r"\bsilenciar\b"),                                           "_cmd_vol_mute"),
+        (re.compile(r"\b(cómo estás|estado del sistema|status)\b"),              "_cmd_estado"),
+        (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"),        "_cmd_cerrar"),
+        (_RE_DIARIO_TEST,                                                        "_cmd_diario"),
+        (_RE_MEMORIA_TEST,                                                       "_cmd_memoria"),
+        (_RE_BUSCAR_NOTAS_TEST,                                                  "_cmd_buscar_notas"),
+        (_RE_APAGAR_TEST,                                                        "_cmd_apagar_pc"),
+        (_RE_REINICIAR_TEST,                                                     "_cmd_reiniciar_pc"),
+        (_RE_ACCION_TEST,                                                        "_cmd_accion"),
     ]
 
     def _route(self, cmd: str) -> str | None:
         cmd = cmd.strip()
         for pattern, handler in self.PATTERNS:
             if pattern.search(cmd):
-                return handler
+                return handler.removeprefix("_cmd_")
         return None  # → Gemini
 
     def test_dns_commands(self):
