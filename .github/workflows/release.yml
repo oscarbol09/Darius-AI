@@ -56,11 +56,14 @@ jobs:
     name: Compilación .EXE y Publicación de Release
     needs: verify
     runs-on: windows-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     steps:
       - name: Checkout del repositorio
         uses: actions/checkout@v4
+
+      - name: Configurar Compilador Nativo MSVC C++
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Configurar Python 3.12
         uses: actions/setup-python@v5
