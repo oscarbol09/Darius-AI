@@ -54,7 +54,7 @@ def main():
         "--enable-plugin=tk-inter",
         "--include-package=customtkinter",
         "--include-package-data=customtkinter",
-        "--include-package-data=sounddevice",
+        "--include-package=speech_recognition",
         "--include-package-data=speech_recognition",
         "--include-data-files=config.json=config.json",
         "--include-data-files=assets/darius.ico=assets/darius.ico",
