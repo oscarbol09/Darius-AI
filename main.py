@@ -45,7 +45,12 @@ import win32com.client
 import win32event
 import winerror
 from dotenv import load_dotenv
-from PIL import Image
+
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 import gui_theme as theme
 from acoustic_trigger import AcousticDoubleClapDetector, auto_select_best_mic
@@ -499,7 +504,7 @@ class DariusFinal(ctk.CTk):
         brand_icon_row.pack(fill="x")
 
         logo_path = Path(__file__).resolve().parent / "assets" / "logo_icon.png"
-        if logo_path.exists():
+        if PIL_AVAILABLE and logo_path.exists():
             try:
                 pil_logo = Image.open(logo_path)
                 self._sidebar_logo_img = ctk.CTkImage(light_image=pil_logo, dark_image=pil_logo, size=(24, 24))
