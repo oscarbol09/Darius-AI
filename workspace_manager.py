@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
 from collections.abc import Callable
@@ -382,6 +383,23 @@ def play_spotify_or_song(uri_or_url: str) -> None:
     webbrowser.open(target)
 
 
+_ROUTINE_LOCK = threading.Lock()
+_LAST_ROUTINE_TIMES: dict[str, float] = {}
+DEFAULT_ROUTINE_COOLDOWN_SECS = 10.0
+
+
+def _check_and_update_cooldown(routine_name: str, cooldown_secs: float = DEFAULT_ROUTINE_COOLDOWN_SECS) -> bool:
+    """Verifica el cooldown de ejecución para una rutina específica."""
+    with _ROUTINE_LOCK:
+        now = time.monotonic()
+        last = _LAST_ROUTINE_TIMES.get(routine_name, 0.0)
+        if cooldown_secs > 0 and (now - last) < cooldown_secs:
+            log.warning(f"⚡ [{routine_name}] Ignorado: rutina ya ejecutada recientemente (en cooldown).")
+            return False
+        _LAST_ROUTINE_TIMES[routine_name] = now
+        return True
+
+
 def run_darius_welcome_protocol(
     talk_fn: Callable[[str], None] | None = None,
     song_url: str = "",
@@ -390,7 +408,8 @@ def run_darius_welcome_protocol(
     monitor_secondary: int = 2,
     secondary_url: str = "",
     welcome_phrase: str = "",
-) -> None:
+    cooldown_secs: float = DEFAULT_ROUTINE_COOLDOWN_SECS,
+) -> bool:
     """
     Ejecuta el protocolo de bienvenida y preparación de estación de Darius AI:
       1. Inicia reproducción de música/audio opcional.
@@ -398,6 +417,9 @@ def run_darius_welcome_protocol(
       3. Sintetiza frase de bienvenida.
       4. Trae al frente el editor de código (Cursor) en pantalla completa.
     """
+    if not _check_and_update_cooldown("Protocolo Darius", cooldown_secs):
+        return False
+
     log.info("⚡ [Protocolo Darius] Iniciando secuencia de bienvenida...")
 
     # 1. Música de fondo
@@ -423,24 +445,40 @@ def run_darius_welcome_protocol(
     # 4. Abrir/Enfocar Cursor en pantalla completa
     time.sleep(0.5)
     focus_or_launch_cursor(fullscreen=True)
+    return True
 
 
 # Alias de compatibilidad
 run_workspace_welcome_protocol = run_darius_welcome_protocol
 
 
-def run_dev_mode(talk_fn: Callable[[str], None] | None = None) -> None:
+def run_dev_mode(
+    talk_fn: Callable[[str], None] | None = None,
+    cooldown_secs: float = DEFAULT_ROUTINE_COOLDOWN_SECS,
+) -> bool:
     """Activa el modo de desarrollo: Cursor fullscreen + Claude en monitor secundario."""
+    if not _check_and_update_cooldown("Modo Dev", cooldown_secs):
+        return False
+
     if talk_fn:
         talk_fn("Activando modo de desarrollo. Preparando entorno de código y asistencia.")
     open_url_on_monitor("https://claude.ai/new", monitor_index=2 if get_monitor_count() > 1 else 1, fullscreen=False)
     focus_or_launch_cursor(fullscreen=True)
+    return True
 
 
-def run_trading_mode(talk_fn: Callable[[str], None] | None = None) -> None:
+def run_trading_mode(
+    talk_fn: Callable[[str], None] | None = None,
+    cooldown_secs: float = DEFAULT_ROUTINE_COOLDOWN_SECS,
+) -> bool:
     """Activa el modo de trading / análisis de mercados."""
+    if not _check_and_update_cooldown("Modo Trading", cooldown_secs):
+        return False
+
     if talk_fn:
         talk_fn("Activando modo de mercados. Abriendo gráficas y monitoreo financiero.")
     open_url_on_monitor("https://www.binance.com/en/trade/BTC_USDT", monitor_index=1, fullscreen=True)
     if get_monitor_count() > 1:
         open_url_on_monitor("https://tasaradar.com", monitor_index=2, fullscreen=True)
+    return True
+

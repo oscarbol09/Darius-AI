@@ -22,16 +22,16 @@ import numpy as np
 
 log = logging.getLogger("DARIUS.AcousticTrigger")
 
-# Parámetros acústicos por defecto
+# Parámetros acústicos calibrados para manos humanas y prevención de ecos
 DEFAULT_SAMPLE_RATE = 44100
 DEFAULT_BLOCK_MS = 40
-DEFAULT_SPIKE_RATIO = 7.0
-DEFAULT_COOLDOWN_S = 0.45
-DEFAULT_MIN_DOUBLE_GAP_S = 0.05
-DEFAULT_MAX_DOUBLE_GAP_S = 0.35
-DEFAULT_RETRIGGER_RATIO = 0.55
+DEFAULT_SPIKE_RATIO = 8.5
+DEFAULT_COOLDOWN_S = 2.0
+DEFAULT_MIN_DOUBLE_GAP_S = 0.14
+DEFAULT_MAX_DOUBLE_GAP_S = 0.65
+DEFAULT_RETRIGGER_RATIO = 0.50
 DEFAULT_NOISE_FLOOR_ALPHA = 0.992
-DEFAULT_MIN_RMS = 0.012
+DEFAULT_MIN_RMS = 0.025
 QUIET_GATE_MULT = 2.2
 INPUT_PROBE_S = 0.4
 INPUT_SILENT_RMS = 0.001
@@ -185,6 +185,7 @@ class AcousticDoubleClapDetector:
         device_spec: str = "",
         sample_rate: int = DEFAULT_SAMPLE_RATE,
         block_ms: int = DEFAULT_BLOCK_MS,
+        is_speaking_fn: Callable[[], bool] | None = None,
     ):
         self.on_trigger = on_trigger
         self.spike_ratio = spike_ratio
@@ -194,6 +195,7 @@ class AcousticDoubleClapDetector:
         self.device_spec = device_spec
         self.sample_rate = sample_rate
         self.block_ms = block_ms
+        self.is_speaking_fn = is_speaking_fn
 
         self._running = False
         self._thread: threading.Thread | None = None
@@ -230,6 +232,7 @@ class AcousticDoubleClapDetector:
 
         noise_floor = 1e-4
         last_logged_double = 0.0
+        last_speaking_time = 0.0
         first_clap_time: float | None = None
         spike_armed = True
 
@@ -249,6 +252,21 @@ class AcousticDoubleClapDetector:
                 while self._running:
                     data, overflowed = stream.read(blocksize)
                     if overflowed:
+                        continue
+
+                    now = time.monotonic()
+
+                    # Supresión de eco acústico: si el asistente está hablando por los altavoces
+                    # o terminó de hablar hace menos de 1.8 segundos, ignorar audio para evitar bucles.
+                    if self.is_speaking_fn and self.is_speaking_fn():
+                        last_speaking_time = now
+                        first_clap_time = None
+                        spike_armed = False
+                        continue
+
+                    if (now - last_speaking_time) < 1.8:
+                        first_clap_time = None
+                        spike_armed = False
                         continue
 
                     level = rms_mono(data)

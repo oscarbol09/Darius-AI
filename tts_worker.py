@@ -119,8 +119,18 @@ class TTSWorker:
         """Envía texto al worker. No bloquea."""
         self._queue.put(text)
 
+    def clear_queue(self):
+        """Vacía la cola de mensajes pendientes de síntesis para cancelación inmediata."""
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+                self._queue.task_done()
+            except Exception:
+                break
+
     def stop(self):
         """Detiene el worker enviando señal None."""
+        self.clear_queue()
         self._queue.put(None)
 
     def wait_until_done(self, timeout: float = 5.0):
@@ -128,3 +138,4 @@ class TTSWorker:
         deadline = time.time() + timeout
         while not self._queue.empty() and time.time() < deadline:
             time.sleep(0.1)
+

@@ -51,8 +51,8 @@
   },
   "acoustic_trigger": {
     "enabled": false,
-    "spike_ratio": 7.0,
-    "cooldown_s": 0.45,
+    "spike_ratio": 8.5,
+    "cooldown_s": 2.0,
     "action": "protocolo_darius",
     "device": ""
   },

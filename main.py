@@ -391,6 +391,7 @@ class DariusFinal(ctk.CTk):
             spike_ratio=cfg.acoustic_trigger_spike_ratio,
             cooldown_s=cfg.acoustic_trigger_cooldown_s,
             device_spec=cfg.acoustic_trigger_device,
+            is_speaking_fn=lambda: self.tts_worker.is_speaking.is_set(),
         )
         if cfg.acoustic_trigger_enabled:
             self._clap_detector.start()
@@ -753,12 +754,10 @@ class DariusFinal(ctk.CTk):
             self._clap_detector.stop()
             cfg.set(False, "acoustic_trigger", "enabled")
             self.add_to_chat("Sistema", "Detector de doble aplauso desactivado.")
-            self.talk("Detector de aplausos desactivado.")
         else:
             self._clap_detector.start()
             cfg.set(True, "acoustic_trigger", "enabled")
             self.add_to_chat("Sistema", "Detector de doble aplauso activado.")
-            self.talk("Detector de aplausos activado.")
         if hasattr(self, "clap_btn"):
             active = self._clap_detector.is_running()
             self.clap_btn.configure(
@@ -768,7 +767,9 @@ class DariusFinal(ctk.CTk):
 
     def _on_acoustic_double_clap(self):
         """Manejador de evento de doble aplauso acústico."""
-        log.info("👏 [Trigger] Doble aplauso recibido en DariusFinal.")
+        if self.is_muted or self.tts_worker.is_speaking.is_set():
+            return
+        log.info("👏 [Trigger] Doble aplauso recibido en Darius.")
         self.add_to_chat("Sistema", "👏 ¡Doble aplauso detectado!")
         action = cfg.acoustic_trigger_action.lower()
         if action in ("protocolo_darius", "welcome_protocol"):
@@ -1358,8 +1359,13 @@ class DariusFinal(ctk.CTk):
         r"\b(ver\s+monitores|cu[aá]ntos\s+monitores|pantallas\s+conectadas|info\s+monitores)\b",
         re.IGNORECASE
     )
+    _RE_DETENER = re.compile(
+        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar?|cancela[r]?|alto|basta|para\s+ya|det[eé]n(te)?|stop)\b",
+        re.IGNORECASE
+    )
 
     _CMD_PATTERNS = [
+        (_RE_DETENER,                                                             "_cmd_detener"),
         (_RE_HORA,                                                                "_cmd_hora"),
         (_RE_FECHA,                                                               "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
@@ -1547,6 +1553,14 @@ class DariusFinal(ctk.CTk):
             f"Sistema operativo. {len(self.installed_apps)} aplicaciones en base de datos. "
             f"Modo de activación: {mode_names.get(self.listen_mode, self.listen_mode)}."
         )
+
+    def _cmd_detener(self, _):
+        if hasattr(self, "tts_worker"):
+            self.tts_worker.clear_queue()
+        with self._pending_lock:
+            self._pending_action = None
+        self.add_to_chat("Darius", "Operación detenida y cola de voz silenciada.")
+        self.set_status("DETENIDO", "#F87171")
 
     def _cmd_cerrar(self, _):
         self.talk(f"Cerrando protocolos. Hasta pronto, {USER_NAME}.")
