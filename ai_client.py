@@ -190,11 +190,18 @@ def _call_openai_compatible(
         turns = cfg.gemini_history_turns * 2
         for m in history[-turns:]:
             role = "assistant" if m.get("role") in ("model", "assistant") else "user"
-            content = m.get("content", "")
+            content = str(m.get("content", "")).strip()
             if content:
-                messages.append({"role": role, "content": content})
+                if len(messages) > 1 and messages[-1]["role"] == role:
+                    messages[-1]["content"] += f"\n{content}"
+                else:
+                    messages.append({"role": role, "content": content})
 
-    messages.append({"role": "user", "content": prompt})
+    clean_prompt = prompt.strip()
+    if len(messages) > 1 and messages[-1]["role"] == "user":
+        messages[-1]["content"] += f"\n{clean_prompt}"
+    else:
+        messages.append({"role": "user", "content": clean_prompt})
 
     headers: dict[str, str] = {
         "Content-Type": "application/json",
@@ -254,12 +261,25 @@ def ask_gemini(prompt: str, history: list[dict] | None = None) -> tuple[str, str
     if client is not None:
         from google.genai import types
         system_instruction = _build_system_instruction(prompt)
-        contents = []
+        # Construir contents garantizando alternancia estricta user <-> model
+        contents: list[dict] = []
         if history:
-            for m in history:
-                role = "user" if m["role"] == "user" else "model"
-                contents.append({"role": role, "parts": [{"text": m["content"]}]})
-        contents.append({"role": "user", "parts": [{"text": prompt}]})
+            turns = cfg.gemini_history_turns * 2
+            for m in history[-turns:]:
+                role = "user" if m.get("role") in ("user", "human") else "model"
+                text = str(m.get("content", "")).strip()
+                if not text:
+                    continue
+                if contents and contents[-1]["role"] == role:
+                    contents[-1]["parts"][0]["text"] += f"\n{text}"
+                else:
+                    contents.append({"role": role, "parts": [{"text": text}]})
+
+        clean_prompt = prompt.strip()
+        if contents and contents[-1]["role"] == "user":
+            contents[-1]["parts"][0]["text"] += f"\n{clean_prompt}"
+        else:
+            contents.append({"role": "user", "parts": [{"text": clean_prompt}]})
 
         model = cfg.llm_gemini_model or cfg.gemini_model
         try:

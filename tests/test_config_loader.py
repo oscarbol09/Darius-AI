@@ -81,3 +81,26 @@ class TestConfigLive:
         assert cfg.user_name == "TestUser"
         cfg.set(original, "assistant", "user_name")
         assert original == cfg.user_name
+
+    def test_cfg_set_thread_safety(self):
+        import threading
+        from config_loader import cfg
+
+        errors = []
+
+        def worker(idx):
+            try:
+                for i in range(10):
+                    cfg.set(f"User_{idx}_{i}", "assistant", "user_name")
+                    _ = cfg.user_name
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(errors) == 0
+        cfg.set("Oscar", "assistant", "user_name")

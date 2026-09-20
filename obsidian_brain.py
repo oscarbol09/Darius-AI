@@ -25,11 +25,22 @@ from config_loader import cfg
 log = logging.getLogger("DARIUS.Obsidian")
 
 
+_RESERVED_DOS_NAMES = {
+    "CON", "PRN", "AUX", "NUL",
+    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+}
+
+
 def _sanitize_filename(name: str) -> str:
     """Convierte un texto arbitrario en un nombre de archivo seguro para Windows."""
     clean = re.sub(r'[\\/*?:"<>|]', "", name).strip()
-    clean = re.sub(r"\s+", " ", clean)
-    return clean[:80] if clean else "nota_sin_titulo"
+    clean = re.sub(r"\s+", " ", clean).strip(". ")
+    if not clean:
+        return "nota_sin_titulo"
+    if clean.upper() in _RESERVED_DOS_NAMES:
+        clean = f"_{clean}"
+    return clean[:80]
 
 
 class ObsidianBrain:

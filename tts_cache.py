@@ -93,13 +93,17 @@ def play_cached_wav(path: Path) -> bool:
             raw_frames = wf.readframes(wf.getnframes())
 
         if sampwidth == 2 and raw_frames:
-            pcm_i16 = np.frombuffer(raw_frames, dtype=np.int16)
-            pcm_f = pcm_i16.astype(np.float32) / 32768.0
-            if channels > 1:
-                pcm_f = pcm_f.reshape(-1, channels)
-            sd.play(pcm_f, framerate)
-            sd.wait()
-            return True
+            remainder = len(raw_frames) % (channels * 2)
+            if remainder:
+                raw_frames = raw_frames[:-remainder]
+            if raw_frames:
+                pcm_i16 = np.frombuffer(raw_frames, dtype=np.int16)
+                pcm_f = pcm_i16.astype(np.float32) / 32768.0
+                if channels > 1:
+                    pcm_f = pcm_f.reshape(-1, channels)
+                sd.play(pcm_f, framerate)
+                sd.wait()
+                return True
     except Exception as exc:
         log.debug(f"sounddevice playback fallback: {exc}")
 

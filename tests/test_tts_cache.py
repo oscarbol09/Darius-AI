@@ -75,3 +75,14 @@ def test_play_cached_wav(tmp_path: Path):
     with patch("sounddevice.play", MagicMock()) as mock_play, patch("sounddevice.wait", MagicMock()):
         assert play_cached_wav(wav_file) is True
         mock_play.assert_called_once()
+
+
+def test_play_raw_pcm_with_odd_bytes():
+    """El motor de reproducción ElevenLabs debe soportar buffers con número impar de bytes sin lanzar ValueError."""
+    from elevenlabs_tts_engine import ElevenLabsTTS
+
+    engine = ElevenLabsTTS(api_key="test", voice_id="test")
+    odd_bytes = b"\x00\x01\x00\x02\x03"  # 5 bytes (impar)
+    with patch("sounddevice.play", MagicMock()) as mock_play, patch("sounddevice.wait", MagicMock()):
+        assert engine._play_raw_pcm(odd_bytes) is True
+        mock_play.assert_called_once()

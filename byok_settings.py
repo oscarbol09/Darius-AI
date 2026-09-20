@@ -20,6 +20,7 @@ Integra pruebas de conexión y de voz en tiempo real con persistencia en config.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 import tkinter as tk
@@ -117,6 +118,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.configure(fg_color="#090D16")
         self.attributes("-topmost", True)
         self.grab_set()
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.on_save_callback = on_save_callback
         self.selected_provider = cfg.active_provider or "gemini"
@@ -609,8 +611,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             font=("Segoe UI", 11),
             height=40,
             corner_radius=8,
-            command=self.destroy,
+            command=self._on_close,
         ).pack(side="right", padx=(6, 0))
+
+    def _on_close(self):
+        with contextlib.suppress(Exception):
+            self.grab_release()
+        self.destroy()
 
     # =========================================================================
     #  MANEJO DE PESTAÑAS (TABS)
@@ -851,8 +858,8 @@ class BYOKSettingsModal(ctk.CTkToplevel):
                 if engine_key == "elevenlabs":
                     if not api_key:
                         raise ValueError("No has introducido tu clave de API de ElevenLabs.")
-                    from elevenlabs_tts_engine import ElevenLabsTTSEngine
-                    engine = ElevenLabsTTSEngine(
+                    from elevenlabs_tts_engine import ElevenLabsTTS
+                    engine = ElevenLabsTTS(
                         api_key=api_key,
                         voice_id=voice_id,
                         model_id=model_id,
@@ -862,8 +869,8 @@ class BYOKSettingsModal(ctk.CTkToplevel):
                     if not success:
                         msg = "Fallo en la llamada a ElevenLabs (revisa tu saldo y API Key)."
                 elif engine_key == "edge":
-                    from edge_tts_engine import EdgeTTSEngine
-                    engine = EdgeTTSEngine()
+                    from edge_tts_engine import EdgeTTS
+                    engine = EdgeTTS()
                     success = engine.speak(test_phrase)
                     if not success:
                         msg = "Fallo en Edge-TTS (verifica tu conexión a internet)."

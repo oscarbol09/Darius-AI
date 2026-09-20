@@ -22,6 +22,7 @@ Nota de migración:
 """
 
 import asyncio
+import contextlib
 import logging
 
 log = logging.getLogger("DARIUS.EdgeTTS")
@@ -53,35 +54,51 @@ class EdgeTTS:
         self.volume = volume
         self._loop: asyncio.AbstractEventLoop | None = None
 
-    def speak(self, text: str):
+    def speak(self, text: str) -> bool:
         """
         Síncrono: habla el texto usando edge-tts.
-        Crea un event loop si es necesario.
+        Crea y cierra un event loop si es necesario.
         """
         try:
-            asyncio.run(self._speak_async(text))
+            return asyncio.run(self._speak_async(text))
         except RuntimeError:
             loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(self._speak_async(text))
+            try:
+                asyncio.set_event_loop(loop)
+                return loop.run_until_complete(self._speak_async(text))
+            finally:
+                loop.close()
         except Exception as e:
             log.warning(f"Error en edge-tts: {e}")
+            return False
 
-    async def _speak_async(self, text: str):
+    async def _speak_async(self, text: str) -> bool:
         """
-        Asíncrono: ejecuta edge-tts.
-        Pendiente: implementar con edge_tts.Communicate.
+        Asíncrono: genera audio con edge-tts y lo reproduce limpiamente.
         """
+        import os
+        import tempfile
+        from pathlib import Path
+
+        tmp_file = Path(tempfile.gettempdir()) / f"darius_edge_{os.getpid()}_{id(text)}.mp3"
         try:
             import edge_tts
             communicate = edge_tts.Communicate(text, self.voice)
-            await communicate.save("_tts_temp.mp3")
+            await communicate.save(str(tmp_file))
             try:
                 import playsound
-                playsound.playsound("_tts_temp.mp3")
+                playsound.playsound(str(tmp_file))
+                return True
             except ImportError:
-                log.warning("playsound no instalado. pip install playsound")
+                log.warning("playsound no disponible. Instala con: pip install playsound")
+                return False
         except ImportError:
-            log.warning("edge-tts no instalado. pip install edge-tts")
+            log.warning("edge-tts no instalado. Instala con: pip install edge-tts")
+            return False
         except Exception as e:
             log.warning(f"Error en edge-tts: {e}")
+            return False
+        finally:
+            if tmp_file.exists():
+                with contextlib.suppress(Exception):
+                    tmp_file.unlink(missing_ok=True)

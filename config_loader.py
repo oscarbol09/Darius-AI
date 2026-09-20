@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 
 log = logging.getLogger("DARIUS.Config")
@@ -146,45 +147,53 @@ class _Config:
 
     def __init__(self, data: dict):
         self._data = data
+        self._lock = threading.RLock()
 
     # ── Acceso genérico ───────────────────────────────────────────────────────
 
     def get(self, *keys, default=None):
         """Accede a un valor anidado por claves. Retorna default si no existe."""
-        node = self._data
-        for k in keys:
-            if not isinstance(node, dict) or k not in node:
-                return default
-            node = node[k]
-        return node
+        with self._lock:
+            node = self._data
+            for k in keys:
+                if not isinstance(node, dict) or k not in node:
+                    return default
+                node = node[k]
+            return node
 
     def set(self, value, *keys):
         """
-        Actualiza un valor en la config en runtime y lo persiste en config.json.
+        Actualiza un valor en la config en runtime y lo persiste en config.json de forma atómica.
         Ejemplo: cfg.set("Miguel", "assistant", "user_name")
         """
         if not keys:
             return
-        node = self._data
-        for k in keys[:-1]:
-            node = node.setdefault(k, {})
-        node[keys[-1]] = value
-        self._save()
+        with self._lock:
+            node = self._data
+            for k in keys[:-1]:
+                node = node.setdefault(k, {})
+            node[keys[-1]] = value
+            self._save()
 
     def _save(self):
-        """Persiste el estado actual en config.json."""
-        try:
-            data_to_write = {
-                k: v for k, v in self._data.items()
-                if not k.startswith("_comment")
-            }
-            _CONFIG_FILE.write_text(
-                json.dumps(data_to_write, ensure_ascii=False, indent=2),
-                encoding="utf-8",
-            )
-            log.info("config.json actualizado.")
-        except Exception as e:
-            log.warning(f"No se pudo guardar config.json: {e}")
+        """Persiste el estado actual en config.json de forma atómica y segura."""
+        with self._lock:
+            tmp_file = _CONFIG_FILE.with_suffix(f".{os.getpid()}.tmp")
+            try:
+                data_to_write = {
+                    k: v for k, v in self._data.items()
+                    if not k.startswith("_comment")
+                }
+                tmp_file.write_text(
+                    json.dumps(data_to_write, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                tmp_file.replace(_CONFIG_FILE)
+                log.info("config.json actualizado.")
+            except Exception as e:
+                log.warning(f"No se pudo guardar config.json: {e}")
+                if tmp_file.exists():
+                    tmp_file.unlink(missing_ok=True)
 
     # ── Propiedades con tipo estático ─────────────────────────────────────────
 

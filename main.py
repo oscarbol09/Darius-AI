@@ -374,6 +374,8 @@ class DariusFinal(ctk.CTk):
         self._is_thinking         = False
         self._pending_action: dict | None = None
         self._pending_lock        = threading.RLock()
+        self._chat_file_lock      = threading.Lock()
+        self._mic_device_index: int | None = None
         self._ptt_active          = False
 
         self.listen_mode = DEFAULT_LISTEN_MODE
@@ -424,11 +426,11 @@ class DariusFinal(ctk.CTk):
         self.listener.pause_threshold          = MIC_PAUSE_THRESHOLD
         self.listener.non_speaking_duration    = 0.5
         try:
-            best_mic_idx = auto_select_best_mic(cfg.acoustic_trigger_device)
-            mic_kwargs = {"device_index": best_mic_idx} if best_mic_idx is not None else {}
+            self._mic_device_index = auto_select_best_mic(cfg.acoustic_trigger_device)
+            mic_kwargs = {"device_index": self._mic_device_index} if self._mic_device_index is not None else {}
             with sr.Microphone(**mic_kwargs) as source:
                 self.listener.adjust_for_ambient_noise(source, duration=1)
-            log.info("Calibración completada.")
+            log.info(f"Calibración completada en dispositivo {self._mic_device_index}.")
         except Exception as e:
             log.warning(f"No se pudo calibrar el micrófono: {e}")
 
@@ -444,16 +446,20 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def _append_chat_file(self, speaker: str, text: str):
-        try:
-            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            with open(CHAT_FILE, "a", encoding="utf-8") as f:
-                f.write(f"[{ts}] {speaker}: {text}\n")
-            self._trim_chat_file()
-        except Exception as e:
-            log.warning(f"No se pudo escribir historial local: {e}")
+        with self._chat_file_lock:
+            try:
+                ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                with open(CHAT_FILE, "a", encoding="utf-8") as f:
+                    f.write(f"[{ts}] {speaker}: {text}\n")
+                self._trim_chat_file()
+            except Exception as e:
+                log.warning(f"No se pudo escribir historial local: {e}")
 
     def _trim_chat_file(self):
+        # Nota: asume que el lock _chat_file_lock ya está adquirido por _append_chat_file
         try:
+            if not CHAT_FILE.exists():
+                return
             with open(CHAT_FILE, encoding="utf-8") as f:
                 lines = f.readlines()
             if len(lines) > MAX_CHAT_LINES:
@@ -548,6 +554,14 @@ class DariusFinal(ctk.CTk):
             fg_color="#1F2937", corner_radius=8, padx=6, pady=2
         )
         self.monitors_pill.pack(side="left", padx=3)
+
+        # Apps Pill
+        self.apps_pill = ctk.CTkLabel(
+            telemetry_row, text=f"📦 {len(self.installed_apps)} APPS",
+            font=("Segoe UI", 10, "bold"), text_color="#94A3B8",
+            fg_color="#1F2937", corner_radius=8, padx=6, pady=2
+        )
+        self.apps_pill.pack(side="left", padx=3)
 
         # Aplauso Pill / Botón de Toggle
         clap_active = hasattr(self, "_clap_detector") and self._clap_detector.is_running()
@@ -898,8 +912,6 @@ class DariusFinal(ctk.CTk):
 
     def _start_audio_level_monitor(self):
         def monitor():
-            import audioop
-
             import pyaudio
             pa = pyaudio.PyAudio()
             try:
@@ -908,7 +920,14 @@ class DariusFinal(ctk.CTk):
                 while self.running:
                     try:
                         data = stream.read(512, exception_on_overflow=False)
-                        self._current_audio_level = float(audioop.rms(data, 2))
+                        if data:
+                            pcm_i16 = np.frombuffer(data, dtype=np.int16)
+                            rms = (
+                                float(np.sqrt(np.mean(pcm_i16.astype(np.float32) ** 2)))
+                                if pcm_i16.size > 0
+                                else 0.0
+                            )
+                            self._current_audio_level = rms
                     except Exception:
                         self._current_audio_level = 0.0
                     time.sleep(0.02)
@@ -1121,7 +1140,6 @@ class DariusFinal(ctk.CTk):
             time.sleep(0.02)
 
     def _ptt_capture_and_process(self):
-        import audioop
         import io
         import wave
 
@@ -1135,7 +1153,14 @@ class DariusFinal(ctk.CTk):
             while KEYBOARD_AVAILABLE and keyboard.is_pressed(LISTEN_KEY) and self.running:
                 data = stream.read(chunk, exception_on_overflow=False)
                 frames.append(data)
-                self._current_audio_level = float(audioop.rms(data, 2))
+                if data:
+                    pcm_i16 = np.frombuffer(data, dtype=np.int16)
+                    rms = (
+                        float(np.sqrt(np.mean(pcm_i16.astype(np.float32) ** 2)))
+                        if pcm_i16.size > 0
+                        else 0.0
+                    )
+                    self._current_audio_level = rms
             stream.stop_stream()
             stream.close()
         except Exception as e:
@@ -1210,7 +1235,8 @@ class DariusFinal(ctk.CTk):
 
     def listen_and_process(self):
         try:
-            with sr.Microphone() as source:
+            mic_kwargs = {"device_index": self._mic_device_index} if self._mic_device_index is not None else {}
+            with sr.Microphone(**mic_kwargs) as source:
                 if self.tts_worker.is_speaking.is_set():
                     return
                 self.set_status("ESCUCHANDO…", "#00fbff")
@@ -1557,6 +1583,9 @@ class DariusFinal(ctk.CTk):
     def _cmd_detener(self, _):
         if hasattr(self, "tts_worker"):
             self.tts_worker.clear_queue()
+        with contextlib.suppress(Exception):
+            import sounddevice as sd
+            sd.stop()
         with self._pending_lock:
             self._pending_action = None
         self.add_to_chat("Darius", "Operación detenida y cola de voz silenciada.")
@@ -1722,6 +1751,8 @@ class DariusFinal(ctk.CTk):
                 self.talk("No obtuve respuesta del motor de IA.")
         except Exception as exc:
             log.error(f"[IA] Error inesperado: {exc}")
+            if self.conversation_history and self.conversation_history[-1]["role"] == "user":
+                self.conversation_history.pop()
             self.talk("Ocurrió un error al consultar la IA. Comandos locales activos.")
         finally:
             self._is_thinking = False

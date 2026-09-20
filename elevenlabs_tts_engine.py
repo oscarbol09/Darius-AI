@@ -155,6 +155,11 @@ class ElevenLabsTTS:
         try:
             import sounddevice as sd
 
+            if len(raw_pcm) % 2 != 0:
+                raw_pcm = raw_pcm[:-1]
+            if not raw_pcm:
+                return False
+
             pcm_i16 = np.frombuffer(raw_pcm, dtype=np.int16)
             pcm_f = pcm_i16.astype(np.float32) / 32768.0
             sd.play(pcm_f, self.sample_rate)

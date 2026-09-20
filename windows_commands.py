@@ -765,9 +765,10 @@ $ip     = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlia
 # ═════════════════════════════════════════════════════════════════════════════
 
 def _normalize(text: str) -> str:
+    text = text.lower().strip()
     for src, dst in zip("áéíóúüñàèìòù", "aeiouunaeiou", strict=True):
         text = text.replace(src, dst)
-    return text.lower().strip()
+    return text
 
 
 def _build_table(source: dict) -> tuple[dict, list]:

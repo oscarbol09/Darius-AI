@@ -94,6 +94,10 @@ class TestNormalization(unittest.TestCase):
         self.assertEqual(_normalize("Configuración"), "configuracion")
         self.assertEqual(_normalize("Administración"), "administracion")
         self.assertEqual(_normalize("Energía"), "energia")
+        self.assertEqual(_normalize("ÁBREME"), "abreme")
+        self.assertEqual(_normalize("ÚLTIMO"), "ultimo")
+        self.assertEqual(_normalize("ÍNDICE"), "indice")
+        self.assertEqual(_normalize("ÓRGANO"), "organo")
 
     @unittest.skipUnless(WINCMD_AVAILABLE, "windows_commands no disponible")
     def test_lowercase(self):

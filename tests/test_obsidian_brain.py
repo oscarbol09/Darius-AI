@@ -24,6 +24,15 @@ class TestSanitizeFilename:
         clean = _sanitize_filename("")
         assert clean == "nota_sin_titulo"
 
+    def test_sanitizes_reserved_dos_names(self):
+        for name in ["CON", "PRN", "AUX", "NUL", "COM1", "LPT1"]:
+            clean = _sanitize_filename(name)
+            assert clean == f"_{name}"
+
+    def test_strips_trailing_dots_and_spaces(self):
+        clean = _sanitize_filename("  mi_nota...  ")
+        assert clean == "mi_nota"
+
 
 class TestObsidianBrainOperations:
     def test_save_memory_creates_markdown_file(self, tmp_path: Path):
