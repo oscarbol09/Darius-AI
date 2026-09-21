@@ -25,14 +25,14 @@ log = logging.getLogger("DARIUS.AcousticTrigger")
 # Parámetros acústicos calibrados para manos humanas y prevención de ecos
 DEFAULT_SAMPLE_RATE = 44100
 DEFAULT_BLOCK_MS = 40
-DEFAULT_SPIKE_RATIO = 8.5
-DEFAULT_COOLDOWN_S = 2.0
-DEFAULT_MIN_DOUBLE_GAP_S = 0.14
-DEFAULT_MAX_DOUBLE_GAP_S = 0.65
-DEFAULT_RETRIGGER_RATIO = 0.50
-DEFAULT_NOISE_FLOOR_ALPHA = 0.992
-DEFAULT_MIN_RMS = 0.025
-QUIET_GATE_MULT = 2.2
+DEFAULT_SPIKE_RATIO = 14.0
+DEFAULT_COOLDOWN_S = 4.0
+DEFAULT_MIN_DOUBLE_GAP_S = 0.16
+DEFAULT_MAX_DOUBLE_GAP_S = 0.60
+DEFAULT_RETRIGGER_RATIO = 0.45
+DEFAULT_NOISE_FLOOR_ALPHA = 0.995
+DEFAULT_MIN_RMS = 0.045
+QUIET_GATE_MULT = 2.5
 INPUT_PROBE_S = 0.4
 INPUT_SILENT_RMS = 0.001
 
@@ -257,14 +257,14 @@ class AcousticDoubleClapDetector:
                     now = time.monotonic()
 
                     # Supresión de eco acústico: si el asistente está hablando por los altavoces
-                    # o terminó de hablar hace menos de 1.8 segundos, ignorar audio para evitar bucles.
+                    # o terminó de hablar hace menos de 3.0 segundos, ignorar audio para evitar bucles.
                     if self.is_speaking_fn and self.is_speaking_fn():
                         last_speaking_time = now
                         first_clap_time = None
                         spike_armed = False
                         continue
 
-                    if (now - last_speaking_time) < 1.8:
+                    if (now - last_speaking_time) < 3.0:
                         first_clap_time = None
                         spike_armed = False
                         continue
