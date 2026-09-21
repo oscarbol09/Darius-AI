@@ -549,6 +549,7 @@ class DariusFinal(ctk.CTk):
             ("workspaces", "⚡ Workspaces"),
             ("obsidian", "🧠 Obsidian Brain"),
             ("system", "🛠 Sistema & Audio"),
+            ("settings", "⚙ Ajustes & Modelos"),
         ]
 
         for view_id, label in views:
@@ -799,6 +800,22 @@ class DariusFinal(ctk.CTk):
         actions_box = ctk.CTkFrame(header_card, fg_color="transparent")
         actions_box.pack(side="right", padx=(8, 12), pady=8)
 
+        self.settings_top_btn = ctk.CTkButton(
+            actions_box,
+            text="⚙ AJUSTES",
+            width=84,
+            height=30,
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BG_CARD_HOVER,
+            text_color=theme.ACCENT_PRIMARY,
+            border_color=theme.BORDER_SUBTLE,
+            border_width=1,
+            font=theme.FONT_CAPTION_BOLD,
+            corner_radius=theme.RADIUS_SM,
+            command=self._open_byok_settings,
+        )
+        self.settings_top_btn.pack(side="right", padx=(4, 0))
+
         self.clear_btn = ctk.CTkButton(
             actions_box,
             text="🗑 LIMPIAR",
@@ -813,7 +830,7 @@ class DariusFinal(ctk.CTk):
             corner_radius=theme.RADIUS_SM,
             command=self.reset_conversation,
         )
-        self.clear_btn.pack(side="right", padx=(4, 0))
+        self.clear_btn.pack(side="right", padx=4)
 
         self.mute_btn = ctk.CTkButton(
             actions_box,
@@ -1238,6 +1255,44 @@ class DariusFinal(ctk.CTk):
             command=lambda: threading.Thread(target=self._scan_applications, daemon=True).start(),
         ).pack(fill="x", padx=12, pady=(0, 10))
 
+        # Settings & BYOK Card
+        byok_card = ctk.CTkFrame(
+            page_sys,
+            fg_color=theme.BG_CARD_INNER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
+        )
+        byok_card.pack(fill="x", padx=10, pady=6)
+
+        ctk.CTkLabel(
+            byok_card,
+            text="⚙ Modelos IA, Claves de API & Síntesis de Voz (BYOK)",
+            font=theme.FONT_BODY_BOLD,
+            text_color=theme.ACCENT_PRIMARY,
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(10, 4))
+
+        ctk.CTkLabel(
+            byok_card,
+            text="Gestiona tus API Keys de ElevenLabs, Gemini, OpenRouter, Groq, Ollama y personaliza motores TTS.",
+            font=theme.FONT_CAPTION,
+            text_color=theme.TEXT_SECONDARY,
+            anchor="w",
+        ).pack(fill="x", padx=12, pady=(0, 8))
+
+        ctk.CTkButton(
+            byok_card,
+            text="⚙ ABRIR PANEL DE AJUSTES & API KEYS",
+            height=32,
+            fg_color=theme.ACCENT_PRIMARY,
+            hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.BG_CANVAS,
+            font=theme.FONT_CAPTION_BOLD,
+            corner_radius=theme.RADIUS_SM,
+            command=self._open_byok_settings,
+        ).pack(fill="x", padx=12, pady=(0, 10))
+
         # 2.3 Bottom Command Dock
         dock_frame = ctk.CTkFrame(
             self.main_studio_frame,
@@ -1277,6 +1332,9 @@ class DariusFinal(ctk.CTk):
         ).pack(side="right", padx=(0, 10), pady=8)
 
     def _show_page(self, page_id: str):
+        if page_id == "settings":
+            self._open_byok_settings()
+            return
         self.current_page = page_id
         for pid, frame in self._pages.items():
             if pid == page_id:
