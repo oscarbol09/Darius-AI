@@ -185,6 +185,10 @@ Puedes personalizar rutas y pantallas en `config.json`:
 | **"¿Cuántos monitores tengo?"** | Consulta Win32 `EnumDisplayMonitors` y describe dimensiones, posición y monitor primario | `workspace_manager.py` |
 | **"Organizar pantallas"** / **"Organizar ventanas"** | Distribuye las ventanas principales en cuadrícula según la topología multi-monitor | `workspace_manager.py` |
 | **"Pantalla completa"** / **"F11"** | Envía tecla `F11` a la ventana activa mediante eventos de teclado de Windows | `workspace_manager.py` |
+| **"¿Qué hay en mi pantalla?"** / **"Analiza mi pantalla"** | Captura atómica con `mss` y análisis visual multimodal con el LLM activo | `screen_vision.py` |
+| **"Analiza este error en pantalla"** | Detecta stacktraces, diálogos de error y fallos de compilación con OCR | `screen_vision.py` |
+| **"Investiga a fondo sobre [tema]"** | Pipeline de Deep Research web multi-fuente y guardado de informe en Obsidian | `deep_research.py` |
+| **"Planifica [meta compleja]"** | Descomposición agéntica en pasos ordenados con auto-recuperación | `agent_planner.py` |
 | **"Anota en mi diario que..."** | Inserta entrada con hora en la nota diaria (`Diario/YYYY-MM-DD.md`) de Obsidian | `obsidian_brain.py` |
 | **"Recuerda que..."** | Almacena memoria permanente con tags y timestamp en `Darius/Memorias/` | `obsidian_brain.py` |
 | **"Subir / Bajar volumen"** | Modifica el nivel de volumen maestro del endpoint de audio con PyCAW | `windows_commands.py` |

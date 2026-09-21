@@ -81,6 +81,10 @@ Darius-AI/
 ├── tts_worker.py            <- WORKER TTS — Despachador multi-motor (ElevenLabs > Edge > SAPI) desacoplado en hilo COM
 ├── ai_client.py             <- MOTOR BYOK — Clientes Gemini, OpenAI, Groq, NVIDIA NIM, OpenRouter, Ollama
 ├── obsidian_brain.py        <- CEREBRO — Gestión de notas diarias, memorias y búsqueda contextual en Obsidian
+├── screen_vision.py         <- VISIÓN & OCR — Captura atómica multi-monitor (mss) y análisis multimodal
+├── deep_research.py         <- DEEP RESEARCH — Investigación autónoma multi-fuente y reportes en Obsidian
+├── agent_planner.py         <- PLANIFICADOR AGÉNTICO — Descomposición de metas multi-paso y auto-recuperación
+├── self_test.py             <- DIAGNÓSTICO HERMÉTICO — Suite de auto-certificación sin efectos secundarios
 ├── windows_commands.py      <- Catálogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL, python actions)
 ├── human_gui.py            <- AUTOMATIZACIÓN GUI — Curvas de Bézier cúbicas, tipeo estocástico Unicode y scraper web nativo
 ├── agentic_bridge.py       <- PUENTE AGÉNTICO — Loop de ejecución de herramientas autónomas y fast-path CLI
@@ -93,6 +97,10 @@ Darius-AI/
 ├── installer.iss            <- SCRIPT DE INSTALADOR — Generador de setup Windows con Inno Setup
 ├── tests/
 │   ├── conftest.py          <- Configuración de pytest y fixtures compartidos
+│   ├── test_screen_vision.py<- Tests de captura en memoria y payloads multimodales
+│   ├── test_deep_research.py<- Tests de búsqueda multi-fuente y guardado en Obsidian
+│   ├── test_agent_planner.py<- Tests de descomposición de metas y canalización de contexto
+│   ├── test_self_test.py    <- Tests de la suite diagnóstica hermética
 │   ├── test_human_gui.py    <- Tests de trayectorias de Bézier, failsafe Win32 y scraper web
 │   ├── test_agentic_bridge.py <- Tests del motor de herramientas autónomas y tool execution
 │   ├── test_acoustic_trigger.py <- Tests de detección de aplausos, RMS mono y piso de ruido adaptativo

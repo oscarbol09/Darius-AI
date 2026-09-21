@@ -25,5 +25,7 @@ comtypes>=1.2.0
 pycaw>=20181226
 keyboard>=0.13.5
 
-# -- Utilidades y Procesamiento Numérico ---------------------------------------
+# -- Utilidades y Procesamiento Numérico / Visión ------------------------------
 numpy>=1.24.0
+mss>=9.0.0
+beautifulsoup4>=4.12.0

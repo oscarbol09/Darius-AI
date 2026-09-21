@@ -94,6 +94,7 @@ def _call_gemini_rest(
     prompt: str,
     system_instruction: str = "",
     history: list[dict] | None = None,
+    image_b64: str | None = None,
     max_tokens: int = 800,
     temperature: float = 0.7,
     timeout: int = 25,
@@ -118,10 +119,19 @@ def _call_gemini_rest(
                 contents.append({"role": role, "parts": [{"text": text}]})
 
     clean_prompt = prompt.strip()
+    user_parts: list[dict[str, Any]] = [{"text": clean_prompt}]
+    if image_b64:
+        user_parts.append({
+            "inline_data": {
+                "mime_type": "image/jpeg",
+                "data": image_b64,
+            }
+        })
+
     if contents and contents[-1]["role"] == "user":
-        contents[-1]["parts"][0]["text"] += f"\n{clean_prompt}"
+        contents[-1]["parts"].extend(user_parts)
     else:
-        contents.append({"role": "user", "parts": [{"text": clean_prompt}]})
+        contents.append({"role": "user", "parts": user_parts})
 
     payload: dict[str, Any] = {
         "contents": contents,
@@ -263,6 +273,7 @@ def _call_openai_compatible(
     prompt: str,
     history: list[dict] | None = None,
     extra_headers: dict | None = None,
+    image_b64: str | None = None,
     timeout: int = 25,
     max_tokens: int | None = None,
     temperature: float | None = None,
@@ -271,7 +282,7 @@ def _call_openai_compatible(
     Ejecuta una petición estándar a cualquier API compatible con OpenAI /chat/completions.
     """
     system_instruction = _build_system_instruction(prompt)
-    messages: list[dict[str, str]] = [{"role": "system", "content": system_instruction}]
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system_instruction}]
 
     if history:
         turns = cfg.gemini_history_turns * 2
@@ -285,10 +296,22 @@ def _call_openai_compatible(
                     messages.append({"role": role, "content": content})
 
     clean_prompt = prompt.strip()
-    if len(messages) > 1 and messages[-1]["role"] == "user":
-        messages[-1]["content"] += f"\n{clean_prompt}"
+    if image_b64:
+        user_content: Any = [
+            {"type": "text", "text": clean_prompt},
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_b64}",
+                },
+            },
+        ]
+        messages.append({"role": "user", "content": user_content})
     else:
-        messages.append({"role": "user", "content": clean_prompt})
+        if len(messages) > 1 and messages[-1]["role"] == "user":
+            messages[-1]["content"] += f"\n{clean_prompt}"
+        else:
+            messages.append({"role": "user", "content": clean_prompt})
 
     headers: dict[str, str] = {
         "Content-Type": "application/json",
@@ -338,7 +361,11 @@ def _call_openai_compatible(
 #  IMPLEMENTACIONES DE PROVEEDORES
 # ─────────────────────────────────────────────────────────────────────────────
 
-def ask_gemini(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def ask_gemini(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """Consulta a Google Gemini usando la clave configurada o entorno vía REST."""
     api_key = resolve_provider_key("gemini")
     if not api_key:
@@ -353,6 +380,7 @@ def ask_gemini(prompt: str, history: list[dict] | None = None) -> tuple[str, str
             prompt=prompt,
             system_instruction=system_instruction,
             history=history,
+            image_b64=image_b64,
             max_tokens=cfg.gemini_max_tokens,
             temperature=cfg.gemini_temperature,
         )
@@ -364,7 +392,11 @@ def ask_gemini(prompt: str, history: list[dict] | None = None) -> tuple[str, str
         raise RuntimeError(error_msg) from exc
 
 
-def ask_openai(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def ask_openai(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """Consulta a OpenAI (ChatGPT)."""
     api_key = resolve_provider_key("openai")
     if not api_key:
@@ -376,11 +408,16 @@ def ask_openai(prompt: str, history: list[dict] | None = None) -> tuple[str, str
         model=model,
         prompt=prompt,
         history=history,
+        image_b64=image_b64,
     )
     return text, f"OpenAI ({model})"
 
 
-def ask_openrouter(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def ask_openrouter(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """Consulta a OpenRouter con rotación defensiva de modelos."""
     api_key = resolve_provider_key("openrouter")
     if not api_key:
@@ -407,6 +444,7 @@ def ask_openrouter(prompt: str, history: list[dict] | None = None) -> tuple[str,
                 prompt=prompt,
                 history=history,
                 extra_headers=extra_headers,
+                image_b64=image_b64,
                 timeout=20,
             )
             return text, f"OpenRouter ({model})"
@@ -418,7 +456,11 @@ def ask_openrouter(prompt: str, history: list[dict] | None = None) -> tuple[str,
     raise RuntimeError(f"Todos los modelos de OpenRouter fallaron: {last_err}")
 
 
-def ask_nvidia(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def ask_nvidia(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """Consulta a NVIDIA NIM."""
     api_key = resolve_provider_key("nvidia")
     if not api_key:
@@ -430,11 +472,16 @@ def ask_nvidia(prompt: str, history: list[dict] | None = None) -> tuple[str, str
         model=model,
         prompt=prompt,
         history=history,
+        image_b64=image_b64,
     )
     return text, f"NVIDIA NIM ({model})"
 
 
-def ask_groq(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def ask_groq(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """Consulta a Groq Cloud."""
     api_key = resolve_provider_key("groq")
     if not api_key:
@@ -446,11 +493,16 @@ def ask_groq(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
         model=model,
         prompt=prompt,
         history=history,
+        image_b64=image_b64,
     )
     return text, f"Groq ({model})"
 
 
-def ask_ollama(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def ask_ollama(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """Consulta a Ollama local."""
     base_url = (cfg.llm_ollama_base_url or "http://localhost:11434/v1").rstrip("/")
     endpoint = f"{base_url}/chat/completions"
@@ -461,12 +513,17 @@ def ask_ollama(prompt: str, history: list[dict] | None = None) -> tuple[str, str
         model=model,
         prompt=prompt,
         history=history,
+        image_b64=image_b64,
         timeout=45,
     )
     return text, f"Ollama ({model})"
 
 
-def ask_custom(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def ask_custom(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """Consulta a un endpoint personalizado compatible con OpenAI."""
     base_url = (cfg.llm_custom_base_url or "http://localhost:1234/v1").rstrip("/")
     endpoint = f"{base_url}/chat/completions"
@@ -478,6 +535,7 @@ def ask_custom(prompt: str, history: list[dict] | None = None) -> tuple[str, str
         model=model,
         prompt=prompt,
         history=history,
+        image_b64=image_b64,
         timeout=45,
     )
     return text, f"Custom ({model})"
@@ -496,6 +554,7 @@ def _resolve_agentic_tool_loop(
     caller_fn,
     original_prompt: str,
     history: list[dict] | None = None,
+    image_b64: str | None = None,
 ) -> tuple[str, str]:
     """
     Si la respuesta del modelo contiene una invocación de herramienta [ACTION: ...],
@@ -526,7 +585,7 @@ def _resolve_agentic_tool_loop(
         augmented_history = list(history or [])
         augmented_history.append({"role": "model", "content": raw_text})
 
-        synthesized_text, sub_provider = caller_fn(followup_prompt, augmented_history)
+        synthesized_text, sub_provider = caller_fn(followup_prompt, augmented_history, image_b64=image_b64)
         clean_synth = ACTION_REGEX.sub("", synthesized_text).strip()
         return clean_synth or synthesized_text, f"{sub_provider} [Tool:{tool_name}]"
     except Exception as exc:
@@ -538,7 +597,11 @@ def _resolve_agentic_tool_loop(
 #  DISPATCHER PRINCIPAL CON FALLBACK DEFENSIVO
 # ─────────────────────────────────────────────────────────────────────────────
 
-def get_ai_response(prompt: str, history: list[dict] | None = None) -> tuple[str, str]:
+def get_ai_response(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
     """
     Ejecuta la consulta con el proveedor activo en BYOK.
     Si el proveedor principal falla y el fallback está activado, escala ordenadamente.
@@ -556,8 +619,8 @@ def get_ai_response(prompt: str, history: list[dict] | None = None) -> tuple[str
     primary_fn = provider_callers.get(active, ask_gemini)
 
     try:
-        raw_text, provider = primary_fn(prompt, history)
-        return _resolve_agentic_tool_loop(raw_text, provider, primary_fn, prompt, history)
+        raw_text, provider = primary_fn(prompt, history, image_b64=image_b64)
+        return _resolve_agentic_tool_loop(raw_text, provider, primary_fn, prompt, history, image_b64=image_b64)
     except Exception as primary_exc:
         log.warning(f"Proveedor principal '{active}' falló: {primary_exc}")
 
@@ -569,8 +632,10 @@ def get_ai_response(prompt: str, history: list[dict] | None = None) -> tuple[str
         if active != "openrouter" and openrouter_key:
             try:
                 log.info("Intentando fallback con OpenRouter...")
-                raw_text, provider = ask_openrouter(prompt, history)
-                return _resolve_agentic_tool_loop(raw_text, provider, ask_openrouter, prompt, history)
+                raw_text, provider = ask_openrouter(prompt, history, image_b64=image_b64)
+                return _resolve_agentic_tool_loop(
+                    raw_text, provider, ask_openrouter, prompt, history, image_b64=image_b64
+                )
             except Exception as fb_exc:
                 log.warning(f"Fallback OpenRouter falló: {fb_exc}")
 
@@ -579,10 +644,14 @@ def get_ai_response(prompt: str, history: list[dict] | None = None) -> tuple[str
         if active != "gemini" and gemini_key:
             try:
                 log.info("Intentando fallback con Gemini...")
-                raw_text, provider = ask_gemini(prompt, history)
-                return _resolve_agentic_tool_loop(raw_text, provider, ask_gemini, prompt, history)
+                raw_text, provider = ask_gemini(prompt, history, image_b64=image_b64)
+                return _resolve_agentic_tool_loop(
+                    raw_text, provider, ask_gemini, prompt, history, image_b64=image_b64
+                )
             except Exception as gemini_exc:
                 log.warning(f"Fallback Gemini falló: {gemini_exc}")
+
+        return _classify_error_message(primary_exc, active.upper()), "error"
 
         return _classify_error_message(primary_exc, active.upper()), "error"
 

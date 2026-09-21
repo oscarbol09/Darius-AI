@@ -115,6 +115,61 @@ class ObsidianBrain:
         log.info(f"[Obsidian] Memoria guardada: {filepath.relative_to(vault)}")
         return filepath
 
+    def save_research_report(
+        self,
+        topic: str,
+        content: str,
+        sources: list[dict | str] | None = None,
+        tags: list[str] | None = None,
+    ) -> Path:
+        """
+        Guarda un informe estructurado de investigación en la carpeta de investigaciones de Obsidian.
+        """
+        vault = self.vault_path
+        folder = vault / "Darius" / "Investigaciones"
+        folder.mkdir(parents=True, exist_ok=True)
+
+        today_str = datetime.date.today().strftime("%Y-%m-%d")
+        clean_topic = _sanitize_filename(topic)
+        filename = f"{today_str} - {clean_topic}.md"
+        filepath = folder / filename
+
+        tag_list = list(set(["darius", "investigacion", "deep_research"] + (tags or [])))
+        tags_yaml = "\n".join(f"  - {t}" for t in tag_list)
+        now_iso = datetime.datetime.now().astimezone().isoformat()
+
+        sources_md = ""
+        if sources:
+            sources_md = "\n\n## Fuentes y Referencias Consultadas\n"
+            for i, src in enumerate(sources, 1):
+                if isinstance(src, dict):
+                    title = src.get("title", "Fuente web")
+                    url = src.get("url", "")
+                    snippet = src.get("snippet", "")
+                    sources_md += f"{i}. [{title}]({url})\n"
+                    if snippet:
+                        sources_md += f"   > {snippet[:180]}...\n"
+                else:
+                    sources_md += f"{i}. {src}\n"
+
+        safe_topic = topic.replace('"', "")
+        markdown = (
+            f"---\n"
+            f"tipo: investigacion\n"
+            f"tema: \"{safe_topic}\"\n"
+            f"fecha_creacion: '{now_iso}'\n"
+            f"tags:\n"
+            f"{tags_yaml}\n"
+            f"---\n\n"
+            f"# Informe de Investigación: {topic}\n\n"
+            f"{content.strip()}"
+            f"{sources_md}\n"
+        )
+
+        filepath.write_text(markdown, encoding="utf-8")
+        log.info(f"[Obsidian] Informe de investigación guardado: {filepath.relative_to(vault)}")
+        return filepath
+
     def append_daily_note(self, entry: str) -> Path:
         """
         Agrega una entrada con marca de tiempo a la nota diaria de hoy (YYYY-MM-DD.md).

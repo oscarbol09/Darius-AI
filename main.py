@@ -1991,12 +1991,27 @@ class DariusFinal(ctk.CTk):
         r"\b(extrae|scrapp?ea|analiza|lee|resume)\s+(la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url)?\s*(https?://\S+)\b",
         re.IGNORECASE
     )
+    _RE_VISION_SCREEN = re.compile(
+        r"\b(qu[eé]\s+hay\s+en\s+(mi\s+)?pantalla|analiza\s+(mi\s+)?pantalla|lee\s+(la\s+)?pantalla|analiza\s+(este\s+)?error\s+(en\s+pantalla)?|mira\s+(la\s+)?pantalla|qu[eé]\s+estoy\s+viendo|captura\s+(de\s+)?pantalla)\b",  # noqa: E501
+        re.IGNORECASE
+    )
+    _RE_DEEP_RESEARCH = re.compile(
+        r"\b(investiga\s+(a\s+fondo|profundamente|exhaustivamente|sobre)?|investigaci[oó]n\s+profunda\s+(sobre|de)?|haz\s+una\s+investigaci[oó]n\s+(sobre|de)?)\s+(.+)$",  # noqa: E501
+        re.IGNORECASE
+    )
+    _RE_PLANNER_GOAL = re.compile(
+        r"\b(planifica|crea\s+un\s+plan\s+para|ejecuta\s+el\s+plan|plan\s+de\s+acci[oó]n\s+para)\s+(.+)$",
+        re.IGNORECASE
+    )
 
     _CMD_PATTERNS = [
         (_RE_DETENER,                                                             "_cmd_detener"),
         (_RE_HORA,                                                                "_cmd_hora"),
         (_RE_FECHA,                                                               "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
+        (_RE_VISION_SCREEN,                                                       "_cmd_screen_vision"),
+        (_RE_DEEP_RESEARCH,                                                       "_cmd_deep_research"),
+        (_RE_PLANNER_GOAL,                                                        "_cmd_agent_planner"),
         (_RE_SCRAPE_WEB,                                                          "_cmd_scrape_web"),
         (_RE_HUMAN_TYPE,                                                          "_cmd_human_type"),
         (_RE_HUMAN_CLICK,                                                         "_cmd_human_click"),
@@ -2155,6 +2170,60 @@ class DariusFinal(ctk.CTk):
             )
             self.ask_gemini(summary_prompt)
         threading.Thread(target=run, daemon=True, name="scrape-web").start()
+
+    def _cmd_screen_vision(self, cmd: str):
+        self.set_status("👁️ ANALIZANDO PANTALLA…", "#38BDF8")
+        self.talk("Analizando lo que se muestra en tu pantalla, un momento.")
+
+        def run():
+            from screen_vision import vision_engine
+            is_error = bool(re.search(r"\berror|fallo|excepci[oó]n|falla\b", cmd, re.IGNORECASE))
+            is_ocr = bool(re.search(r"\blee|texto|documento|c[oó]digo\b", cmd, re.IGNORECASE))
+
+            if is_error:
+                analysis = vision_engine.analyze_screen_error(monitor_index=1)
+            elif is_ocr:
+                analysis = vision_engine.read_screen_text(monitor_index=1)
+            else:
+                analysis = vision_engine.analyze_screen(prompt=cmd, monitor_index=1)
+
+            self.add_to_chat("Darius", analysis)
+            self.talk(analysis)
+            self.set_status("SISTEMA LISTO", "#34D399")
+
+        threading.Thread(target=run, daemon=True, name="screen-vision").start()
+
+    def _cmd_deep_research(self, cmd: str):
+        m = self._RE_DEEP_RESEARCH.search(cmd)
+        topic = m.group(4).strip() if m else cmd
+        self.set_status("🔬 INVESTIGANDO A FONDO…", "#A855F7")
+
+        def run():
+            from deep_research import research_pipeline
+            res = research_pipeline.run_research(
+                topic=topic,
+                save_to_obsidian=True,
+                speak_fn=self.talk,
+            )
+            self.add_to_chat("Darius", f"### Informe de Investigación: {topic}\n\n{res['report']}")
+            self.set_status("SISTEMA LISTO", "#34D399")
+
+        threading.Thread(target=run, daemon=True, name="deep-research").start()
+
+    def _cmd_agent_planner(self, cmd: str):
+        m = self._RE_PLANNER_GOAL.search(cmd)
+        goal = m.group(2).strip() if m else cmd
+
+        def run():
+            from agent_planner import agent_planner
+            res = agent_planner.plan_and_execute(
+                goal=goal,
+                speak_fn=self.talk,
+                status_fn=self.set_status,
+            )
+            self.add_to_chat("Darius", res["summary"])
+
+        threading.Thread(target=run, daemon=True, name="agent-planner").start()
 
     def _cmd_darius_protocol(self, _):
         self.talk("Iniciando Protocolo Darius. Configurando entorno de trabajo y herramientas.")
@@ -2482,6 +2551,10 @@ class DariusFinal(ctk.CTk):
 _CMD_PATTERNS = DariusFinal._CMD_PATTERNS
 
 if __name__ == "__main__":
+    if "--self-test" in sys.argv:
+        from self_test import main as run_test_cli
+        run_test_cli()
+
     enable_dpi_awareness()
     app = DariusFinal()
     app.mainloop()
