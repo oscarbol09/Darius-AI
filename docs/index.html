@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Darius AI — Documentación Oficial | Asistente Nativo para Windows</title>
+  <meta name="description" content="Manual de usuario y documentación técnica de Darius AI: Asistente virtual de escritorio nativo para Windows con control por voz, memoria en Obsidian, visión de pantalla y BYOK.">
+  <meta name="author" content="Oscarbol09">
+  <meta property="og:title" content="Darius AI — Documentación Oficial">
+  <meta property="og:description" content="Asistente de escritorio nativo para Windows con control por voz, memoria en Obsidian y arquitectura BYOK.">
+  <meta property="og:image" content="assets/social_preview.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  
+  <link rel="icon" type="image/x-icon" href="assets/favicon.ico">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    <!-- ── Sidebar ───────────────────────────────────────────────────────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <img src="assets/logo_icon.png" alt="Darius AI Logo" class="brand-logo">
+        <div class="brand-info">
+          <span class="brand-title">DARIUS AI</span>
+          <span class="brand-version">v7.0.0 STABLE</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-group">
+          <div class="nav-group-title">Comenzar</div>
+          <a href="#inicio" class="nav-link active"><span class="icon">🚀</span> Introducción</a>
+          <a href="#instalacion" class="nav-link"><span class="icon">💾</span> Instalación & Setup</a>
+          <a href="#interfaz" class="nav-link"><span class="icon">🖥</span> Interfaz Split-Pane</a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Subsistemas & IA</div>
+          <a href="#byok" class="nav-link"><span class="icon">🤖</span> Motores BYOK LLM</a>
+          <a href="#vision" class="nav-link"><span class="icon">👁</span> Visión & OCR MSS</a>
+          <a href="#deep-research" class="nav-link"><span class="icon">🔬</span> Deep Research</a>
+          <a href="#planner" class="nav-link"><span class="icon">🧭</span> Agent Planner</a>
+          <a href="#obsidian" class="nav-link"><span class="icon">🧠</span> Obsidian Brain</a>
+          <a href="#voz-tts" class="nav-link"><span class="icon">🔊</span> Voz & Síntesis (TTS)</a>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-group-title">Referencia & SO</div>
+          <a href="#comandos" class="nav-link"><span class="icon">🎙</span> Catálogo de Comandos</a>
+          <a href="#self-test" class="nav-link"><span class="icon">🛠</span> Diagnóstico Self-Test</a>
+          <a href="#compilacion" class="nav-link"><span class="icon">📦</span> Compilación Standalone</a>
+          <a href="#licencia" class="nav-link"><span class="icon">⚖️</span> Licencia & Autoría</a>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div>Desarrollado por <strong><a href="https://github.com/oscarbol09" target="_blank" rel="noopener">@Oscarbol09</a></strong></div>
+        <div>Licencia GNU GPL-3.0</div>
+      </div>
+    </aside>
+
+    <!-- ── Main Wrapper ────────────────────────────────────────────────── -->
+    <div class="main-wrapper">
+      <!-- Top Sticky Header -->
+      <header class="top-nav">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú">☰</button>
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" class="search-input" placeholder="Buscar comandos, módulos o guías…">
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <a href="https://github.com/oscarbol09/Darius-AI/releases/latest" class="btn-header btn-primary" target="_blank" rel="noopener">
+            📥 Descargar .EXE
+          </a>
+          <a href="https://github.com/oscarbol09/Darius-AI" class="btn-header btn-ghost" target="_blank" rel="noopener">
+            ⭐ GitHub
+          </a>
+        </div>
+      </header>
+
+      <!-- Documentation Content Body -->
+      <main class="content-body">
+
+        <!-- ── Section: Inicio / Hero ────────────────────────────────────── -->
+        <section id="inicio" class="hero">
+          <div class="hero-badge">⚡ ARQUITECTURA NATIVA PARA WINDOWS 10 / 11</div>
+          <h1 class="hero-title">Darius AI Documentation</h1>
+          <p class="hero-subtitle">
+            Asistente de escritorio nativo para Windows con control por voz en tiempo real, cerebro de memoria sincronizado con Obsidian, visión multimodal de pantalla y arquitectura de modelos abiertos BYOK.
+          </p>
+
+          <div class="hero-cta-group">
+            <a href="https://github.com/oscarbol09/Darius-AI/releases/latest" class="btn-header btn-primary btn-lg" target="_blank" rel="noopener">
+              Descargar Instalador v7.0.0 (Win64)
+            </a>
+            <a href="#instalacion" class="btn-header btn-ghost btn-lg">
+              Guía de Instalación Local
+            </a>
+          </div>
+
+          <div class="grid-bento">
+            <div class="card">
+              <span class="card-icon">⚡</span>
+              <h3 class="card-title">100% Local First</h3>
+              <p class="card-desc">Comandos del sistema operativo, control Win32, volumen y notas se ejecutan en local en milisegundos sin enviar datos a la nube.</p>
+            </div>
+            <div class="card">
+              <span class="card-icon">🔑</span>
+              <h3 class="card-title">Libertad BYOK</h3>
+              <p class="card-desc">Conecta tu proveedor preferido: Google Gemini, OpenAI, Groq, OpenRouter, NVIDIA NIM o instancias locales de Ollama.</p>
+            </div>
+            <div class="card">
+              <span class="card-icon">🧠</span>
+              <h3 class="card-title">Memoria en Obsidian</h3>
+              <p class="card-desc">Persistencia directa en archivos Markdown locales para bitácora diaria y memorias permanentes con inyección de contexto.</p>
+            </div>
+            <div class="card">
+              <span class="card-icon">👁</span>
+              <h3 class="card-title">Visión de Pantalla MSS</h3>
+              <p class="card-desc">Captura ultra-rápida en memoria (<15ms) con análisis visual de bugs, stacktraces y lectura OCR asistida por LLMs.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Section: Instalación ──────────────────────────────────────── -->
+        <section id="instalacion">
+          <h2>Instalación & Puesta en Marcha</h2>
+          <p>Darius AI se puede utilizar tanto mediante su instalador standalone compilado en C nativo como a través de su entorno de desarrollo en Python.</p>
+
+          <div class="tabs-container">
+            <div class="tabs-nav">
+              <button class="tab-btn active" data-tab="exe">Opción 1: Instalador Oficial .EXE (Recomendado)</button>
+              <button class="tab-btn" data-tab="python">Opción 2: Desde Código Fuente (Python)</button>
+            </div>
+
+            <div class="tab-content active" id="tab-exe">
+              <p>Ideal si deseas usar Darius AI de inmediato sin necesidad de tener Python ni compiladores instalados en tu computadora:</p>
+              <ol>
+                <li>Descarga el instalador <strong><code>DariusAI-Setup-v7.0.0.exe</code></strong> desde <a href="https://github.com/oscarbol09/Darius-AI/releases/latest" target="_blank" rel="noopener">Releases de GitHub</a>.</li>
+                <li>Ejecuta el archivo. El asistente se instalará de forma aislada en tu perfil de usuario (<code>%LOCALAPPDATA%\Programs\DariusAI</code>) sin requerir permisos de administrador.</li>
+                <li>Lanza <strong>Darius AI</strong> desde el menú de inicio o el acceso directo del escritorio.</li>
+              </ol>
+            </div>
+
+            <div class="tab-content" id="tab-python">
+              <p>Requisitos: <strong>Windows 10/11</strong> y <strong>Python 3.11 o 3.12</strong>.</p>
+              
+              <div class="code-box">
+                <div class="code-header">
+                  <span class="code-lang">PowerShell</span>
+                  <button class="btn-copy">Copiar</button>
+                </div>
+                <pre><code># 1. Clonar el repositorio
+git clone https://github.com/oscarbol09/Darius-AI.git
+cd Darius-AI
+
+# 2. Crear y activar entorno virtual
+python -m venv .venv
+.venv\Scripts\activate
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Iniciar el asistente
+python main.py</code></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="callout callout-tip">
+            <span>💡</span>
+            <div><strong>Tip de Inicio:</strong> En la primera ejecución, pulsa el botón <code>⚙ Configuración</code> en la esquina inferior izquierda para ingresar tu clave de API (Gemini, OpenAI, Groq, etc.) y seleccionar tu voz preferida.</div>
+          </div>
+        </section>
+
+        <!-- ── Section: Interfaz ─────────────────────────────────────────── -->
+        <section id="interfaz">
+          <h2>Interfaz Gráfica Split-Pane Studio</h2>
+          <p>
+            Darius AI incorpora una estación de trabajo ergonómica de <code>880x620</code> con paleta Deep Slate/Zinc, visualizador de ondas a 60 FPS proyectado en Canvas y 4 vistas operativas:
+          </p>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Vista</th>
+                  <th>Propósito</th>
+                  <th>Capacidades Clave</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>💬 Conversación</strong></td>
+                  <td>Consola principal de chat e interacción</td>
+                  <td>Historial en tiempo real, transcripción de voz, burbujas coloreadas por rol y estado acústico.</td>
+                </tr>
+                <tr>
+                  <td><strong>⚡ Workspaces</strong></td>
+                  <td>Automatizaciones de 1-clic y rutinas</td>
+                  <td>Protocolo Darius, Modo Desarrollo (Cursor/Docs), Modo Trading, Enfoque de Cursor, Top RAM y Limpieza DNS.</td>
+                </tr>
+                <tr>
+                  <td><strong>🧠 Obsidian Brain</strong></td>
+                  <td>Gestor de notas y memoria permanente</td>
+                  <td>Escritura rápida en nota diaria, buscador semántico en la bóveda e inspección de memorias.</td>
+                </tr>
+                <tr>
+                  <td><strong>🛠 Sistema & Audio</strong></td>
+                  <td>Telemetría y control de periféricos</td>
+                  <td>Controles de volumen con PyCAW, prueba de micrófonos y re-escaneo del catálogo de apps de Windows.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── Section: BYOK ─────────────────────────────────────────────── -->
+        <section id="byok">
+          <h2>Motores de Inteligencia Artificial (BYOK)</h2>
+          <p>
+            La arquitectura <em>Bring Your Own Key</em> te permite alternar entre 7 motores de lenguaje en caliente mediante llamadas HTTP/REST optimizadas con <code>urllib</code> sin dependencias pesadas:
+          </p>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Proveedor</th>
+                  <th>Identificador</th>
+                  <th>Modelo Predeterminado</th>
+                  <th>Variable de Entorno</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Google Gemini</strong></td>
+                  <td><code>gemini</code></td>
+                  <td><code>gemini-2.0-flash</code></td>
+                  <td><code>GEMINI_API_KEY</code></td>
+                </tr>
+                <tr>
+                  <td><strong>OpenAI / ChatGPT</strong></td>
+                  <td><code>openai</code></td>
+                  <td><code>gpt-4o-mini</code></td>
+                  <td><code>OPENAI_API_KEY</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Groq Cloud</strong></td>
+                  <td><code>groq</code></td>
+                  <td><code>llama-3.3-70b-versatile</code></td>
+                  <td><code>GROQ_API_KEY</code></td>
+                </tr>
+                <tr>
+                  <td><strong>NVIDIA NIM</strong></td>
+                  <td><code>nvidia_nim</code></td>
+                  <td><code>meta/llama-3.3-70b-instruct</code></td>
+                  <td><code>NVIDIA_API_KEY</code></td>
+                </tr>
+                <tr>
+                  <td><strong>OpenRouter</strong></td>
+                  <td><code>openrouter</code></td>
+                  <td><code>deepseek/deepseek-r1:free</code></td>
+                  <td><code>OPENROUTER_API_KEY</code></td>
+                </tr>
+                <tr>
+                  <td><strong>Ollama (Local)</strong></td>
+                  <td><code>ollama</code></td>
+                  <td><code>llama3.2</code></td>
+                  <td><em>(No requerida)</em></td>
+                </tr>
+                <tr>
+                  <td><strong>Personalizado</strong></td>
+                  <td><code>custom</code></td>
+                  <td><em>Configurable</em></td>
+                  <td><em>Vía Modal o config.json</em></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── Section: Visión Multimodal ─────────────────────────────────── -->
+        <section id="vision">
+          <h2>Visión Multimodal & OCR (<15ms)</h2>
+          <p>
+            El módulo <code>screen_vision.py</code> permite a Darius AI observar lo que ocurre en tu pantalla en tiempo real mediante captura directa Win32 GDI con <code>mss</code>, compresión JPEG adaptativa en memoria (~150-250 KB) y codificación Base64 sin escrituras a disco.
+          </p>
+
+          <div class="code-box">
+            <div class="code-header">
+              <span class="code-lang">Comandos de Voz / Texto</span>
+              <button class="btn-copy">Copiar</button>
+            </div>
+            <pre><code>"¿Qué hay en mi pantalla?"        # Análisis contextual del monitor activo
+"Analiza este error en pantalla"  # Diagnóstico visual de stacktraces y diálogos
+"Lee el texto de mi pantalla"     # Transcripción tipográfica y extracción OCR</code></pre>
+          </div>
+        </section>
+
+        <!-- ── Section: Deep Research ────────────────────────────────────── -->
+        <section id="deep-research">
+          <h2>Investigación Profunda Autónoma (Deep Research)</h2>
+          <p>
+            Inspirado en flujos de razonamiento autónomo, <code>deep_research.py</code> ejecuta una investigación multi-fuente:
+          </p>
+          <ol>
+            <li>Descompone el tema en <strong>3 consultas ortogonales de búsqueda</strong>.</li>
+            <li>Realiza web scraping no bloqueante en DuckDuckGo con extracción y sanitización vía <code>BeautifulSoup4</code>.</li>
+            <li>Sintetiza un reporte académico con citas numeradas <code>[1]</code>, <code>[2]</code>.</li>
+            <li>Archiva automáticamente el reporte en tu bóveda de Obsidian en <code>Darius/Investigaciones/YYYY-MM-DD - [Tema].md</code>.</li>
+          </ol>
+        </section>
+
+        <!-- ── Section: Agent Planner ────────────────────────────────────── -->
+        <section id="planner">
+          <h2>Planificador de Agentes Multi-Paso</h2>
+          <p>
+            El subsistema <code>agent_planner.py</code> descompone metas complejas en 1 a 4 pasos atómicos de ejecución, encadenando la salida de un paso al siguiente mediante la variable contextual <code>{{PREV}}</code>:
+          </p>
+
+          <div class="code-box">
+            <div class="code-header">
+              <span class="code-lang">Ejemplo de Ejecución</span>
+              <button class="btn-copy">Copiar</button>
+            </div>
+            <pre><code>Usuario: "Planifica investigar computación cuántica y preparar el modo desarrollo"
+Darius AI:
+  1. [deep_research] Genera y archiva informe sobre computación cuántica.
+  2. [workspace_dev] Maximiza Cursor en monitor 1 y abre documentación en monitor 2.
+  3. [talk] Notifica al usuario que el entorno de trabajo está listo.</code></pre>
+          </div>
+        </section>
+
+        <!-- ── Section: Obsidian Brain ──────────────────────────────────── -->
+        <section id="obsidian">
+          <h2>Cerebro y Memoria en Obsidian</h2>
+          <p>
+            Darius AI almacena el conocimiento en tu bóveda local de Obsidian en formato Markdown estándar con frontmatter YAML:
+          </p>
+          <ul>
+            <li><strong>Diario Personal (<code>Diario/YYYY-MM-DD.md</code>):</strong> Registra eventos diarios con marca de tiempo precisa.</li>
+            <li><strong>Memorias Permanentes (<code>Darius/Memorias/</code>):</strong> Almacena hechos sobre el usuario, configuraciones y preferencias.</li>
+            <li><strong>Inyección de Contexto:</strong> Al consultar a la IA, Darius recupera notas relevantes de tu bóveda para enriquecer el prompt del LLM.</li>
+          </ul>
+        </section>
+
+        <!-- ── Section: Comandos ─────────────────────────────────────────── -->
+        <section id="comandos">
+          <h2>Catálogo de Comandos de Voz y Automatización</h2>
+          
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Comando de Voz</th>
+                  <th>Acción Realizada</th>
+                  <th>Módulo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>"Protocolo Darius"</code></td>
+                  <td>Maximiza IDE en monitor 1, abre herramientas en monitor 2 y da la bienvenida</td>
+                  <td><code>workspace_manager.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Modo desarrollo"</code></td>
+                  <td>Enfoca Cursor/Code y abre documentación técnica secundaria</td>
+                  <td><code>workspace_manager.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Modo trading"</code></td>
+                  <td>Distribuye TradingView y Finviz/Binance en los monitores</td>
+                  <td><code>workspace_manager.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Limpiar DNS"</code></td>
+                  <td>Ejecuta flush de caché DNS en Windows</td>
+                  <td><code>windows_commands.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Top procesos RAM"</code></td>
+                  <td>Lista los 5 procesos que consumen más memoria</td>
+                  <td><code>windows_commands.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Subir / Bajar volumen"</code></td>
+                  <td>Ajusta el volumen maestro del sistema con PyCAW</td>
+                  <td><code>windows_commands.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Anota en mi diario..."</code></td>
+                  <td>Agrega una entrada con hora a la nota de hoy en Obsidian</td>
+                  <td><code>obsidian_brain.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Recuerda que..."</code></td>
+                  <td>Crea una nota permanente con tags en la memoria de Darius</td>
+                  <td><code>obsidian_brain.py</code></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── Section: Self-Test ────────────────────────────────────────── -->
+        <section id="self-test">
+          <h2>Suite de Diagnóstico Hermético (Self-Test)</h2>
+          <p>
+            Darius AI incluye un verificador de integridad no destructivo que certifica el correcto funcionamiento de todos los subsistemas sin modificar el estado de tu equipo:
+          </p>
+
+          <div class="code-box">
+            <div class="code-header">
+              <span class="code-lang">Terminal</span>
+              <button class="btn-copy">Copiar</button>
+            </div>
+            <pre><code># Ejecutar auto-certificación desde la raíz del proyecto
+python main.py --self-test
+
+# Salida esperada:
+# [PASS] AUDIO SUBSYSTEM  : Micrófonos detectados: 2 | Salidas de audio: 2
+# [PASS] WIN32 TOPOLOGY   : 2 monitor(es) detectado(s) [M1: 1920x1080, M2: 1920x1080]
+# [PASS] OBSIDIAN VAULT   : Bóveda activa y accesible en: C:\Users\...\Cerebro
+# [PASS] BYOK LLM ENGINE  : Activo: 'gemini' (Listo) | Proveedores con clave: [...]
+# [PASS] VISION & OCR     : Captura atómica OK: 1600x900 (184.2 KB en memoria)
+# [PASS] TOOL CONTRACTS   : 33 acciones del SO registradas | 33 patrones regex</code></pre>
+          </div>
+        </section>
+
+        <!-- ── Section: Compilación ──────────────────────────────────────── -->
+        <section id="compilacion">
+          <h2>Compilación a Binario Nativo Standalone (.EXE)</h2>
+          <p>
+            Para generar el binario C++ compilado sin dependencias de Python y el instalador de Windows:
+          </p>
+
+          <div class="code-box">
+            <div class="code-header">
+              <span class="code-lang">PowerShell</span>
+              <button class="btn-copy">Copiar</button>
+            </div>
+            <pre><code># 1. Compilar con Nuitka AOT
+python build_nuitka.py
+
+# 2. Compilar instalador con Inno Setup 6
+iscc installer.iss</code></pre>
+          </div>
+        </section>
+
+        <!-- ── Section: Licencia & Autoría ───────────────────────────────── -->
+        <section id="licencia">
+          <h2>Licencia & Autoría</h2>
+          <p>
+            Darius AI es software libre y de código abierto publicado bajo los términos de la <strong>GNU General Public License v3.0 (GPL-3.0)</strong>.
+          </p>
+          <ul>
+            <li><strong>Autor y Desarrollador Principal:</strong> <a href="https://github.com/oscarbol09" target="_blank" rel="noopener">@Oscarbol09</a></li>
+            <li><strong>Repositorio Oficial:</strong> <a href="https://github.com/oscarbol09/Darius-AI" target="_blank" rel="noopener">github.com/oscarbol09/Darius-AI</a></li>
+            <li><strong>Copyright:</strong> Copyright (C) 2026 Oscarbol09. Todos los derechos reservados bajo GPLv3.</li>
+          </ul>
+        </section>
+
+        <!-- ── Footer ────────────────────────────────────────────────────── -->
+        <footer class="page-footer">
+          <div>Darius AI &copy; 2026 Oscarbol09. Publicado bajo licencia GPL-3.0.</div>
+          <div>
+            <a href="https://github.com/oscarbol09/Darius-AI" target="_blank" rel="noopener">GitHub</a> &bull;
+            <a href="https://github.com/oscarbol09/Darius-AI/issues" target="_blank" rel="noopener">Reportar Bug</a> &bull;
+            <a href="https://github.com/oscarbol09/Darius-AI/releases" target="_blank" rel="noopener">Releases</a>
+          </div>
+        </footer>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

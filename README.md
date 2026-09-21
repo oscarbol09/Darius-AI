@@ -7,9 +7,11 @@
 <p align="center">
   <a href="https://github.com/oscarbol09/Darius-AI/releases/latest"><img src="https://img.shields.io/github/v/release/oscarbol09/Darius-AI?color=blue&label=Versi%C3%B3n" alt="Release" /></a>
   <a href="https://github.com/oscarbol09/Darius-AI"><img src="https://img.shields.io/badge/Plataforma-Windows%2010%20%7C%2011-0078d4.svg" alt="Windows" /></a>
+  <a href="https://oscarbol09.github.io/Darius-AI/"><img src="https://img.shields.io/badge/Docs-Sitio%20Oficial-10B981.svg" alt="Documentación Oficial" /></a>
   <a href="https://github.com/oscarbol09/Darius-AI/releases/latest"><img src="https://img.shields.io/badge/Descargar-Instalador%20.EXE-2ea44f.svg" alt="Descargar .EXE" /></a>
 </p>
 
+> 📖 **Sitio Web de Documentación Oficial:** [oscarbol09.github.io/Darius-AI](https://oscarbol09.github.io/Darius-AI/)  
 > 🚀 **¿Quieres usar Darius AI sin instalar Python?** Descarga el instalador oficial **[DariusAI-Setup-v7.0.0.exe](https://github.com/oscarbol09/Darius-AI/releases/latest)** en la sección de Releases. Se instala en segundos en tu equipo sin requerir permisos de administrador.
 
 **Darius AI** es un asistente de escritorio por voz y automatización nativa para Windows con arquitectura BYOK (*Bring Your Own Key*), automatización antropomórfica de GUI (*Computer Use*), cerebro de memoria en Obsidian y renderizado visual a 60 FPS.
