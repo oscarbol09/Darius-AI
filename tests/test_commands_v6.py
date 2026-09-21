@@ -648,8 +648,20 @@ class TestCmdPatterns(unittest.TestCase):
         r"\b(extrae|scrapp?ea|analiza|lee|resume)\s+(la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url)?\s*(https?://\S+)\b",
         re.IGNORECASE
     )
+    _RE_VISION_SCREEN_TEST = re.compile(
+        r"\b(qu[eé]\s+hay\s+en\s+(mi\s+)?pantalla|analiza\s+(mi\s+)?pantalla|lee\s+(la\s+)?pantalla|analiza\s+(este\s+)?error\s+(en\s+pantalla)?|mira\s+(la\s+)?pantalla|qu[eé]\s+estoy\s+viendo|captura\s+(de\s+)?pantalla)\b",  # noqa: E501
+        re.IGNORECASE
+    )
+    _RE_DEEP_RESEARCH_TEST = re.compile(
+        r"\b(investiga\s+(a\s+fondo|profundamente|exhaustivamente|sobre)?|investigaci[oó]n\s+profunda\s+(sobre|de)?|haz\s+una\s+investigaci[oó]n\s+(sobre|de)?)\s+(.+)$",  # noqa: E501
+        re.IGNORECASE
+    )
+    _RE_PLANNER_GOAL_TEST = re.compile(
+        r"\b(planifica|crea\s+un\s+plan\s+para|ejecuta\s+el\s+plan|plan\s+de\s+acci[oó]n\s+para)\s+(.+)$",
+        re.IGNORECASE
+    )
     _RE_DETENER_TEST = re.compile(
-        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar?|cancela[r]?|alto|basta|para\s+ya|det[eé]n(te)?|stop)\b",
+        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar|cancela[r]?|alto|basta|para\s+ya|para\s+ahora|det[eé]n(te)?|stop)\b",
         re.IGNORECASE
     )
     _RE_DARIUS_PROTOCOL_TEST = re.compile(
@@ -717,6 +729,9 @@ class TestCmdPatterns(unittest.TestCase):
         (_RE_HORA_TEST,                                                          "_cmd_hora"),
         (_RE_FECHA_TEST,                                                         "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
+        (_RE_VISION_SCREEN_TEST,                                                 "_cmd_screen_vision"),
+        (_RE_DEEP_RESEARCH_TEST,                                                 "_cmd_deep_research"),
+        (_RE_PLANNER_GOAL_TEST,                                                  "_cmd_agent_planner"),
         (_RE_SCRAPE_WEB_TEST,                                                    "_cmd_scrape_web"),
         (_RE_HUMAN_TYPE_TEST,                                                    "_cmd_human_type"),
         (_RE_HUMAN_CLICK_TEST,                                                   "_cmd_human_click"),
@@ -781,6 +796,16 @@ class TestCmdPatterns(unittest.TestCase):
         self.assertEqual(self._route("doble clic"), "human_click")
         self.assertEqual(self._route("extrae la página https://example.com"), "scrape_web")
         self.assertEqual(self._route("analiza https://news.ycombinator.com"), "scrape_web")
+
+    def test_screen_vision_deep_research_planner_commands(self):
+        self.assertEqual(self._route("analiza mi pantalla"), "screen_vision")
+        self.assertEqual(self._route("qué hay en mi pantalla"), "screen_vision")
+        self.assertEqual(self._route("mira la pantalla"), "screen_vision")
+        self.assertEqual(self._route("analiza este error en pantalla"), "screen_vision")
+        self.assertEqual(self._route("investiga a fondo sobre computación cuántica"), "deep_research")
+        self.assertEqual(self._route("investigación profunda de redes neuronales"), "deep_research")
+        self.assertEqual(self._route("planifica crear una landing page"), "agent_planner")
+        self.assertEqual(self._route("plan de acción para migrar la base de datos"), "agent_planner")
 
     def test_hora_commands(self):
         self.assertEqual(self._route("qué hora es"), "hora")

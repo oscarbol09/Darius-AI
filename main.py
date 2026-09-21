@@ -1960,7 +1960,7 @@ class DariusFinal(ctk.CTk):
         re.IGNORECASE
     )
     _RE_DETENER = re.compile(
-        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar?|cancela[r]?|alto|basta|para\s+ya|det[eé]n(te)?|stop)\b",
+        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar|cancela[r]?|alto|basta|para\s+ya|para\s+ahora|det[eé]n(te)?|stop)\b",
         re.IGNORECASE
     )
     _RE_DNS = re.compile(
