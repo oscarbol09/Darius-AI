@@ -29,13 +29,13 @@
     "fallback_enabled": true
   },
   "tts": {
-    "engine": "sapi",
+    "engine": "elevenlabs",
     "rate": 1,
     "volume": 100
   },
   "elevenlabs": {
     "api_key": "",
-    "voice_id": "",
+    "voice_id": "5slaYQQkGjeriQx4QZOm",
     "model_id": "eleven_multilingual_v2",
     "output_format": "pcm_24000",
     "cache_enabled": true
