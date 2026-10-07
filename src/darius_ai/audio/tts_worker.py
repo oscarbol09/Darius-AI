@@ -14,7 +14,7 @@ import queue
 import threading
 import time
 
-from config_loader import cfg
+from src.darius_ai.core.config_loader import cfg
 
 log = logging.getLogger("DARIUS.TTS")
 
@@ -87,7 +87,7 @@ class TTSWorker:
     def _speak_elevenlabs(self, text: str) -> bool:
         """Intenta sintetizar con ElevenLabs y caché en disco."""
         try:
-            from elevenlabs_tts_engine import ElevenLabsTTS
+            from src.darius_ai.audio.elevenlabs_tts_engine import ElevenLabsTTS
 
             api_key = cfg.elevenlabs_api_key or os.environ.get("ELEVENLABS_API_KEY", "")
             voice_id = cfg.elevenlabs_voice_id or os.environ.get("ELEVENLABS_VOICE_ID", "")
@@ -106,7 +106,7 @@ class TTSWorker:
     def _speak_edge_tts(self, text: str) -> bool:
         """Intenta sintetizar con Edge-TTS."""
         try:
-            from edge_tts_engine import EdgeTTS
+            from src.darius_ai.audio.edge_tts_engine import EdgeTTS
 
             tts = EdgeTTS()
             tts.speak(text)
@@ -138,4 +138,3 @@ class TTSWorker:
         deadline = time.time() + timeout
         while not self._queue.empty() and time.time() < deadline:
             time.sleep(0.1)
-

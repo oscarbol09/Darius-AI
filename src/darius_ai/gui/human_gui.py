@@ -34,18 +34,18 @@ log = logging.getLogger("DARIUS.HumanGUI")
 # ─────────────────────────────────────────────────────────────────────────────
 
 KEYEVENTF_EXTENDEDKEY = 0x0001
-KEYEVENTF_KEYUP       = 0x0002
-KEYEVENTF_UNICODE     = 0x0004
-KEYEVENTF_SCANCODE    = 0x0008
+KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_UNICODE = 0x0004
+KEYEVENTF_SCANCODE = 0x0008
 
-MOUSEEVENTF_MOVE       = 0x0001
-MOUSEEVENTF_LEFTDOWN   = 0x0002
-MOUSEEVENTF_LEFTUP     = 0x0004
-MOUSEEVENTF_RIGHTDOWN  = 0x0008
-MOUSEEVENTF_RIGHTUP    = 0x0010
+MOUSEEVENTF_MOVE = 0x0001
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_RIGHTDOWN = 0x0008
+MOUSEEVENTF_RIGHTUP = 0x0010
 MOUSEEVENTF_MIDDLEDOWN = 0x0020
-MOUSEEVENTF_MIDDLEUP   = 0x0040
-MOUSEEVENTF_WHEEL      = 0x0800
+MOUSEEVENTF_MIDDLEUP = 0x0040
+MOUSEEVENTF_WHEEL = 0x0800
 
 VK_MAP = {
     "ctrl": 0x11,
@@ -73,14 +73,24 @@ VK_MAP = {
     "end": 0x23,
     "pageup": 0x21,
     "pagedown": 0x22,
-    "f1": 0x70, "f2": 0x71, "f3": 0x72, "f4": 0x73,
-    "f5": 0x74, "f6": 0x75, "f7": 0x76, "f8": 0x77,
-    "f9": 0x78, "f10": 0x79, "f11": 0x7A, "f12": 0x7B,
+    "f1": 0x70,
+    "f2": 0x71,
+    "f3": 0x72,
+    "f4": 0x73,
+    "f5": 0x74,
+    "f6": 0x75,
+    "f7": 0x76,
+    "f8": 0x77,
+    "f9": 0x78,
+    "f10": 0x79,
+    "f11": 0x7A,
+    "f12": 0x7B,
 }
 
 
 class FailsafeError(Exception):
     """Excepción lanzada cuando el usuario activa la parada de emergencia."""
+
     pass
 
 
@@ -168,8 +178,8 @@ class HumanGUIAutomator:
 
             # Ecuación cúbica de Bézier
             inv = 1.0 - t
-            bx = (inv ** 3) * x0 + 3 * (inv ** 2) * t * x1 + 3 * inv * (t ** 2) * x2 + (t ** 3) * x3
-            by = (inv ** 3) * y0 + 3 * (inv ** 2) * t * y1 + 3 * inv * (t ** 2) * y2 + (t ** 3) * y3
+            bx = (inv**3) * x0 + 3 * (inv**2) * t * x1 + 3 * inv * (t**2) * x2 + (t**3) * x3
+            by = (inv**3) * y0 + 3 * (inv**2) * t * y1 + 3 * inv * (t**2) * y2 + (t**3) * y3
 
             # Añadir micro-jitter sutil (excepto en el punto final)
             if i < steps:
@@ -382,8 +392,12 @@ class HumanGUIAutomator:
             title = html.unescape(title_match.group(1).strip()) if title_match else "Sin título"
 
             # Eliminar bloques de scripts, estilos, cabeceras y pies de página
-            cleaned = re.sub(r"<(script|style|nav|header|footer|svg|noscript)[^>]*>.*?</\1>", "",
-                             raw_html, flags=re.IGNORECASE | re.DOTALL)
+            cleaned = re.sub(
+                r"<(script|style|nav|header|footer|svg|noscript)[^>]*>.*?</\1>",
+                "",
+                raw_html,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
             # Eliminar comentarios HTML
             cleaned = re.sub(r"<!--.*?-->", "", cleaned, flags=re.DOTALL)
             # Reemplazar saltos de bloque

@@ -9,7 +9,7 @@ Ventajas de edge-tts:
   - Funciona de manera ligera y con excelente calidad neural
 
 Uso futuro:
-    from edge_tts_engine import EdgeTTS
+    from src.darius_ai.audio.edge_tts_engine import EdgeTTS
     tts = EdgeTTS(voice="es-MX-DaliaNeural")
     tts.speak("Hola, soy Darius")
 
@@ -83,10 +83,12 @@ class EdgeTTS:
         tmp_file = Path(tempfile.gettempdir()) / f"darius_edge_{os.getpid()}_{id(text)}.mp3"
         try:
             import edge_tts
+
             communicate = edge_tts.Communicate(text, self.voice)
             await communicate.save(str(tmp_file))
             try:
                 import playsound
+
                 playsound.playsound(str(tmp_file))
                 return True
             except ImportError:

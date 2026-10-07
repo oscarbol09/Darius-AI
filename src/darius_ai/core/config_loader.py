@@ -8,7 +8,7 @@ Si config.json no existe, lo crea con los valores por defecto, de forma
 que el usuario siempre disponga de un archivo editable en disco.
 
 Uso en main.py:
-    from config_loader import cfg
+    from src.darius_ai.core.config_loader import cfg
 
     assistant_name = cfg.assistant_name   # "darius"
     user_name      = cfg.user_name        # "Oscar"
@@ -138,6 +138,7 @@ _DEFAULTS: dict = {
 #  Clase de configuración
 # ==============================================================================
 
+
 class _Config:
     """
     Acceso tipado a la configuración con fallback automático a defaults.
@@ -180,10 +181,7 @@ class _Config:
         with self._lock:
             tmp_file = _CONFIG_FILE.with_suffix(f".{os.getpid()}.tmp")
             try:
-                data_to_write = {
-                    k: v for k, v in self._data.items()
-                    if not k.startswith("_comment")
-                }
+                data_to_write = {k: v for k, v in self._data.items() if not k.startswith("_comment")}
                 tmp_file.write_text(
                     json.dumps(data_to_write, ensure_ascii=False, indent=2),
                     encoding="utf-8",
@@ -385,7 +383,13 @@ class _Config:
 
     @property
     def workspace_song_uri(self) -> str:
-        return str(self.get("workspace", "song_uri", default="https://open.spotify.com/track/39shmbIHICJ2Wxnk1fPSdz?si=2900c75c2e2d4b82"))
+        return str(
+            self.get(
+                "workspace",
+                "song_uri",
+                default="https://open.spotify.com/track/39shmbIHICJ2Wxnk1fPSdz?si=2900c75c2e2d4b82",
+            )
+        )
 
     @property
     def workspace_claude_url(self) -> str:
@@ -567,6 +571,7 @@ def _validate_types(data: dict, schema: dict, path: str = "") -> dict:
 # ==============================================================================
 #  Merge y carga
 # ==============================================================================
+
 
 def _deep_merge(base: dict, override: dict) -> dict:
     """

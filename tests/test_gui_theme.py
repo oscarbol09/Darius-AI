@@ -8,7 +8,7 @@ y la presencia de la licencia GNU GPLv3 con Copyright para Oscarbol09.
 import re
 from pathlib import Path
 
-import gui_theme as theme
+from src.darius_ai.gui import gui_theme as theme
 
 
 def test_theme_geometry_constants():
@@ -97,4 +97,3 @@ def test_packaging_and_installer_metadata():
     pyproject_content = pyproject.read_text(encoding="utf-8")
     assert 'name = "Oscarbol09"' in pyproject_content
     assert "https://github.com/oscarbol09/Darius-AI" in pyproject_content
-

@@ -17,7 +17,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from ai_client import get_ai_response
+from src.darius_ai.core.ai_client import get_ai_response
 
 log = logging.getLogger("DARIUS.Planner")
 
@@ -81,7 +81,7 @@ class AgentPlannerEngine:
 
     def create_plan(self, goal: str) -> list[dict[str, Any]]:
         """Solicita al LLM la descomposición de la meta en pasos estructurados."""
-        prompt = f"{PLANNER_SYSTEM_PROMPT}\n\nMeta del usuario: \"{goal.strip()}\"\n\nJSON:"
+        prompt = f'{PLANNER_SYSTEM_PROMPT}\n\nMeta del usuario: "{goal.strip()}"\n\nJSON:'
         try:
             raw_response, _ = get_ai_response(prompt)
             match = re.search(r"\{[\s\S]*\}", raw_response)
@@ -111,7 +111,8 @@ class AgentPlannerEngine:
 
         try:
             if t == "screen_vision":
-                from screen_vision import vision_engine
+                from src.darius_ai.core.screen_vision import vision_engine
+
                 action = p.get("action", "analyze")
                 prompt = p.get("prompt", "")
                 if action == "error":
@@ -123,7 +124,8 @@ class AgentPlannerEngine:
                 return True, out
 
             elif t == "deep_research":
-                from deep_research import research_pipeline
+                from src.darius_ai.core.deep_research import research_pipeline
+
                 topic = p.get("topic", "") or prev_result or "tema general"
                 depth = p.get("depth", "standard")
                 res = research_pipeline.run_research(topic=topic, depth=depth, save_to_obsidian=True)
@@ -131,32 +133,37 @@ class AgentPlannerEngine:
 
             elif t == "web_search":
                 query = p.get("query", "") or prev_result
-                from deep_research import _search_duckduckgo
+                from src.darius_ai.core.deep_research import _search_duckduckgo
+
                 results = _search_duckduckgo(query, max_results=3)
                 out = "\n".join(f"- {r['title']}: {r['snippet']} ({r['url']})" for r in results)
                 return True, out or "No se encontraron resultados en la web."
 
             elif t == "save_obsidian_memory":
-                from obsidian_brain import brain
+                from src.darius_ai.core.obsidian_brain import brain
+
                 title = p.get("title", "Nota de Darius")
                 content = p.get("content", "") or prev_result
                 path = brain.save_memory(title=title, content=content)
                 return True, f"Memoria guardada en Obsidian: {path.name}"
 
             elif t == "append_daily_note":
-                from obsidian_brain import brain
+                from src.darius_ai.core.obsidian_brain import brain
+
                 entry = p.get("entry", "") or prev_result
                 path = brain.append_daily_note(entry=entry)
                 return True, f"Entrada añadida a la nota diaria: {path.name}"
 
             elif t == "open_app":
-                from windows_commands import resolve_and_launch
+                from src.darius_ai.system.windows_commands import resolve_and_launch
+
                 app_name = p.get("app_name", "")
                 desc = resolve_and_launch(app_name)
                 return True, f"Lanzando aplicación: {desc or app_name}"
 
             elif t == "human_gui":
-                from human_gui import gui
+                from src.darius_ai.gui.human_gui import gui
+
                 action = p.get("action", "type")
                 if action == "type":
                     txt = p.get("text", "") or prev_result
@@ -171,7 +178,8 @@ class AgentPlannerEngine:
                     return True, "Clic ejecutado."
 
             elif t == "windows_action":
-                from windows_commands import resolve_action, run_action
+                from src.darius_ai.system.windows_commands import resolve_action, run_action
+
                 cmd = p.get("command", "")
                 entry = resolve_action(cmd)
                 if entry:
@@ -217,13 +225,15 @@ class AgentPlannerEngine:
                 status_fn(f"⚡ PASO {i}/{len(steps)}: {tool.upper()[:16]}", "#38BDF8")
 
             ok, output = self.execute_step(tool, params, prev_result=last_output)
-            step_results.append({
-                "step_index": i,
-                "tool": tool,
-                "params": params,
-                "success": ok,
-                "output": output,
-            })
+            step_results.append(
+                {
+                    "step_index": i,
+                    "tool": tool,
+                    "params": params,
+                    "success": ok,
+                    "output": output,
+                }
+            )
 
             if ok:
                 success_count += 1
@@ -231,10 +241,7 @@ class AgentPlannerEngine:
             else:
                 log.warning(f"[Planner] Paso {i} falló: {output}")
 
-        summary = (
-            f"Meta completada: '{goal}'. "
-            f"Se ejecutaron {success_count} de {len(steps)} pasos correctamente."
-        )
+        summary = f"Meta completada: '{goal}'. Se ejecutaron {success_count} de {len(steps)} pasos correctamente."
 
         if speak_fn:
             # Si el último paso fue una herramienta informativa, hablar su salida

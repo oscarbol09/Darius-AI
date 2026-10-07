@@ -13,7 +13,7 @@ Cobertura:
 import json
 from unittest.mock import MagicMock, patch
 
-from ai_client import (
+from src.darius_ai.core.ai_client import (
     PROVIDER_NAMES,
     _build_system_instruction,
     _call_openai_compatible,
@@ -21,10 +21,10 @@ from ai_client import (
     get_ai_response,
     resolve_provider_key,
 )
-from ai_client import (
+from src.darius_ai.core.ai_client import (
     test_provider_connection as check_provider_connection,
 )
-from config_loader import cfg
+from src.darius_ai.core.config_loader import cfg
 
 
 class TestProviderKeyResolution:
@@ -61,12 +61,12 @@ class TestProviderKeyResolution:
 class TestOpenAICompatibleCaller:
     """Pruebas para el ejecutor HTTP unificado de OpenAI /chat/completions."""
 
-    @patch("ai_client._req.urlopen")
+    @patch("src.darius_ai.core.ai_client._req.urlopen")
     def test_successful_response_extraction(self, mock_urlopen):
         mock_resp = MagicMock()
-        mock_resp.read.return_value = json.dumps({
-            "choices": [{"message": {"content": "Hola, soy una IA en Darius."}}]
-        }).encode("utf-8")
+        mock_resp.read.return_value = json.dumps(
+            {"choices": [{"message": {"content": "Hola, soy una IA en Darius."}}]}
+        ).encode("utf-8")
         mock_resp.__enter__.return_value = mock_resp
         mock_urlopen.return_value = mock_resp
 
@@ -78,7 +78,7 @@ class TestOpenAICompatibleCaller:
         )
         assert result == "Hola, soy una IA en Darius."
 
-    @patch("ai_client._req.urlopen")
+    @patch("src.darius_ai.core.ai_client._req.urlopen")
     def test_history_included_in_payload(self, mock_urlopen):
         captured_payload = None
 
@@ -86,9 +86,9 @@ class TestOpenAICompatibleCaller:
             nonlocal captured_payload
             captured_payload = json.loads(request.data.decode("utf-8"))
             mock_resp = MagicMock()
-            mock_resp.read.return_value = json.dumps({
-                "choices": [{"message": {"content": "Entendido."}}]
-            }).encode("utf-8")
+            mock_resp.read.return_value = json.dumps({"choices": [{"message": {"content": "Entendido."}}]}).encode(
+                "utf-8"
+            )
             mock_resp.__enter__.return_value = mock_resp
             return mock_resp
 
@@ -146,17 +146,15 @@ class TestTestProviderConnection:
             assert not success
             assert "Falta la API Key" in msg
 
-    @patch("ai_client._call_openai_compatible")
+    @patch("src.darius_ai.core.ai_client._call_openai_compatible")
     def test_successful_test_connection(self, mock_call):
         mock_call.return_value = "OK"
-        success, msg, latency = check_provider_connection(
-            "groq", api_key="gsk-valid", model="llama-3.3-70b-versatile"
-        )
+        success, msg, latency = check_provider_connection("groq", api_key="gsk-valid", model="llama-3.3-70b-versatile")
         assert success
         assert "Conexión exitosa" in msg
         assert latency >= 0.0
 
-    @patch("ai_client._call_openai_compatible")
+    @patch("src.darius_ai.core.ai_client._call_openai_compatible")
     def test_failed_test_connection(self, mock_call):
         mock_call.side_effect = RuntimeError("HTTP 401: Unauthorized")
         success, msg, latency = check_provider_connection(
@@ -173,7 +171,7 @@ class TestDispatcherAndFallback:
         orig_prov = cfg.active_provider
         try:
             cfg.set("openai", "llm", "active_provider")
-            with patch("ai_client.ask_openai") as mock_ask:
+            with patch("src.darius_ai.core.ai_client.ask_openai") as mock_ask:
                 mock_ask.return_value = ("Respuesta de OpenAI", "OpenAI (gpt-4o-mini)")
                 text, prov = get_ai_response("Hola")
                 assert text == "Respuesta de OpenAI"
@@ -186,9 +184,13 @@ class TestDispatcherAndFallback:
         try:
             cfg.set("groq", "llm", "active_provider")
             cfg.set(True, "llm", "fallback_enabled")
-            with patch("ai_client.ask_groq", side_effect=RuntimeError("Groq 429")), \
-                 patch("ai_client.resolve_provider_key", return_value="openrouter-key-123"), \
-                 patch("ai_client.ask_openrouter", return_value=("Fallback OK", "OpenRouter (gemma)")):
+            with (
+                patch("src.darius_ai.core.ai_client.ask_groq", side_effect=RuntimeError("Groq 429")),
+                patch("src.darius_ai.core.ai_client.resolve_provider_key", return_value="openrouter-key-123"),
+                patch(
+                    "src.darius_ai.core.ai_client.ask_openrouter", return_value=("Fallback OK", "OpenRouter (gemma)")
+                ),
+            ):
                 text, prov = get_ai_response("Pregunta")
                 assert text == "Fallback OK"
                 assert "OpenRouter" in prov
@@ -218,8 +220,10 @@ class TestAgenticToolCallingLoop:
         orig_prov = cfg.active_provider
         try:
             cfg.set("openai", "llm", "active_provider")
-            with patch("ai_client.ask_openai") as mock_ask, \
-                 patch("agentic_bridge.bridge.flush_dns") as mock_dns:
+            with (
+                patch("src.darius_ai.core.ai_client.ask_openai") as mock_ask,
+                patch("src.darius_ai.core.agentic_bridge.bridge.flush_dns") as mock_dns,
+            ):
                 mock_dns.return_value = (True, "Caché DNS vaciada con éxito.")
                 # Primera llamada emite acción, segunda sintetiza
                 mock_ask.side_effect = [
@@ -238,7 +242,7 @@ class TestAgenticToolCallingLoop:
         orig_prov = cfg.active_provider
         try:
             cfg.set("openai", "llm", "active_provider")
-            with patch("ai_client.ask_openai") as mock_ask:
+            with patch("src.darius_ai.core.ai_client.ask_openai") as mock_ask:
                 mock_ask.return_value = ("Hola, ¿cómo estás?", "OpenAI (gpt-4o-mini)")
                 text, prov = get_ai_response("Hola")
                 assert text == "Hola, ¿cómo estás?"
@@ -246,4 +250,3 @@ class TestAgenticToolCallingLoop:
                 assert mock_ask.call_count == 1
         finally:
             cfg.set(orig_prov, "llm", "active_provider")
-

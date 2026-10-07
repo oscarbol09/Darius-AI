@@ -26,10 +26,28 @@ MAX_OUTPUT_CHARS = 3000
 
 # Palabras clave y comandos clasificados como destructivos o modificadores
 DESTRUCTIVE_KEYWORDS = {
-    "merge", "delete", "remove", "drop", "destroy", "format", "reboot",
-    "shutdown", "kill", "stop-process", "clear-recyclebin", "push --force",
-    "reset --hard", "clean -fdx", "branch -d", "branch -D", "pr merge",
-    "pr close", "rmdir /s", "del /f", "del /s", "rm -rf"
+    "merge",
+    "delete",
+    "remove",
+    "drop",
+    "destroy",
+    "format",
+    "reboot",
+    "shutdown",
+    "kill",
+    "stop-process",
+    "clear-recyclebin",
+    "push --force",
+    "reset --hard",
+    "clean -fdx",
+    "branch -d",
+    "branch -D",
+    "pr merge",
+    "pr close",
+    "rmdir /s",
+    "del /f",
+    "del /s",
+    "rm -rf",
 }
 
 
@@ -193,14 +211,15 @@ class AgenticBridge:
             "$totalRam = [math]::Round($os.TotalVisibleMemorySize / 1024, 1); "
             "$disk = Get-PSDrive C; "
             "$freeDisk = [math]::Round($disk.Free / 1GB, 1); "
-            "Write-Output \"RAM: $freeRam MB libres de $totalRam MB | Disco C: $freeDisk GB libres\""
+            'Write-Output "RAM: $freeRam MB libres de $totalRam MB | Disco C: $freeDisk GB libres"'
         )
         return self.execute_powershell(ps_cmd)
 
     def human_mouse_move(self, x: int, y: int) -> tuple[bool, str]:
         """Mueve el ratón suavemente con física de curva de Bézier."""
         try:
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
+
             gui.human_mouse_move(x, y)
             return True, f"Ratón movido a ({x}, {y})."
         except Exception as exc:
@@ -215,7 +234,8 @@ class AgenticBridge:
     ) -> tuple[bool, str]:
         """Ejecuta un clic o doble clic con duraciones humanas."""
         try:
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
+
             gui.human_click(x=x, y=y, button=button, double=double)
             action_name = "Doble clic" if double else f"Clic {button}"
             coord_str = f" en ({x}, {y})" if x is not None and y is not None else ""
@@ -226,7 +246,8 @@ class AgenticBridge:
     def human_type(self, text: str, wpm: int = 70) -> tuple[bool, str]:
         """Escribe texto en pantalla con cadencia mecanográfica humana."""
         try:
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
+
             gui.human_type(text, wpm=wpm)
             preview = text[:30] + ("..." if len(text) > 30 else "")
             return True, f"Texto escrito ({len(text)} caracteres): '{preview}'"
@@ -236,7 +257,8 @@ class AgenticBridge:
     def human_hotkey(self, keys: str) -> tuple[bool, str]:
         """Presiona una combinación de teclas (ej: 'ctrl+c', 'win+r')."""
         try:
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
+
             key_list = [k.strip() for k in re.split(r"[,+\s]+", keys) if k.strip()]
             gui.human_hotkey(*key_list)
             return True, f"Atajo ejecutado: {' + '.join(key_list)}"
@@ -246,7 +268,8 @@ class AgenticBridge:
     def scrape_web(self, url: str) -> tuple[bool, str]:
         """Descarga y extrae el texto limpio de una página web en segundo plano."""
         try:
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
+
             res = gui.scrape_web_content(url, max_chars=MAX_OUTPUT_CHARS)
             if res.get("success"):
                 title = res.get("title", "")

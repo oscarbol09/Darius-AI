@@ -24,7 +24,7 @@ import urllib.parse
 import urllib.request as _req
 from typing import Any
 
-from config_loader import cfg
+from src.darius_ai.core.config_loader import cfg
 
 log = logging.getLogger("DARIUS.AI")
 
@@ -62,6 +62,7 @@ PROVIDER_NAMES = {
 # ─────────────────────────────────────────────────────────────────────────────
 #  RESOLUCIÓN DE CREDENCIALES (BYOK: Config > Entorno)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def resolve_provider_key(provider: str) -> str:
     """Resuelve la API Key para un proveedor: primero desde config.json, luego variables de entorno."""
@@ -121,12 +122,14 @@ def _call_gemini_rest(
     clean_prompt = prompt.strip()
     user_parts: list[dict[str, Any]] = [{"text": clean_prompt}]
     if image_b64:
-        user_parts.append({
-            "inline_data": {
-                "mime_type": "image/jpeg",
-                "data": image_b64,
+        user_parts.append(
+            {
+                "inline_data": {
+                    "mime_type": "image/jpeg",
+                    "data": image_b64,
+                }
             }
-        })
+        )
 
     if contents and contents[-1]["role"] == "user":
         contents[-1]["parts"].extend(user_parts)
@@ -141,9 +144,7 @@ def _call_gemini_rest(
         },
     }
     if system_instruction:
-        payload["system_instruction"] = {
-            "parts": [{"text": system_instruction}]
-        }
+        payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
 
     data = json.dumps(payload).encode("utf-8")
     req = _req.Request(  # noqa: S310
@@ -179,13 +180,24 @@ def _call_gemini_rest(
 #  INYECCIÓN DE SISTEMA Y MEMORIA OBSIDIAN
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _get_system_time_context() -> str:
     """Obtiene la fecha, hora y zona horaria locales del equipo para inyectar en los prompts."""
     now = datetime.datetime.now().astimezone()
     dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     meses = [
-        "enero", "febrero", "marzo", "abril", "mayo", "junio",
-        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+        "enero",
+        "febrero",
+        "marzo",
+        "abril",
+        "mayo",
+        "junio",
+        "julio",
+        "agosto",
+        "septiembre",
+        "octubre",
+        "noviembre",
+        "diciembre",
     ]
     dia_semana = dias[now.weekday()]
     dia = now.day
@@ -226,8 +238,8 @@ def _build_system_instruction(prompt: str = "") -> str:
         "- [ACTION: execute_powershell(command)] -> PowerShell de forma no interactiva.\n"
         "- [ACTION: human_type(texto)] -> Escribe texto en pantalla con cadencia mecanográfica humana.\n"
         "- [ACTION: human_click(x=100, y=200)] -> Realiza clic en coordenadas con física humana.\n"
-        "- [ACTION: human_hotkey(keys=\"ctrl+v\")] -> Presiona combinaciones de teclas.\n"
-        "- [ACTION: scrape_web(url=\"https://...\")] -> Extrae contenido limpio de una página web.\n\n"
+        '- [ACTION: human_hotkey(keys="ctrl+v")] -> Presiona combinaciones de teclas.\n'
+        '- [ACTION: scrape_web(url="https://...")] -> Extrae contenido limpio de una página web.\n\n'
         "REGLAS DE EJECUCIÓN:\n"
         "1. Si el usuario solicita consultar información, escribir texto, mover el mouse o scrapear la web, "
         "EMITE ÚNICAMENTE la acción correspondiente: `[ACTION: nombre_herramienta(args)]`.\n"
@@ -235,7 +247,8 @@ def _build_system_instruction(prompt: str = "") -> str:
         "3. Con el resultado de la herramienta, sintetiza una respuesta concisa y ejecutiva en español."
     )
     try:
-        from obsidian_brain import brain
+        from src.darius_ai.core.obsidian_brain import brain
+
         context = brain.get_memory_context(prompt)
         if context:
             base += f"\n\n[CONTEXTO DE MEMORIA EN OBSIDIAN]\n{context}"
@@ -265,6 +278,7 @@ def _classify_error_message(exc: Exception, provider: str = "IA") -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 #  CLIENTE OPENAI-COMPATIBLE UNIFICADO (REST)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _call_openai_compatible(
     endpoint: str,
@@ -360,6 +374,7 @@ def _call_openai_compatible(
 # ─────────────────────────────────────────────────────────────────────────────
 #  IMPLEMENTACIONES DE PROVEEDORES
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def ask_gemini(
     prompt: str,
@@ -570,7 +585,7 @@ def _resolve_agentic_tool_loop(
     log.info(f"[AgenticLoop] Acción detectada: {tool_name}({tool_args}) desde {provider_name}")
 
     try:
-        from agentic_bridge import bridge
+        from src.darius_ai.core.agentic_bridge import bridge
 
         tool_res = bridge.parse_and_execute_tool(tool_name, tool_args)
         status_desc = "éxito" if tool_res["success"] else "falló"
@@ -596,6 +611,7 @@ def _resolve_agentic_tool_loop(
 # ─────────────────────────────────────────────────────────────────────────────
 #  DISPATCHER PRINCIPAL CON FALLBACK DEFENSIVO
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def get_ai_response(
     prompt: str,
@@ -645,9 +661,7 @@ def get_ai_response(
             try:
                 log.info("Intentando fallback con Gemini...")
                 raw_text, provider = ask_gemini(prompt, history, image_b64=image_b64)
-                return _resolve_agentic_tool_loop(
-                    raw_text, provider, ask_gemini, prompt, history, image_b64=image_b64
-                )
+                return _resolve_agentic_tool_loop(raw_text, provider, ask_gemini, prompt, history, image_b64=image_b64)
             except Exception as gemini_exc:
                 log.warning(f"Fallback Gemini falló: {gemini_exc}")
 
@@ -659,6 +673,7 @@ def get_ai_response(
 # ─────────────────────────────────────────────────────────────────────────────
 #  VERIFICACIÓN DE CONEXIÓN EN TIEMPO REAL (GUI TEST)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_provider_connection(
     provider: str,

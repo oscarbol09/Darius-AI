@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from acoustic_trigger import (
+from src.darius_ai.audio.acoustic_trigger import (
     AcousticDoubleClapDetector,
     auto_select_best_mic,
     resolve_input_device_index,
@@ -47,7 +47,7 @@ def test_resolve_input_device_substring():
         (0, {"name": "Realtek Audio", "max_input_channels": 2}),
         (1, {"name": "HyperX SoloCast Mic", "max_input_channels": 1}),
     ]
-    with patch("acoustic_trigger.get_input_devices", return_value=devices):
+    with patch("src.darius_ai.audio.acoustic_trigger.get_input_devices", return_value=devices):
         assert resolve_input_device_index("solocast") == 1
 
 
@@ -64,8 +64,8 @@ def test_auto_select_best_mic_fallback():
     with (
         patch("sounddevice.default.device", [0, 0]),
         patch("sounddevice.query_devices", side_effect=mock_query),
-        patch("acoustic_trigger.get_input_devices", return_value=devices),
-        patch("acoustic_trigger.probe_device_max_rms", side_effect=[0.0001, 0.05]),
+        patch("src.darius_ai.audio.acoustic_trigger.get_input_devices", return_value=devices),
+        patch("src.darius_ai.audio.acoustic_trigger.probe_device_max_rms", side_effect=[0.0001, 0.05]),
     ):
         best = auto_select_best_mic()
         assert best == 1

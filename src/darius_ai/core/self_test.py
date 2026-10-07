@@ -20,11 +20,11 @@ if hasattr(sys.stdout, "reconfigure"):
     with contextlib.suppress(Exception):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from ai_client import resolve_provider_key
-from config_loader import cfg
-from obsidian_brain import brain
-from screen_vision import vision_engine
-from workspace_manager import get_monitor_count, get_monitor_rects
+from src.darius_ai.core.ai_client import resolve_provider_key
+from src.darius_ai.core.config_loader import cfg
+from src.darius_ai.core.obsidian_brain import brain
+from src.darius_ai.core.screen_vision import vision_engine
+from src.darius_ai.system.workspace_manager import get_monitor_count, get_monitor_rects
 
 
 @dataclass
@@ -40,6 +40,7 @@ def check_audio_subsystem() -> CheckResult:
     output_count = 0
     try:
         import sounddevice as sd
+
         devices = sd.query_devices()
         input_count = sum(1 for d in devices if d.get("max_input_channels", 0) > 0)
         output_count = sum(1 for d in devices if d.get("max_output_channels", 0) > 0)
@@ -65,7 +66,7 @@ def check_win32_topology() -> CheckResult:
         monitors = get_monitor_rects()
         count = get_monitor_count()
         if count > 0:
-            details = ", ".join(f"M{i+1}: {r[2]-r[0]}x{r[3]-r[1]}" for i, r in enumerate(monitors))
+            details = ", ".join(f"M{i + 1}: {r[2] - r[0]}x{r[3] - r[1]}" for i, r in enumerate(monitors))
             return CheckResult("WIN32 TOPOLOGY", "PASS", f"{count} monitor(es) detectado(s) [{details}]")
         return CheckResult("WIN32 TOPOLOGY", "WARN", "No se detectaron monitores Win32")
     except Exception as e:
@@ -106,7 +107,7 @@ def check_vision_pipeline() -> CheckResult:
             return CheckResult(
                 "VISION & OCR",
                 "PASS",
-                f"Captura atómica OK: {meta['width']}x{meta['height']} ({meta['size_bytes']/1024:.1f} KB en memoria)",
+                f"Captura atómica OK: {meta['width']}x{meta['height']} ({meta['size_bytes'] / 1024:.1f} KB en memoria)",
             )
         return CheckResult("VISION & OCR", "WARN", "Captura devolvió buffer vacío")
     except Exception as e:
@@ -116,11 +117,13 @@ def check_vision_pipeline() -> CheckResult:
 def check_tool_contracts() -> CheckResult:
     """Verifica los catálogos de comandos y herramientas registradas."""
     try:
-        from windows_commands import SYSTEM_ACTIONS
+        from src.darius_ai.system.windows_commands import SYSTEM_ACTIONS
+
         actions_count = len(SYSTEM_ACTIONS)
 
         try:
             from main import _CMD_PATTERNS
+
             patterns_count = len(_CMD_PATTERNS)
             patterns_msg = f"{patterns_count} patrones regex de voz"
         except Exception:

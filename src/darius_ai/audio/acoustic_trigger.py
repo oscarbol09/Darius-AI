@@ -50,11 +50,7 @@ def get_input_devices() -> list[tuple[int, dict]]:
     try:
         import sounddevice as sd
 
-        return [
-            (i, dev)
-            for i, dev in enumerate(sd.query_devices())
-            if dev.get("max_input_channels", 0) >= 1
-        ]
+        return [(i, dev) for i, dev in enumerate(sd.query_devices()) if dev.get("max_input_channels", 0) >= 1]
     except Exception as exc:
         log.warning(f"Error consultando dispositivos de audio: {exc}")
         return []
@@ -274,9 +270,9 @@ class AcousticDoubleClapDetector:
                     # Adaptar el piso de ruido si el nivel está por debajo de la puerta de silencio
                     quiet_gate = noise_floor * QUIET_GATE_MULT
                     if level < quiet_gate:
-                        noise_floor = DEFAULT_NOISE_FLOOR_ALPHA * noise_floor + (
-                            1.0 - DEFAULT_NOISE_FLOOR_ALPHA
-                        ) * level
+                        noise_floor = (
+                            DEFAULT_NOISE_FLOOR_ALPHA * noise_floor + (1.0 - DEFAULT_NOISE_FLOOR_ALPHA) * level
+                        )
                         noise_floor = max(noise_floor, 1e-7)
 
                     threshold = max(noise_floor * self.spike_ratio, DEFAULT_MIN_RMS)
@@ -286,11 +282,7 @@ class AcousticDoubleClapDetector:
                     if level < retrigger_level:
                         spike_armed = True
 
-                    if (
-                        spike_armed
-                        and level >= threshold
-                        and (now - last_logged_double) >= self.cooldown_s
-                    ):
+                    if spike_armed and level >= threshold and (now - last_logged_double) >= self.cooldown_s:
                         spike_armed = False
                         if first_clap_time is None:
                             first_clap_time = now

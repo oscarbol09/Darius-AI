@@ -6,7 +6,7 @@ Extraídas de main.py para ser testeables de forma aislada (sin GUI,
 sin Windows, sin CustomTkinter). Ver test_voice_v6.py.
 
 Uso:
-    from voice_filter import check_name_in_text, process_recognized_text
+    from src.darius_ai.audio.voice_filter import check_name_in_text, process_recognized_text
 """
 
 import logging
@@ -41,7 +41,8 @@ def check_name_in_text(
         if similarity >= cutoff:
             log.debug(
                 "[NOMBRE] Variante aceptada: '%s' (%.2f)",
-                words[0], similarity,
+                words[0],
+                similarity,
             )
             return True, " ".join(words[1:]).strip()
     return False, text

@@ -6,12 +6,12 @@ Valida la persistencia, tipado y resolución de ajustes de TTS y ElevenLabs en c
 
 from pathlib import Path
 
-from byok_settings import (
+from src.darius_ai.core.config_loader import cfg, get_app_resource_dir, get_user_data_dir
+from src.darius_ai.gui.byok_settings import (
     ELEVENLABS_MODEL_PRESETS,
     ELEVENLABS_VOICE_PRESETS,
     TTS_ENGINES,
 )
-from config_loader import cfg, get_app_resource_dir, get_user_data_dir
 
 
 def test_user_data_dir_and_resource_dir():
@@ -37,7 +37,7 @@ def test_save_tts_config(tmp_path: Path, monkeypatch):
     """Verifica que cfg.set actualice y persista las propiedades de TTS y ElevenLabs."""
     fake_config = tmp_path / "config.json"
     fake_config.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr("config_loader._CONFIG_FILE", fake_config)
+    monkeypatch.setattr("src.darius_ai.core.config_loader._CONFIG_FILE", fake_config)
 
     # Actualizar motor
     cfg.set("elevenlabs", "tts", "engine")

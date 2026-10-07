@@ -11,7 +11,7 @@ Arquitectura:
   - Vosk y Whisper se agregan como backends alternativos
 
 Uso futuro:
-    from stt_engine import STTEngine
+    from src.darius_ai.audio.stt_engine import STTEngine
     stt = STTEngine(backend="vosk", model_path="models/vosk-small")
     text = stt.listen()
 
@@ -55,6 +55,7 @@ class STTEngine:
     def _listen_google(self, timeout: float) -> str | None:
         """Backend actual: Google Speech Recognition via speech_recognition."""
         import speech_recognition as sr
+
         r = sr.Recognizer()
         try:
             with sr.Microphone() as source:
@@ -79,8 +80,7 @@ class STTEngine:
           - Probar con sample de audio
         """
         raise NotImplementedError(
-            "Vosk backend no implementado. "
-            "Requiere: pip install vosk y descargar modelo de alphacephei.com"
+            "Vosk backend no implementado. Requiere: pip install vosk y descargar modelo de alphacephei.com"
         )
 
     def _listen_whisper(self, timeout: float) -> str | None:
@@ -92,6 +92,5 @@ class STTEngine:
           - Probar modelos base/small vs large
         """
         raise NotImplementedError(
-            "Whisper backend no implementado. "
-            "Requiere: pip install openai-whisper (y ffmpeg en PATH)"
+            "Whisper backend no implementado. Requiere: pip install openai-whisper (y ffmpeg en PATH)"
         )

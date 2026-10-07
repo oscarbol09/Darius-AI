@@ -4,7 +4,7 @@ test_agent_planner.py — Pruebas unitarias para el planificador agéntico multi
 
 from unittest.mock import MagicMock, patch
 
-from agent_planner import AgentPlannerEngine
+from src.darius_ai.core.agent_planner import AgentPlannerEngine
 
 
 def test_planner_create_plan_mocked():
@@ -20,7 +20,7 @@ def test_planner_create_plan_mocked():
       ]
     }
     """
-    with patch("agent_planner.get_ai_response", return_value=(mock_llm_json, "Gemini")):
+    with patch("src.darius_ai.core.agent_planner.get_ai_response", return_value=(mock_llm_json, "Gemini")):
         steps = planner.create_plan("captura pantalla y anota en diario")
         assert len(steps) == 2
         assert steps[0]["tool"] == "screen_vision"
@@ -31,7 +31,9 @@ def test_planner_execute_step_with_context_piping():
     """Valida la ejecución de un paso y la inyección del resultado previo."""
     planner = AgentPlannerEngine()
 
-    with patch("obsidian_brain.brain.append_daily_note", return_value=MagicMock(name="2026-09-21.md")) as mock_note:
+    with patch(
+        "src.darius_ai.core.obsidian_brain.brain.append_daily_note", return_value=MagicMock(name="2026-09-21.md")
+    ) as mock_note:
         ok, out = planner.execute_step(
             tool="append_daily_note",
             params={"entry": "{{PREV}}"},

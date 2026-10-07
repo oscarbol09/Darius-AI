@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from human_gui import (
+from src.darius_ai.gui.human_gui import (
     FailsafeError,
     HumanGUIAutomator,
 )
@@ -53,8 +53,10 @@ class TestFailsafeSystem:
 
     def test_failsafe_at_screen_corner(self):
         automator = HumanGUIAutomator()
-        with patch.object(automator, "get_cursor_pos", return_value=(0, 0)), \
-             pytest.raises(FailsafeError, match="esquina"):
+        with (
+            patch.object(automator, "get_cursor_pos", return_value=(0, 0)),
+            pytest.raises(FailsafeError, match="esquina"),
+        ):
             automator.check_failsafe()
 
     def test_failsafe_safe_position_does_not_raise(self):
@@ -65,8 +67,10 @@ class TestFailsafeSystem:
     def test_abort_flag_triggers_failsafe(self):
         automator = HumanGUIAutomator()
         automator.abort()
-        with patch.object(automator, "get_cursor_pos", return_value=(500, 400)), \
-             pytest.raises(FailsafeError, match="abortada"):
+        with (
+            patch.object(automator, "get_cursor_pos", return_value=(500, 400)),
+            pytest.raises(FailsafeError, match="abortada"),
+        ):
             automator.check_failsafe()
 
 
@@ -77,8 +81,10 @@ class TestMouseAndKeyboardActions:
     def test_human_mouse_move_mocked(self, mock_sleep):
         automator = HumanGUIAutomator()
         automator.failsafe_enabled = False
-        with patch.object(automator, "set_cursor_pos") as mock_set, \
-             patch.object(automator, "get_cursor_pos", return_value=(100, 100)):
+        with (
+            patch.object(automator, "set_cursor_pos") as mock_set,
+            patch.object(automator, "get_cursor_pos", return_value=(100, 100)),
+        ):
             ok = automator.human_mouse_move(500, 500, steps=10)
             assert ok is True
             assert mock_set.call_count >= 10

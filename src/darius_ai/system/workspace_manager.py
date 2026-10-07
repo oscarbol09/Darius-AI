@@ -41,6 +41,7 @@ _VK_F11 = 0x7A
 #  DETECCIÓN Y MONITORES WIN32
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def get_monitor_rects() -> list[tuple[int, int, int, int]]:
     """
     Retorna los rectángulos de todos los monitores físicos conectados (left, top, right, bottom),
@@ -105,6 +106,7 @@ def get_monitor_count() -> int:
 #  DETECCIÓN DE EJECUTABLES
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def find_chrome_executable() -> str | None:
     """Busca el ejecutable de Google Chrome en rutas estándar de Windows."""
     if sys.platform == "win32":
@@ -147,6 +149,7 @@ def find_vscode_executable() -> str | None:
 # ─────────────────────────────────────────────────────────────────────────────
 #  ENFOQUE NATIVO DE VENTANAS WIN32 (CURSOR / VS CODE / NAVEGADOR)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def get_process_main_hwnd(target_exe_name: str) -> int | None:
     """
@@ -292,6 +295,7 @@ def snap_window_to_monitor(
 #  APERTURA Y CONTROL DE APLICACIONES
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def focus_or_launch_cursor(fullscreen: bool = True) -> bool:
     """
     Enfoca la instancia activa de Cursor.exe si existe;
@@ -368,6 +372,7 @@ def open_url_on_monitor(
 # ─────────────────────────────────────────────────────────────────────────────
 #  RUTINAS Y PROTOCOLOS DE ESPACIO DE TRABAJO (DARIUS AI)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def play_spotify_or_song(uri_or_url: str) -> None:
     """Abre una pista de Spotify o enlace de audio."""
@@ -481,4 +486,3 @@ def run_trading_mode(
     if get_monitor_count() > 1:
         open_url_on_monitor("https://tasaradar.com", monitor_index=2, fullscreen=True)
     return True
-

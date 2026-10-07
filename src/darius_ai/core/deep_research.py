@@ -20,9 +20,9 @@ import urllib.request
 from collections.abc import Callable
 from typing import Any
 
-from ai_client import get_ai_response
-from config_loader import cfg
-from obsidian_brain import brain
+from src.darius_ai.core.ai_client import get_ai_response
+from src.darius_ai.core.config_loader import cfg
+from src.darius_ai.core.obsidian_brain import brain
 
 log = logging.getLogger("DARIUS.Research")
 
@@ -38,6 +38,7 @@ def _clean_html_text(html_content: str) -> str:
     """Limpia el HTML extrayendo únicamente el texto legible."""
     try:
         from bs4 import BeautifulSoup
+
         soup = BeautifulSoup(html_content, "html.parser")
         for tag in soup(["script", "style", "nav", "footer", "header", "noscript", "svg"]):
             tag.decompose()
@@ -66,6 +67,7 @@ def _search_duckduckgo(query: str, max_results: int = 5) -> list[dict[str, str]]
 
         try:
             from bs4 import BeautifulSoup
+
             soup = BeautifulSoup(html_doc, "html.parser")
             for result_div in soup.find_all("div", class_="result"):
                 title_tag = result_div.find("a", class_="result__a")
@@ -83,11 +85,13 @@ def _search_duckduckgo(query: str, max_results: int = 5) -> list[dict[str, str]]
 
                     snippet = snippet_tag.get_text(strip=True) if snippet_tag else ""
                     if link.startswith("http"):
-                        results.append({
-                            "title": title,
-                            "url": link,
-                            "snippet": snippet,
-                        })
+                        results.append(
+                            {
+                                "title": title,
+                                "url": link,
+                                "snippet": snippet,
+                            }
+                        )
                 if len(results) >= max_results:
                     break
         except Exception as parse_err:
@@ -126,7 +130,7 @@ class DeepResearchPipeline:
             f"genera {count} consultas de búsqueda en Google/DuckDuckGo breves y precisas "
             f"para encontrar información técnica, datos actuales y análisis de fondo.\n"
             f"Devuelve ÚNICAMENTE un objeto JSON con una lista de strings en la clave 'queries'. "
-            f"Ejemplo: {{\"queries\": [\"query 1\", \"query 2\"]}}"
+            f'Ejemplo: {{"queries": ["query 1", "query 2"]}}'
         )
         try:
             raw, _ = get_ai_response(prompt)
@@ -186,7 +190,7 @@ class DeepResearchPipeline:
             content = _fetch_page_content(src["url"])
             if content and len(content) > 100:
                 extracted_evidence.append(
-                    f"--- FUENTE [{i+1}]: {src['title']} ({src['url']}) ---\n{content[:1500]}\n"
+                    f"--- FUENTE [{i + 1}]: {src['title']} ({src['url']}) ---\n{content[:1500]}\n"
                 )
 
         evidence_text = "\n".join(extracted_evidence)

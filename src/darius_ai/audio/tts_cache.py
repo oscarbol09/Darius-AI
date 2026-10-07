@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from config_loader import get_user_data_dir
+from src.darius_ai.core.config_loader import get_user_data_dir
 
 log = logging.getLogger("DARIUS.TTSCache")
 

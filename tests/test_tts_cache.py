@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 
-from tts_cache import (
+from src.darius_ai.audio.tts_cache import (
     compute_cache_key,
     get_cached_wav_path,
     is_cached,
@@ -79,7 +79,7 @@ def test_play_cached_wav(tmp_path: Path):
 
 def test_play_raw_pcm_with_odd_bytes():
     """El motor de reproducción ElevenLabs debe soportar buffers con número impar de bytes sin lanzar ValueError."""
-    from elevenlabs_tts_engine import ElevenLabsTTS
+    from src.darius_ai.audio.elevenlabs_tts_engine import ElevenLabsTTS
 
     engine = ElevenLabsTTS(api_key="test", voice_id="test")
     odd_bytes = b"\x00\x01\x00\x02\x03"  # 5 bytes (impar)

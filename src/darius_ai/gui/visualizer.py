@@ -3,7 +3,7 @@ import tkinter as tk
 import customtkinter as ctk
 import numpy as np
 
-import gui_theme as theme
+from src.darius_ai.gui import gui_theme as theme
 
 
 class HighPerfWaveVisualizer(ctk.CTkFrame):

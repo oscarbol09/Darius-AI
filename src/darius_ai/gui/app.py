@@ -52,27 +52,27 @@ try:
 except ImportError:
     PIL_AVAILABLE = False
 
-import gui_theme as theme
-from acoustic_trigger import AcousticDoubleClapDetector, auto_select_best_mic
-from obsidian_brain import brain
-from tts_worker import TTSWorker
-from voice_filter import (
+from src.darius_ai.audio.acoustic_trigger import AcousticDoubleClapDetector, auto_select_best_mic
+from src.darius_ai.audio.tts_worker import TTSWorker
+from src.darius_ai.audio.voice_filter import (
     LISTEN_MODE_AUTO,
     LISTEN_MODE_NAME,
     LISTEN_MODE_PTT,
     _strip_name,
     check_name_in_text,
 )
-from windows_commands import (
+from src.darius_ai.core.obsidian_brain import brain
+from src.darius_ai.gui import gui_theme as theme
+from src.darius_ai.system.windows_commands import (
     resolve_action as wincmd_resolve_action,
 )
-from windows_commands import (
+from src.darius_ai.system.windows_commands import (
     resolve_and_launch as wincmd_launch,
 )
-from windows_commands import (
+from src.darius_ai.system.windows_commands import (
     run_action as wincmd_run_action,
 )
-from workspace_manager import (
+from src.darius_ai.system.workspace_manager import (
     focus_or_launch_cursor,
     get_monitor_count,
     get_monitor_rects,
@@ -83,7 +83,7 @@ from workspace_manager import (
 
 load_dotenv()
 
-from config_loader import cfg, get_user_data_dir  # noqa: E402
+from src.darius_ai.core.config_loader import cfg, get_user_data_dir  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  INSTANCIA ÚNICA
@@ -141,7 +141,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("DARIUS")
 
-from ai_client import get_ai_response  # noqa: E402
+from src.darius_ai.core.ai_client import get_ai_response  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONTROL DE VOLUMEN
@@ -1340,7 +1340,7 @@ class DariusFinal(ctk.CTk):
             self.talk(f"Doble aplauso detectado. Esperando tus órdenes, {USER_NAME}.")
 
     def _open_byok_settings(self):
-        from byok_settings import BYOKSettingsModal
+        from src.darius_ai.gui.byok_settings import BYOKSettingsModal
 
         BYOKSettingsModal(self, on_save_callback=self._on_byok_settings_saved)
 
@@ -2049,7 +2049,7 @@ class DariusFinal(ctk.CTk):
             self._execute_action(entry)
         else:
             self.talk("Vaciando caché DNS de Windows.")
-            from agentic_bridge import bridge
+            from src.darius_ai.core.agentic_bridge import bridge
 
             ok, out = bridge.flush_dns()
             self.talk("Caché DNS vaciada correctamente." if ok else f"Error: {out}")
@@ -2059,7 +2059,7 @@ class DariusFinal(ctk.CTk):
         if entry:
             self._execute_action(entry)
         else:
-            from agentic_bridge import bridge
+            from src.darius_ai.core.agentic_bridge import bridge
 
             ok, out = bridge.execute_gh("pr list")
             self.talk(self._format_output_for_tts(out, "Pull Requests de GitHub"))
@@ -2069,7 +2069,7 @@ class DariusFinal(ctk.CTk):
         if entry:
             self._execute_action(entry)
         else:
-            from agentic_bridge import bridge
+            from src.darius_ai.core.agentic_bridge import bridge
 
             ok, out = bridge.execute_git("status --short")
             self.talk(self._format_output_for_tts(out, "Estado de Git"))
@@ -2079,7 +2079,7 @@ class DariusFinal(ctk.CTk):
         if entry:
             self._execute_action(entry)
         else:
-            from agentic_bridge import bridge
+            from src.darius_ai.core.agentic_bridge import bridge
 
             ok, out = bridge.get_top_processes(5)
             self.talk(self._format_output_for_tts(out, "Procesos con mayor consumo de RAM"))
@@ -2094,7 +2094,7 @@ class DariusFinal(ctk.CTk):
 
         def run():
             time.sleep(2.0)
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
 
             gui.human_type(text_to_type)
             self.talk("Texto escrito correctamente.")
@@ -2110,7 +2110,7 @@ class DariusFinal(ctk.CTk):
 
         def run():
             time.sleep(2.0)
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
 
             gui.human_click(button=button, clicks=clicks)
             self.talk("Clic ejecutado.")
@@ -2126,7 +2126,7 @@ class DariusFinal(ctk.CTk):
         self.talk(f"Analizando el contenido de {url}.")
 
         def run():
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
 
             res = gui.scrape_web_content(url)
             if not res.get("ok"):
@@ -2147,7 +2147,7 @@ class DariusFinal(ctk.CTk):
         self.talk("Analizando lo que se muestra en tu pantalla, un momento.")
 
         def run():
-            from screen_vision import vision_engine
+            from src.darius_ai.core.screen_vision import vision_engine
 
             is_error = bool(re.search(r"\berror|fallo|excepci[oó]n|falla\b", cmd, re.IGNORECASE))
             is_ocr = bool(re.search(r"\blee|texto|documento|c[oó]digo\b", cmd, re.IGNORECASE))
@@ -2171,7 +2171,7 @@ class DariusFinal(ctk.CTk):
         self.set_status("🔬 INVESTIGANDO A FONDO…", "#A855F7")
 
         def run():
-            from deep_research import research_pipeline
+            from src.darius_ai.core.deep_research import research_pipeline
 
             res = research_pipeline.run_research(
                 topic=topic,
@@ -2188,7 +2188,7 @@ class DariusFinal(ctk.CTk):
         goal = m.group(2).strip() if m else cmd
 
         def run():
-            from agent_planner import agent_planner
+            from src.darius_ai.core.agent_planner import agent_planner
 
             res = agent_planner.plan_and_execute(
                 goal=goal,
@@ -2322,7 +2322,7 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_detener(self, _):
         with contextlib.suppress(Exception):
-            from human_gui import gui
+            from src.darius_ai.gui.human_gui import gui
 
             gui.abort()
         if hasattr(self, "tts_worker"):
@@ -2535,7 +2535,7 @@ _CMD_PATTERNS = DariusFinal._CMD_PATTERNS
 
 if __name__ == "__main__":
     if "--self-test" in sys.argv:
-        from self_test import main as run_test_cli
+        from src.darius_ai.core.self_test import main as run_test_cli
 
         run_test_cli()
 

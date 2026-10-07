@@ -16,8 +16,8 @@ import io
 import logging
 from typing import Any
 
-from ai_client import get_ai_response
-from config_loader import cfg
+from src.darius_ai.core.ai_client import get_ai_response
+from src.darius_ai.core.config_loader import cfg
 
 log = logging.getLogger("DARIUS.Vision")
 
@@ -30,6 +30,7 @@ _MSS_AVAILABLE = False
 try:
     import mss
     import mss.tools
+
     _MSS_AVAILABLE = True
 except ImportError:
     _MSS_AVAILABLE = False
@@ -37,6 +38,7 @@ except ImportError:
 _PIL_AVAILABLE = False
 try:
     from PIL import Image, ImageGrab
+
     _PIL_AVAILABLE = True
 except ImportError:
     _PIL_AVAILABLE = False

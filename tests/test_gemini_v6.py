@@ -21,17 +21,18 @@ import unittest
 from unittest.mock import MagicMock
 
 # ── Configuración ─────────────────────────────────────────────────────────────
-GEMINI_MODEL         = "gemini-3.6-flash"
-GEMINI_MAX_TOKENS    = 800
-GEMINI_TEMPERATURE   = 0.7
+GEMINI_MODEL = "gemini-3.6-flash"
+GEMINI_MAX_TOKENS = 800
+GEMINI_TEMPERATURE = 0.7
 GEMINI_HISTORY_TURNS = 10
-ASSISTANT_NAME       = "darius"
-USER_NAME            = "Oscar"
+ASSISTANT_NAME = "darius"
+USER_NAME = "Oscar"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  HELPERS — réplicas de funciones de main.py
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _extract_text_from_response(response) -> str:
     """Réplica de la lógica de extracción de texto en ask_gemini()."""
@@ -72,6 +73,7 @@ def _trim_history(history: list, max_turns: int) -> list:
 #  TEST 1 — EXTRACCIÓN DE TEXTO DE RESPUESTA
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestResponseExtraction(unittest.TestCase):
     """
     Verifica la lógica de extracción de texto de distintos formatos
@@ -79,31 +81,31 @@ class TestResponseExtraction(unittest.TestCase):
     """
 
     def test_extract_from_response_text_attribute(self):
-        mock_response      = MagicMock()
+        mock_response = MagicMock()
         mock_response.text = "Hola, soy Darius."
         result = _extract_text_from_response(mock_response)
         self.assertEqual(result, "Hola, soy Darius.")
 
     def test_extract_from_candidates_fallback(self):
         """Cuando response.text es None/vacío, debe usar candidates."""
-        mock_response      = MagicMock()
+        mock_response = MagicMock()
         mock_response.text = None
-        mock_candidate     = MagicMock()
+        mock_candidate = MagicMock()
         mock_candidate.content.parts = [MagicMock(text="Respuesta desde candidates.")]
         mock_response.candidates = [mock_candidate]
         result = _extract_text_from_response(mock_response)
         self.assertEqual(result, "Respuesta desde candidates.")
 
     def test_extract_returns_empty_on_no_content(self):
-        mock_response            = MagicMock()
-        mock_response.text       = None
+        mock_response = MagicMock()
+        mock_response.text = None
         mock_response.candidates = []
         result = _extract_text_from_response(mock_response)
         self.assertEqual(result, "")
 
     def test_response_text_has_priority_over_candidates(self):
         """response.text tiene prioridad — no debe acceder a candidates si text existe."""
-        mock_response      = MagicMock()
+        mock_response = MagicMock()
         mock_response.text = "Texto directo."
         # Si accede a candidates, lanzaría excepción
         del mock_response.candidates
@@ -117,6 +119,7 @@ class TestResponseExtraction(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 2 — LIMPIEZA DE MARKDOWN PARA TTS
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestMarkdownCleanup(unittest.TestCase):
     """
@@ -146,12 +149,12 @@ class TestMarkdownCleanup(unittest.TestCase):
         self.assertNotIn(">", result)
 
     def test_preserves_plain_text(self):
-        text   = "Son las tres de la tarde."
+        text = "Son las tres de la tarde."
         result = _clean_response_for_tts(text)
         self.assertEqual(result, text)
 
     def test_preserves_numbers_and_punctuation(self):
-        text   = "La temperatura es 25°C. Batería: 80%."
+        text = "La temperatura es 25°C. Batería: 80%."
         result = _clean_response_for_tts(text)
         self.assertIn("25", result)
         self.assertIn("80%", result)
@@ -164,6 +167,7 @@ class TestMarkdownCleanup(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 3 — MANEJO DE ERRORES DE API
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestGeminiErrorHandling(unittest.TestCase):
     """
@@ -224,6 +228,7 @@ class TestGeminiErrorHandling(unittest.TestCase):
 #  TEST 4 — GESTIÓN DE HISTORIAL DE CONVERSACIÓN
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestConversationHistory(unittest.TestCase):
     """
     Verifica el manejo de la ventana de contexto conversacional.
@@ -234,37 +239,37 @@ class TestConversationHistory(unittest.TestCase):
         """Genera n_turns turnos de conversación mock."""
         history = []
         for i in range(n_turns):
-            history.append({"role": "user",  "parts": [{"text": f"Pregunta {i}"}]})
+            history.append({"role": "user", "parts": [{"text": f"Pregunta {i}"}]})
             history.append({"role": "model", "parts": [{"text": f"Respuesta {i}"}]})
         return history
 
     def test_history_not_trimmed_below_limit(self):
         history = self._make_history(5)  # 10 mensajes < 20 (límite)
-        result  = _trim_history(history, GEMINI_HISTORY_TURNS)
+        result = _trim_history(history, GEMINI_HISTORY_TURNS)
         self.assertEqual(len(result), 10)
 
     def test_history_trimmed_at_limit(self):
         history = self._make_history(15)  # 30 mensajes > 20 (límite)
-        result  = _trim_history(history, GEMINI_HISTORY_TURNS)
+        result = _trim_history(history, GEMINI_HISTORY_TURNS)
         self.assertEqual(len(result), GEMINI_HISTORY_TURNS * 2)
 
     def test_history_trim_preserves_most_recent(self):
         """El recorte debe conservar los mensajes MÁS RECIENTES."""
         history = self._make_history(15)
-        result  = _trim_history(history, GEMINI_HISTORY_TURNS)
+        result = _trim_history(history, GEMINI_HISTORY_TURNS)
         last_original = history[-1]
-        last_trimmed  = result[-1]
-        self.assertEqual(last_original["parts"][0]["text"],
-                         last_trimmed["parts"][0]["text"])
+        last_trimmed = result[-1]
+        self.assertEqual(last_original["parts"][0]["text"], last_trimmed["parts"][0]["text"])
 
     def test_history_trim_discards_oldest(self):
         """El recorte debe DESCARTAR los mensajes más antiguos."""
         history = self._make_history(15)
-        result  = _trim_history(history, GEMINI_HISTORY_TURNS)
+        result = _trim_history(history, GEMINI_HISTORY_TURNS)
         first_original = history[0]["parts"][0]["text"]
         texts_in_result = [m["parts"][0]["text"] for m in result]
-        self.assertNotIn(first_original, texts_in_result,
-                         "El mensaje más antiguo no debería estar en el historial recortado")
+        self.assertNotIn(
+            first_original, texts_in_result, "El mensaje más antiguo no debería estar en el historial recortado"
+        )
 
     def test_empty_history_not_trimmed(self):
         result = _trim_history([], GEMINI_HISTORY_TURNS)
@@ -274,7 +279,7 @@ class TestConversationHistory(unittest.TestCase):
         """Cada entrada debe tener 'role' y 'parts' con estructura correcta."""
         history = self._make_history(1)
         for entry in history:
-            self.assertIn("role",  entry)
+            self.assertIn("role", entry)
             self.assertIn("parts", entry)
             self.assertIn(entry["role"], ("user", "model"))
             self.assertIsInstance(entry["parts"], list)
@@ -284,6 +289,7 @@ class TestConversationHistory(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 5 — SYSTEM INSTRUCTION
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestSystemInstruction(unittest.TestCase):
     """
@@ -311,7 +317,7 @@ class TestSystemInstruction(unittest.TestCase):
         instr_lower = self.SYSTEM_INSTRUCTION.lower()
         self.assertTrue(
             "markdown" in instr_lower or "asteriscos" in instr_lower,
-            "El system_instruction debe prohibir explícitamente markdown"
+            "El system_instruction debe prohibir explícitamente markdown",
         )
 
     def test_instruction_requests_concise_response(self):
@@ -319,13 +325,14 @@ class TestSystemInstruction(unittest.TestCase):
             "conciso" in self.SYSTEM_INSTRUCTION.lower()
             or "3 oración" in self.SYSTEM_INSTRUCTION.lower()
             or "máximo" in self.SYSTEM_INSTRUCTION.lower(),
-            "El system_instruction debe solicitar respuestas concisas"
+            "El system_instruction debe solicitar respuestas concisas",
         )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 6 — INTEGRACIÓN REAL CON LA API (opcional, requiere API key)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestGeminiLiveIntegration(unittest.TestCase):
     """
@@ -338,11 +345,8 @@ class TestGeminiLiveIntegration(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.run_live = (
-            os.getenv("DARIUS_RUN_LIVE_TESTS", "0") == "1"
-            or "--live" in sys.argv
-        )
-        cls.api_key  = os.getenv("GEMINI_API_KEY")
+        cls.run_live = os.getenv("DARIUS_RUN_LIVE_TESTS", "0") == "1" or "--live" in sys.argv
+        cls.api_key = os.getenv("GEMINI_API_KEY")
 
     def _skip_if_not_live(self):
         if not self.run_live:
@@ -355,8 +359,8 @@ class TestGeminiLiveIntegration(unittest.TestCase):
         from google import genai
         from google.genai import types
 
-        client   = genai.Client(api_key=self.api_key)
-        config   = types.GenerateContentConfig(
+        client = genai.Client(api_key=self.api_key)
+        config = types.GenerateContentConfig(
             system_instruction="Eres Darius. Responde en español. Solo texto plano.",
             temperature=0.1,
             max_output_tokens=50,
@@ -377,11 +381,10 @@ class TestGeminiLiveIntegration(unittest.TestCase):
         from google import genai
         from google.genai import types
 
-        client   = genai.Client(api_key=self.api_key)
-        config   = types.GenerateContentConfig(
+        client = genai.Client(api_key=self.api_key)
+        config = types.GenerateContentConfig(
             system_instruction=(
-                "Responde SOLO en texto plano. Sin asteriscos, "
-                "sin bullets, sin markdown de ningún tipo."
+                "Responde SOLO en texto plano. Sin asteriscos, sin bullets, sin markdown de ningún tipo."
             ),
             temperature=0.1,
             max_output_tokens=100,
@@ -410,8 +413,11 @@ class TestGeminiLiveIntegration(unittest.TestCase):
             self.fail("Se esperaba excepción con API key inválida")
         except Exception as e:
             error_type = _classify_gemini_error(e)
-            self.assertEqual(error_type, "auth_error",
-                f"API key inválida debería clasificar como 'auth_error', obtuvo: '{error_type}' ({e})")
+            self.assertEqual(
+                error_type,
+                "auth_error",
+                f"API key inválida debería clasificar como 'auth_error', obtuvo: '{error_type}' ({e})",
+            )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

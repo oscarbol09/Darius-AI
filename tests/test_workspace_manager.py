@@ -6,7 +6,7 @@ Valida la detección de monitores, snapping de ventanas y ejecución de rutinas 
 
 from unittest.mock import MagicMock, patch
 
-from workspace_manager import (
+from src.darius_ai.system.workspace_manager import (
     find_chrome_executable,
     find_cursor_executable,
     find_vscode_executable,
@@ -62,8 +62,10 @@ def test_open_url_on_monitor_empty():
 
 def test_open_url_on_monitor_mocked():
     """Apertura de URL en monitor con Popen mocked."""
-    with patch("workspace_manager.find_chrome_executable", return_value="C:\\dummy\\chrome.exe"), \
-         patch("subprocess.Popen") as mock_popen:
+    with (
+        patch("src.darius_ai.system.workspace_manager.find_chrome_executable", return_value="C:\\dummy\\chrome.exe"),
+        patch("subprocess.Popen") as mock_popen,
+    ):
         res = open_url_on_monitor("https://example.com", monitor_index=1, fullscreen=True)
         assert res is True
         mock_popen.assert_called_once()
@@ -72,10 +74,12 @@ def test_open_url_on_monitor_mocked():
 def test_run_darius_welcome_protocol():
     """Ejecución del protocolo de bienvenida Darius sin excepciones."""
     talk_mock = MagicMock()
-    with patch("workspace_manager.play_spotify_or_song"), \
-         patch("workspace_manager.open_url_on_monitor"), \
-         patch("workspace_manager.focus_or_launch_cursor"), \
-         patch("time.sleep"):
+    with (
+        patch("src.darius_ai.system.workspace_manager.play_spotify_or_song"),
+        patch("src.darius_ai.system.workspace_manager.open_url_on_monitor"),
+        patch("src.darius_ai.system.workspace_manager.focus_or_launch_cursor"),
+        patch("time.sleep"),
+    ):
         run_darius_welcome_protocol(
             talk_fn=talk_mock,
             song_url="https://spotify.com/dummy",
@@ -88,8 +92,10 @@ def test_run_darius_welcome_protocol():
 def test_run_dev_mode():
     """Ejecución de modo desarrollo."""
     talk_mock = MagicMock()
-    with patch("workspace_manager.open_url_on_monitor"), \
-         patch("workspace_manager.focus_or_launch_cursor"):
+    with (
+        patch("src.darius_ai.system.workspace_manager.open_url_on_monitor"),
+        patch("src.darius_ai.system.workspace_manager.focus_or_launch_cursor"),
+    ):
         run_dev_mode(talk_fn=talk_mock)
         talk_mock.assert_called_once()
 
@@ -97,6 +103,6 @@ def test_run_dev_mode():
 def test_run_trading_mode():
     """Ejecución de modo trading."""
     talk_mock = MagicMock()
-    with patch("workspace_manager.open_url_on_monitor"):
+    with patch("src.darius_ai.system.workspace_manager.open_url_on_monitor"):
         run_trading_mode(talk_fn=talk_mock)
         talk_mock.assert_called_once()

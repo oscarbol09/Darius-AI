@@ -33,7 +33,7 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, ".")
 
 try:
-    from windows_commands import (
+    from src.darius_ai.system.windows_commands import (
         _ACT_CUTOFF,
         _ACT_KEYS,
         _ACT_TABLE,
@@ -49,6 +49,7 @@ try:
         resolve_and_launch,
         run_action,
     )
+
     WINCMD_AVAILABLE = True
 except ImportError as e:
     WINCMD_AVAILABLE = False
@@ -64,15 +65,18 @@ IS_WINDOWS = sys.platform == "win32"
 #  HELPERS
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 def _fuzzy_score(query: str, key: str) -> float:
     """Retorna el ratio SequenceMatcher entre query normalizado y key."""
-    from windows_commands import _normalize
+    from src.darius_ai.system.windows_commands import _normalize
+
     return SequenceMatcher(None, _normalize(query), _normalize(key)).ratio()
 
 
 def _best_match(query: str, keys: list) -> tuple[str, float]:
     """Retorna (mejor_key, mejor_score) para una query sobre una lista de keys."""
-    from windows_commands import _normalize
+    from src.darius_ai.system.windows_commands import _normalize
+
     nq = _normalize(query)
     best_key, best_score = "", 0.0
     for k in keys:
@@ -85,6 +89,7 @@ def _best_match(query: str, keys: list) -> tuple[str, float]:
 # ═════════════════════════════════════════════════════════════════════════════
 #  1. NORMALIZACIÓN
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestNormalization(unittest.TestCase):
     """Verifica que _normalize elimine tildes y homogenice a minúsculas."""
@@ -112,6 +117,7 @@ class TestNormalization(unittest.TestCase):
 # ═════════════════════════════════════════════════════════════════════════════
 #  2. TIPO A — RESOLUCIÓN DE PANELES / VENTANAS
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 @unittest.skipUnless(WINCMD_AVAILABLE and IS_WINDOWS, "solo Windows")
 class TestWinCmdTypeA(unittest.TestCase):
@@ -173,32 +179,29 @@ class TestWinCmdTypeA(unittest.TestCase):
         # Este test documenta el umbral, no lo invalida
         if canonical is not None:
             _, score = _best_match("hola mundo xyz123", _WIN_KEYS)
-            self.assertGreaterEqual(score, 0.52,
-                msg=f"Match '{canonical}' con score < umbral (posible falso positivo)")
+            self.assertGreaterEqual(score, 0.52, msg=f"Match '{canonical}' con score < umbral (posible falso positivo)")
 
     # ── resolve_and_launch con mock ───────────────────────────────────────────
 
-    @patch("windows_commands.os.startfile")
+    @patch("src.darius_ai.system.windows_commands.os.startfile")
     def test_launch_ms_settings_uri(self, mock_startfile):
         """URIs ms-settings: deben invocar os.startfile, no subprocess."""
         desc = resolve_and_launch("wifi")
         self.assertIsNotNone(desc)
         mock_startfile.assert_called_once()
         args = mock_startfile.call_args[0][0]
-        self.assertTrue(args.startswith("ms-settings:"),
-                        f"Se esperaba URI ms-settings:, se obtuvo: {args}")
+        self.assertTrue(args.startswith("ms-settings:"), f"Se esperaba URI ms-settings:, se obtuvo: {args}")
 
-    @patch("windows_commands.subprocess.Popen")
+    @patch("src.darius_ai.system.windows_commands.subprocess.Popen")
     def test_launch_msc_snap_in(self, mock_popen):
         """Archivos .msc deben lanzarse con mmc, no con startfile."""
         desc = resolve_and_launch("administrador de dispositivos")
         self.assertIsNotNone(desc)
         mock_popen.assert_called()
         cmd_args = mock_popen.call_args[0][0]
-        self.assertEqual(cmd_args[0], _MMC,
-                         f"Se esperaba '{_MMC}', se obtuvo: {cmd_args}")
+        self.assertEqual(cmd_args[0], _MMC, f"Se esperaba '{_MMC}', se obtuvo: {cmd_args}")
 
-    @patch("windows_commands.os.startfile")
+    @patch("src.darius_ai.system.windows_commands.os.startfile")
     def test_launch_returns_desc_string(self, mock_startfile):
         """resolve_and_launch debe retornar un string no vacío en caso de éxito."""
         desc = resolve_and_launch("bluetooth")
@@ -214,6 +217,7 @@ class TestWinCmdTypeA(unittest.TestCase):
 # ═════════════════════════════════════════════════════════════════════════════
 #  3. TIPO B — RESOLUCIÓN DE ACCIONES / SUBPROCESOS
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 @unittest.skipUnless(WINCMD_AVAILABLE and IS_WINDOWS, "solo Windows")
 class TestWinCmdTypeB(unittest.TestCase):
@@ -233,13 +237,11 @@ class TestWinCmdTypeB(unittest.TestCase):
     def test_resolve_vaciar_papelera(self):
         entry = resolve_action("vaciar papelera")
         self.assertIsNotNone(entry)
-        self.assertTrue(entry.get("confirm", False),
-                        "vaciar_papelera debe requerir confirmación")
+        self.assertTrue(entry.get("confirm", False), "vaciar_papelera debe requerir confirmación")
 
     def test_resolve_ping_google(self):
         entry = resolve_action("hay internet")
-        self.assertIsNotNone(entry,
-            "'hay internet' debe resolver a 'ping google' via alias")
+        self.assertIsNotNone(entry, "'hay internet' debe resolver a 'ping google' via alias")
 
     def test_resolve_alias_limpiar_temp(self):
         entry = resolve_action("borrar temporales")
@@ -285,33 +287,28 @@ class TestWinCmdTypeB(unittest.TestCase):
         for key, data in SYSTEM_ACTIONS.items():
             with self.subTest(action=key):
                 self.assertIn("action", data, f"'{key}' sin campo 'action'")
-                self.assertIn("desc",   data, f"'{key}' sin campo 'desc'")
-                self.assertIn("aliases",data, f"'{key}' sin campo 'aliases'")
-                self.assertIn("type",   data["action"],
-                              f"'{key}.action' sin campo 'type'")
-                self.assertIn("run",    data["action"],
-                              f"'{key}.action' sin campo 'run'")
-                self.assertIn(data["action"]["type"], ("powershell", "cmd", "python"),
-                              f"'{key}.action.type' inválido")
+                self.assertIn("desc", data, f"'{key}' sin campo 'desc'")
+                self.assertIn("aliases", data, f"'{key}' sin campo 'aliases'")
+                self.assertIn("type", data["action"], f"'{key}.action' sin campo 'type'")
+                self.assertIn("run", data["action"], f"'{key}.action' sin campo 'run'")
+                self.assertIn(data["action"]["type"], ("powershell", "cmd", "python"), f"'{key}.action.type' inválido")
 
     def test_confirm_actions_are_marked(self):
         """Acciones destructivas conocidas deben tener confirm=True."""
-        destructivas = ["vaciar papelera", "limpiar archivos temporales",
-                        "resetear red", "cerrar sesion"]
+        destructivas = ["vaciar papelera", "limpiar archivos temporales", "resetear red", "cerrar sesion"]
         for query in destructivas:
             entry = resolve_action(query)
             if entry:  # solo falla si resuelve pero no tiene confirm
-                self.assertTrue(entry.get("confirm", False),
-                                f"'{query}' resolvió a '{entry['canonical']}' sin confirm=True")
+                self.assertTrue(
+                    entry.get("confirm", False), f"'{query}' resolvió a '{entry['canonical']}' sin confirm=True"
+                )
 
     # ── run_action con mock ───────────────────────────────────────────────────
 
-    @patch("windows_commands.subprocess.run")
+    @patch("src.darius_ai.system.windows_commands.subprocess.run")
     def test_run_action_return_output(self, mock_run):
         """Acciones con return_output=True deben capturar stdout."""
-        mock_run.return_value = MagicMock(
-            stdout="192.168.1.100\n", stderr="", returncode=0
-        )
+        mock_run.return_value = MagicMock(stdout="192.168.1.100\n", stderr="", returncode=0)
         entry = resolve_action("ver ip")
         self.assertIsNotNone(entry)
         success, output = run_action(entry)
@@ -319,10 +316,11 @@ class TestWinCmdTypeB(unittest.TestCase):
         self.assertIn("192.168.1.100", output)
         mock_run.assert_called_once()
 
-    @patch("windows_commands.subprocess.Popen")
+    @patch("src.darius_ai.system.windows_commands.subprocess.Popen")
     def test_run_action_background_no_window(self, mock_popen):
         """Acciones sin return_output ni open_window deben usar CREATE_NO_WINDOW."""
         import subprocess as sp
+
         mock_popen.return_value = MagicMock()
         entry = resolve_action("bloquear pantalla")
         self.assertIsNotNone(entry)
@@ -330,13 +328,15 @@ class TestWinCmdTypeB(unittest.TestCase):
         self.assertTrue(success)
         mock_popen.assert_called()
         kwargs = mock_popen.call_args[1]
-        self.assertEqual(kwargs.get("creationflags"), sp.CREATE_NO_WINDOW,
-                         "Acción background debe usar CREATE_NO_WINDOW")
+        self.assertEqual(
+            kwargs.get("creationflags"), sp.CREATE_NO_WINDOW, "Acción background debe usar CREATE_NO_WINDOW"
+        )
 
-    @patch("windows_commands.subprocess.Popen")
+    @patch("src.darius_ai.system.windows_commands.subprocess.Popen")
     def test_run_action_open_window_console(self, mock_popen):
         """Acciones con open_window=True deben abrir consola visible."""
         import subprocess as sp
+
         mock_popen.return_value = MagicMock()
         entry = resolve_action("ping google")
         self.assertIsNotNone(entry)
@@ -344,34 +344,38 @@ class TestWinCmdTypeB(unittest.TestCase):
         self.assertTrue(success)
         mock_popen.assert_called()
         kwargs = mock_popen.call_args[1]
-        self.assertEqual(kwargs.get("creationflags"), sp.CREATE_NEW_CONSOLE,
-                         "Acción open_window debe usar CREATE_NEW_CONSOLE")
+        self.assertEqual(
+            kwargs.get("creationflags"), sp.CREATE_NEW_CONSOLE, "Acción open_window debe usar CREATE_NEW_CONSOLE"
+        )
 
-    @patch("windows_commands.subprocess.run")
+    @patch("src.darius_ai.system.windows_commands.subprocess.run")
     def test_run_action_timeout_returns_false(self, mock_run):
         """Un TimeoutExpired debe retornar (False, mensaje_de_error)."""
         import subprocess as sp
+
         mock_run.side_effect = sp.TimeoutExpired(cmd="test", timeout=15)
         entry = resolve_action("ver ip")
         success, output = run_action(entry)
         self.assertFalse(success)
         self.assertIn("tardó", output.lower())
 
-    @patch("windows_commands.subprocess.run")
+    @patch("src.darius_ai.system.windows_commands.subprocess.run")
     def test_run_action_output_truncated_at_300(self, mock_run):
         """Salidas largas deben truncarse a 300 chars para TTS."""
-        mock_run.return_value = MagicMock(
-            stdout="X" * 500, stderr="", returncode=0
-        )
+        mock_run.return_value = MagicMock(stdout="X" * 500, stderr="", returncode=0)
         entry = resolve_action("ver ip")
         _, output = run_action(entry)
-        self.assertLessEqual(len(output), 305,  # 300 + "…"
-                             "Output de TTS no debe superar 300 chars")
+        self.assertLessEqual(
+            len(output),
+            305,  # 300 + "…"
+            "Output de TTS no debe superar 300 chars",
+        )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  4. FUZZY MATCHING — SCORES Y UMBRALES
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 @unittest.skipUnless(WINCMD_AVAILABLE, "windows_commands no disponible")
 class TestFuzzyMatching(unittest.TestCase):
@@ -386,25 +390,21 @@ class TestFuzzyMatching(unittest.TestCase):
 
     def test_score_bluetooth_typo(self):
         score = _fuzzy_score("bluetooh", "bluetooth")
-        self.assertGreater(score, 0.85,
-            "Typo de una letra debe producir score > 0.85")
+        self.assertGreater(score, 0.85, "Typo de una letra debe producir score > 0.85")
 
     def test_score_completely_different_is_low(self):
         score = _fuzzy_score("reproducir musica", "administrador de dispositivos")
-        self.assertLess(score, 0.52,
-            "Queries no relacionados no deben superar el umbral 0.52")
+        self.assertLess(score, 0.52, "Queries no relacionados no deben superar el umbral 0.52")
 
     def test_threshold_boundary_at_0_52(self):
         """Queries en el límite del umbral deben resolverse o no según el score."""
-        query  = "configurar pantallas"
+        query = "configurar pantallas"
         result = _resolve(query, _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         key, score = _best_match(query, _WIN_KEYS)
         if score >= 0.52:
-            self.assertIsNotNone(result,
-                f"Score {score:.2f} ≥ 0.52 pero _resolve retornó None")
+            self.assertIsNotNone(result, f"Score {score:.2f} ≥ 0.52 pero _resolve retornó None")
         else:
-            self.assertIsNone(result,
-                f"Score {score:.2f} < 0.52 pero _resolve retornó '{result}'")
+            self.assertIsNone(result, f"Score {score:.2f} < 0.52 pero _resolve retornó '{result}'")
 
     def test_keyword_subset_fallback(self):
         """
@@ -412,8 +412,7 @@ class TestFuzzyMatching(unittest.TestCase):
         'ver servicios activos' → todas las palabras en la clave.
         """
         result = _resolve("ver servicios activos", _ACT_TABLE, _ACT_KEYS, _ACT_CUTOFF)
-        self.assertIsNotNone(result,
-            "El fallback de palabras clave debe capturar 'ver servicios activos'")
+        self.assertIsNotNone(result, "El fallback de palabras clave debe capturar 'ver servicios activos'")
 
     def test_type_a_and_type_b_no_crossover(self):
         """
@@ -422,10 +421,8 @@ class TestFuzzyMatching(unittest.TestCase):
         """
         type_a = _resolve("ver ip", _WIN_TABLE, _WIN_KEYS, _WIN_CUTOFF)
         type_b = _resolve("ver ip", _ACT_TABLE, _ACT_KEYS, _ACT_CUTOFF)
-        self.assertIsNone(type_a,
-            "'ver ip' no debe resolverse como panel de Windows (Tipo A)")
-        self.assertIsNotNone(type_b,
-            "'ver ip' debe resolverse como acción de sistema (Tipo B)")
+        self.assertIsNone(type_a, "'ver ip' no debe resolverse como panel de Windows (Tipo A)")
+        self.assertIsNotNone(type_b, "'ver ip' debe resolverse como acción de sistema (Tipo B)")
 
     def test_score_report_all_aliases(self):
         """
@@ -447,16 +444,17 @@ class TestFuzzyMatching(unittest.TestCase):
 # ═════════════════════════════════════════════════════════════════════════════
 
 try:
-    from voice_filter import check_name_in_text
+    from src.darius_ai.audio.voice_filter import check_name_in_text
+
     VOICE_FILTER_AVAILABLE = True
 except ImportError:
     VOICE_FILTER_AVAILABLE = False
 
-ASSISTANT_NAME         = "darius"
+ASSISTANT_NAME = "darius"
 NAME_SIMILARITY_CUTOFF = 0.60
 
 
-@unittest.skipUnless(VOICE_FILTER_AVAILABLE, "voice_filter.py no disponible")
+@unittest.skipUnless(VOICE_FILTER_AVAILABLE, "src.darius_ai.audio.voice_filter.py no disponible")
 class TestActivationModes(unittest.TestCase):
     """
     Prueba la lógica de filtrado de modos usando la función real
@@ -482,16 +480,16 @@ class TestActivationModes(unittest.TestCase):
     def test_nombre_mode_accepts_phonetic_variant_dario(self):
         """'dario' tiene similitud > 0.60 con 'darius' → debe aceptarse."""
         score = SequenceMatcher(None, ASSISTANT_NAME, "dario").ratio()
-        self.assertGreater(score, NAME_SIMILARITY_CUTOFF,
-            f"'dario' score {score:.2f} debería superar {NAME_SIMILARITY_CUTOFF}")
+        self.assertGreater(
+            score, NAME_SIMILARITY_CUTOFF, f"'dario' score {score:.2f} debería superar {NAME_SIMILARITY_CUTOFF}"
+        )
         found, _ = check_name_in_text("dario abre chrome", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
         self.assertTrue(found, "'dario' debería ser aceptado como variante fonética")
 
     def test_nombre_mode_rejects_very_different_word(self):
         """Una palabra muy diferente al nombre no debe activar el asistente."""
         found, _ = check_name_in_text("computadora abre chrome", ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF)
-        self.assertFalse(found,
-            "'computadora' no debe confundirse con 'darius'")
+        self.assertFalse(found, "'computadora' no debe confundirse con 'darius'")
 
     def test_nombre_mode_clean_text_is_command_only(self):
         """El texto limpio NO debe contener el nombre del asistente."""
@@ -504,9 +502,9 @@ class TestActivationModes(unittest.TestCase):
     def test_similarity_cutoff_value(self):
         """Documenta los scores de variantes fonéticas conocidas."""
         variants = {
-            "dario":  True,   # debe aceptarse
-            "mario":  False,  # m inicial muy diferente
-            "darío":  True,   # tilde — normalización debería manejarla
+            "dario": True,  # debe aceptarse
+            "mario": False,  # m inicial muy diferente
+            "darío": True,  # tilde — normalización debería manejarla
             "varios": False,  # contexto común, no debe activar
         }
         for word, expected_above_cutoff in variants.items():
@@ -514,16 +512,17 @@ class TestActivationModes(unittest.TestCase):
             clean_word = word.replace("í", "i").replace("á", "a")
             score = SequenceMatcher(None, ASSISTANT_NAME, clean_word).ratio()
             actual_above = score >= NAME_SIMILARITY_CUTOFF
-            print(f"  '{word}' → score: {score:.3f} | "
-                  f"{'ACEPTA' if actual_above else 'RECHAZA'}")
+            print(f"  '{word}' → score: {score:.3f} | {'ACEPTA' if actual_above else 'RECHAZA'}")
             if expected_above_cutoff:
-                self.assertTrue(actual_above or score > 0.50,
-                    f"'{word}' debería tener score razonable, obtuvo {score:.2f}")
+                self.assertTrue(
+                    actual_above or score > 0.50, f"'{word}' debería tener score razonable, obtuvo {score:.2f}"
+                )
 
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  6. MANEJO DE ERRORES GEMINI
 # ═════════════════════════════════════════════════════════════════════════════
+
 
 class TestGeminiErrorHandling(unittest.TestCase):
     """
@@ -546,34 +545,19 @@ class TestGeminiErrorHandling(unittest.TestCase):
             return "unknown_error"
 
     def test_error_429_classified_as_quota(self):
-        self.assertEqual(
-            self._classify_gemini_error("Error 429: Too Many Requests"),
-            "quota_exceeded"
-        )
+        self.assertEqual(self._classify_gemini_error("Error 429: Too Many Requests"), "quota_exceeded")
 
     def test_error_resource_exhausted(self):
-        self.assertEqual(
-            self._classify_gemini_error("RESOURCE_EXHAUSTED: quota exceeded"),
-            "quota_exceeded"
-        )
+        self.assertEqual(self._classify_gemini_error("RESOURCE_EXHAUSTED: quota exceeded"), "quota_exceeded")
 
     def test_error_unauthenticated(self):
-        self.assertEqual(
-            self._classify_gemini_error("UNAUTHENTICATED: Invalid API_KEY"),
-            "auth_error"
-        )
+        self.assertEqual(self._classify_gemini_error("UNAUTHENTICATED: Invalid API_KEY"), "auth_error")
 
     def test_error_network(self):
-        self.assertEqual(
-            self._classify_gemini_error("network connection refused"),
-            "network_error"
-        )
+        self.assertEqual(self._classify_gemini_error("network connection refused"), "network_error")
 
     def test_error_unknown(self):
-        self.assertEqual(
-            self._classify_gemini_error("Some unexpected internal server error XYZ"),
-            "unknown_error"
-        )
+        self.assertEqual(self._classify_gemini_error("Some unexpected internal server error XYZ"), "unknown_error")
 
     def test_quota_error_does_not_raise(self):
         """El sistema no debe propagar excepciones al usuario — solo hablar."""
@@ -597,6 +581,7 @@ class TestGeminiErrorHandling(unittest.TestCase):
 #  7. CMD_PATTERNS — REGEX DE main.py
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 class TestCmdPatterns(unittest.TestCase):
     """
     Prueba los regex de _CMD_PATTERNS de main.py sin instanciar la UI.
@@ -612,97 +597,82 @@ class TestCmdPatterns(unittest.TestCase):
     _RE_HORA_TEST = re.compile(
         r"\b(qu[eé]\s+horas?(\s+(es|son|tienes|marca))?|hora\s+actual|hora\s+exacta|"
         r"dime\s+la\s+hora|la\s+hora|tienes\s+la\s+hora)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_FECHA_TEST = re.compile(
         r"\b(qu[eé]\s+fecha(\s+(es|tenemos|hoy))?|qu[eé]\s+d[ií]a(\s+(es(\s+hoy)?|tenemos))?|"
         r"fecha\s+de\s+hoy|d[ií]a\s+de\s+hoy|a\s+qu[eé]\s+estamos(\s+hoy)?)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
 
     _RE_DNS_TEST = re.compile(
         r"\b(limpia[r]?|borra[r]?|vacia[r]?|flashe?a[r]?|resetea[r]?)\s+(el\s+|la\s+)?(cach[eé]\s+)?dns(\s+(del?\s+)?(sistema|internet|pc|red))?\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_GH_PRS_TEST = re.compile(
-        r"\b(ver|consultar|mostrar|lista[r]?)\s+(los\s+)?(prs?|pull\s+requests?)(\s+(de\s+)?github)?\b",
-        re.IGNORECASE
+        r"\b(ver|consultar|mostrar|lista[r]?)\s+(los\s+)?(prs?|pull\s+requests?)(\s+(de\s+)?github)?\b", re.IGNORECASE
     )
     _RE_GIT_STATUS_TEST = re.compile(
         r"\b(ver\s+|consultar\s+|mostrar\s+)?(estado\s+de\s+git|git\s+status|cambios\s+en\s+git|c[oó]mo\s+est[aá]\s+el\s+repo(sitorio)?)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_TOP_PROCESSES_TEST = re.compile(
         r"\b(qu[eé]\s+(app[s]?\s+|proceso[s]?\s+)?consume[n]?\s+m[aá]s\s+ram|procesos\s+pesados|procesos\s+que\s+m[aá]s\s+consumen(\s+ram)?|top\s+procesos|quien\s+consume\s+m[aá]s\s+(memoria|ram))\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
-    _RE_HUMAN_TYPE_TEST = re.compile(
-        r"\b(escribe|teclea|digita|escribe\s+por\s+m[ií])\s+(.+)$",
-        re.IGNORECASE
-    )
+    _RE_HUMAN_TYPE_TEST = re.compile(r"\b(escribe|teclea|digita|escribe\s+por\s+m[ií])\s+(.+)$", re.IGNORECASE)
     _RE_HUMAN_CLICK_TEST = re.compile(
-        r"\b(haz\s+clic|da\s+clic|clic\s+izquierdo|clic\s+derecho|doble\s+clic|mover\s+mouse)\b",
-        re.IGNORECASE
+        r"\b(haz\s+clic|da\s+clic|clic\s+izquierdo|clic\s+derecho|doble\s+clic|mover\s+mouse)\b", re.IGNORECASE
     )
     _RE_SCRAPE_WEB_TEST = re.compile(
         r"\b(extrae|scrapp?ea|analiza|lee|resume)\s+(la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url)?\s*(https?://\S+)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_VISION_SCREEN_TEST = re.compile(
         r"\b(qu[eé]\s+hay\s+en\s+(mi\s+)?pantalla|analiza\s+(mi\s+)?pantalla|lee\s+(la\s+)?pantalla|analiza\s+(este\s+)?error\s+(en\s+pantalla)?|mira\s+(la\s+)?pantalla|qu[eé]\s+estoy\s+viendo|captura\s+(de\s+)?pantalla)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_DEEP_RESEARCH_TEST = re.compile(
         r"\b(investiga\s+(a\s+fondo|profundamente|exhaustivamente|sobre)?|investigaci[oó]n\s+profunda\s+(sobre|de)?|haz\s+una\s+investigaci[oó]n\s+(sobre|de)?)\s+(.+)$",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_PLANNER_GOAL_TEST = re.compile(
-        r"\b(planifica|crea\s+un\s+plan\s+para|ejecuta\s+el\s+plan|plan\s+de\s+acci[oó]n\s+para)\s+(.+)$",
-        re.IGNORECASE
+        r"\b(planifica|crea\s+un\s+plan\s+para|ejecuta\s+el\s+plan|plan\s+de\s+acci[oó]n\s+para)\s+(.+)$", re.IGNORECASE
     )
     _RE_DETENER_TEST = re.compile(
         r"\b(c[aá]llate|silencio|detente|detener(se)?|parar|cancela[r]?|alto|basta|para\s+ya|para\s+ahora|det[eé]n(te)?|stop)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_DARIUS_PROTOCOL_TEST = re.compile(
         r"\b(inicia[r]?|ejecuta[r]?|activa[r]?)?\s*(protocolo\s+darius|protocolo|modo\s+bienvenida|rutina\s+de\s+bienvenida|bienvenida\s+darius)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_WORKSPACE_DEV_TEST = re.compile(
         r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+desarrollo|modo\s+dev|modo\s+programaci[oó]n|entorno\s+de\s+desarrollo)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_WORKSPACE_TRADING_TEST = re.compile(
         r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+trading|modo\s+mercados|modo\s+finanzas|pantalla\s+trading)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
     _RE_CURSOR_TEST = re.compile(
-        r"\b(enfoca[r]?\s+cursor|cursor\s+pantalla\s+completa|maximizar\s+cursor|abrir\s+cursor)\b",
-        re.IGNORECASE
+        r"\b(enfoca[r]?\s+cursor|cursor\s+pantalla\s+completa|maximizar\s+cursor|abrir\s+cursor)\b", re.IGNORECASE
     )
     _RE_MONITORES_TEST = re.compile(
-        r"\b(ver\s+monitores|cu[aá]ntos\s+monitores|pantallas\s+conectadas|info\s+monitores)\b",
-        re.IGNORECASE
+        r"\b(ver\s+monitores|cu[aá]ntos\s+monitores|pantallas\s+conectadas|info\s+monitores)\b", re.IGNORECASE
     )
-    _RE_DIARIO_TEST = re.compile(
-        r"\b(anota|escribe|guarda)\s+(en\s+mi\s+)?(diario|bit[aá]cora)\b",
-        re.IGNORECASE
-    )
+    _RE_DIARIO_TEST = re.compile(r"\b(anota|escribe|guarda)\s+(en\s+mi\s+)?(diario|bit[aá]cora)\b", re.IGNORECASE)
     _RE_MEMORIA_TEST = re.compile(
-        r"\b(recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian)\b",
-        re.IGNORECASE
+        r"\b(recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian)\b", re.IGNORECASE
     )
     _RE_BUSCAR_NOTAS_TEST = re.compile(
-        r"\b(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\b",
-        re.IGNORECASE
+        r"\b(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\b", re.IGNORECASE
     )
     _RE_APAGAR_TEST = re.compile(
-        r"\b(apagate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b",
-        re.IGNORECASE
+        r"\b(apagate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b", re.IGNORECASE
     )
     _RE_REINICIAR_TEST = re.compile(
-        r"\b(reinicia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b",
-        re.IGNORECASE
+        r"\b(reinicia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b", re.IGNORECASE
     )
     _RE_ACCION_TEST = re.compile(
         r"\b(ver\s+(mi\s+)?(ip|dns|ram|cpu|disco|espacio|version|serial|modelo|procesador|temperatura|procesos|conexiones|servicios|redes|firewall)|"
@@ -720,44 +690,44 @@ class TestCmdPatterns(unittest.TestCase):
         r"tiempo\s+encendido|uptime|"
         r"resumen\s+(del\s+)?sistema|info\s+(del\s+)?sistema|"
         r"buscar\s+actualizaciones)\b",
-        re.IGNORECASE
+        re.IGNORECASE,
     )
 
     # Replica de _CMD_PATTERNS de main.py (los patrones relevantes)
     PATTERNS = [
-        (_RE_DETENER_TEST,                                                       "_cmd_detener"),
-        (_RE_HORA_TEST,                                                          "_cmd_hora"),
-        (_RE_FECHA_TEST,                                                         "_cmd_fecha"),
+        (_RE_DETENER_TEST, "_cmd_detener"),
+        (_RE_HORA_TEST, "_cmd_hora"),
+        (_RE_FECHA_TEST, "_cmd_fecha"),
         (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
-        (_RE_VISION_SCREEN_TEST,                                                 "_cmd_screen_vision"),
-        (_RE_DEEP_RESEARCH_TEST,                                                 "_cmd_deep_research"),
-        (_RE_PLANNER_GOAL_TEST,                                                  "_cmd_agent_planner"),
-        (_RE_SCRAPE_WEB_TEST,                                                    "_cmd_scrape_web"),
-        (_RE_HUMAN_TYPE_TEST,                                                    "_cmd_human_type"),
-        (_RE_HUMAN_CLICK_TEST,                                                   "_cmd_human_click"),
-        (_RE_DNS_TEST,                                                           "_cmd_flush_dns"),
-        (_RE_GH_PRS_TEST,                                                        "_cmd_gh_prs"),
-        (_RE_GIT_STATUS_TEST,                                                    "_cmd_git_status"),
-        (_RE_TOP_PROCESSES_TEST,                                                 "_cmd_top_processes"),
-        (_RE_DARIUS_PROTOCOL_TEST,                                               "_cmd_darius_protocol"),
-        (_RE_WORKSPACE_DEV_TEST,                                                 "_cmd_workspace_dev"),
-        (_RE_WORKSPACE_TRADING_TEST,                                             "_cmd_workspace_trading"),
-        (_RE_CURSOR_TEST,                                                        "_cmd_focus_cursor"),
-        (_RE_MONITORES_TEST,                                                     "_cmd_ver_monitores"),
-        (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"),        "_cmd_youtube"),
-        (re.compile(r"\b(busca|buscar|googlea)\b"),                              "_cmd_buscar"),
-        (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"),           "_cmd_abrir"),
-        (re.compile(r"\bsubir\s+volumen\b"),                                     "_cmd_vol_up"),
-        (re.compile(r"\bbajar\s+volumen\b"),                                     "_cmd_vol_down"),
-        (re.compile(r"\bsilenciar\b"),                                           "_cmd_vol_mute"),
-        (re.compile(r"\b(cómo estás|estado del sistema|status)\b"),              "_cmd_estado"),
-        (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"),        "_cmd_cerrar"),
-        (_RE_DIARIO_TEST,                                                        "_cmd_diario"),
-        (_RE_MEMORIA_TEST,                                                       "_cmd_memoria"),
-        (_RE_BUSCAR_NOTAS_TEST,                                                  "_cmd_buscar_notas"),
-        (_RE_APAGAR_TEST,                                                        "_cmd_apagar_pc"),
-        (_RE_REINICIAR_TEST,                                                     "_cmd_reiniciar_pc"),
-        (_RE_ACCION_TEST,                                                        "_cmd_accion"),
+        (_RE_VISION_SCREEN_TEST, "_cmd_screen_vision"),
+        (_RE_DEEP_RESEARCH_TEST, "_cmd_deep_research"),
+        (_RE_PLANNER_GOAL_TEST, "_cmd_agent_planner"),
+        (_RE_SCRAPE_WEB_TEST, "_cmd_scrape_web"),
+        (_RE_HUMAN_TYPE_TEST, "_cmd_human_type"),
+        (_RE_HUMAN_CLICK_TEST, "_cmd_human_click"),
+        (_RE_DNS_TEST, "_cmd_flush_dns"),
+        (_RE_GH_PRS_TEST, "_cmd_gh_prs"),
+        (_RE_GIT_STATUS_TEST, "_cmd_git_status"),
+        (_RE_TOP_PROCESSES_TEST, "_cmd_top_processes"),
+        (_RE_DARIUS_PROTOCOL_TEST, "_cmd_darius_protocol"),
+        (_RE_WORKSPACE_DEV_TEST, "_cmd_workspace_dev"),
+        (_RE_WORKSPACE_TRADING_TEST, "_cmd_workspace_trading"),
+        (_RE_CURSOR_TEST, "_cmd_focus_cursor"),
+        (_RE_MONITORES_TEST, "_cmd_ver_monitores"),
+        (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"), "_cmd_youtube"),
+        (re.compile(r"\b(busca|buscar|googlea)\b"), "_cmd_buscar"),
+        (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"), "_cmd_abrir"),
+        (re.compile(r"\bsubir\s+volumen\b"), "_cmd_vol_up"),
+        (re.compile(r"\bbajar\s+volumen\b"), "_cmd_vol_down"),
+        (re.compile(r"\bsilenciar\b"), "_cmd_vol_mute"),
+        (re.compile(r"\b(cómo estás|estado del sistema|status)\b"), "_cmd_estado"),
+        (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"), "_cmd_cerrar"),
+        (_RE_DIARIO_TEST, "_cmd_diario"),
+        (_RE_MEMORIA_TEST, "_cmd_memoria"),
+        (_RE_BUSCAR_NOTAS_TEST, "_cmd_buscar_notas"),
+        (_RE_APAGAR_TEST, "_cmd_apagar_pc"),
+        (_RE_REINICIAR_TEST, "_cmd_reiniciar_pc"),
+        (_RE_ACCION_TEST, "_cmd_accion"),
     ]
 
     def _route(self, cmd: str) -> str | None:
@@ -860,6 +830,7 @@ class TestCmdPatterns(unittest.TestCase):
 #  8. INTEGRIDAD ESTRUCTURAL DE LOS DICCIONARIOS
 # ═════════════════════════════════════════════════════════════════════════════
 
+
 @unittest.skipUnless(WINCMD_AVAILABLE, "windows_commands no disponible")
 class TestDictionaryIntegrity(unittest.TestCase):
     """
@@ -870,16 +841,15 @@ class TestDictionaryIntegrity(unittest.TestCase):
     def test_all_windows_commands_have_cmd_and_desc(self):
         for key, data in WINDOWS_COMMANDS.items():
             with self.subTest(cmd=key):
-                self.assertIn("cmd",  data, f"'{key}' sin campo 'cmd'")
+                self.assertIn("cmd", data, f"'{key}' sin campo 'cmd'")
                 self.assertIn("desc", data, f"'{key}' sin campo 'desc'")
-                self.assertIsInstance(data["cmd"],  str, f"'{key}.cmd' no es string")
+                self.assertIsInstance(data["cmd"], str, f"'{key}.cmd' no es string")
                 self.assertIsInstance(data["desc"], str, f"'{key}.desc' no es string")
 
     def test_all_aliases_are_strings(self):
         for key, data in WINDOWS_COMMANDS.items():
             for i, alias in enumerate(data.get("aliases", [])):
-                self.assertIsInstance(alias, str,
-                    f"'{key}.aliases[{i}]' no es string: {alias!r}")
+                self.assertIsInstance(alias, str, f"'{key}.aliases[{i}]' no es string: {alias!r}")
 
     def test_no_duplicate_aliases_across_tables(self):
         """
@@ -907,8 +877,7 @@ class TestDictionaryIntegrity(unittest.TestCase):
     def test_system_actions_no_empty_run(self):
         for key, data in SYSTEM_ACTIONS.items():
             run = data.get("action", {}).get("run", "").strip()
-            self.assertGreater(len(run), 0,
-                f"'{key}.action.run' está vacío")
+            self.assertGreater(len(run), 0, f"'{key}.action.run' está vacío")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -918,6 +887,7 @@ class TestDictionaryIntegrity(unittest.TestCase):
 try:
     # Solo funciona en Windows con GUI; falla elegantemente en otros entornos
     from main import _CMD_PATTERNS as _REAL_PATTERNS
+
     MAIN_PATTERNS_AVAILABLE = True
 except Exception:
     MAIN_PATTERNS_AVAILABLE = False
@@ -937,17 +907,11 @@ class TestPatternsMatchMain(unittest.TestCase):
 
     def test_all_real_handlers_have_tests(self):
         missing = self.real_handlers - self.test_handlers
-        self.assertEqual(
-            len(missing), 0,
-            f"Handlers en main.py sin test: {missing}"
-        )
+        self.assertEqual(len(missing), 0, f"Handlers en main.py sin test: {missing}")
 
     def test_no_extra_handlers_in_tests(self):
         extra = self.test_handlers - self.real_handlers
-        self.assertEqual(
-            len(extra), 0,
-            f"Handlers en tests que no existen en main.py: {extra}"
-        )
+        self.assertEqual(len(extra), 0, f"Handlers en tests que no existen en main.py: {extra}")
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -958,12 +922,19 @@ if __name__ == "__main__":
     # Permite ejecutar una clase específica: python test_commands_v6.py WinCmd
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         pattern = sys.argv.pop(1)
-        loader  = unittest.TestLoader()
-        suite   = unittest.TestSuite()
-        for cls in [TestNormalization, TestWinCmdTypeA, TestWinCmdTypeB,
-                    TestFuzzyMatching, TestActivationModes,
-                    TestGeminiErrorHandling, TestCmdPatterns,
-                    TestDictionaryIntegrity, TestPatternsMatchMain]:
+        loader = unittest.TestLoader()
+        suite = unittest.TestSuite()
+        for cls in [
+            TestNormalization,
+            TestWinCmdTypeA,
+            TestWinCmdTypeB,
+            TestFuzzyMatching,
+            TestActivationModes,
+            TestGeminiErrorHandling,
+            TestCmdPatterns,
+            TestDictionaryIntegrity,
+            TestPatternsMatchMain,
+        ]:
             if pattern.lower() in cls.__name__.lower():
                 suite.addTests(loader.loadTestsFromTestCase(cls))
         runner = unittest.TextTestRunner(verbosity=2)

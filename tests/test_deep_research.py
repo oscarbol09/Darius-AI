@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from deep_research import DeepResearchPipeline, _clean_html_text
-from obsidian_brain import ObsidianBrain
+from src.darius_ai.core.deep_research import DeepResearchPipeline, _clean_html_text
+from src.darius_ai.core.obsidian_brain import ObsidianBrain
 
 
 def test_clean_html_text():
@@ -34,7 +34,7 @@ def test_generate_search_queries_mocked():
     pipeline = DeepResearchPipeline()
 
     mock_llm_response = '{"queries": ["python async memory leak", "python tracemalloc debug", "python gc tuning"]}'
-    with patch("deep_research.get_ai_response", return_value=(mock_llm_response, "Gemini")):
+    with patch("src.darius_ai.core.deep_research.get_ai_response", return_value=(mock_llm_response, "Gemini")):
         queries = pipeline.generate_search_queries("fugas de memoria en python", count=3)
         assert len(queries) == 3
         assert "python async memory leak" in queries
@@ -54,12 +54,13 @@ def test_run_research_full_flow_mocked():
     with tempfile.TemporaryDirectory() as tmpdir:
         test_brain = ObsidianBrain(vault_path=tmpdir)
 
-        with patch.object(pipeline, "generate_search_queries", return_value=["query 1"]), \
-             patch("deep_research._search_duckduckgo", return_value=mock_sources), \
-             patch("deep_research._fetch_page_content", return_value="Contenido extraído de prueba"), \
-             patch("deep_research.get_ai_response", return_value=(mock_report, "OpenAI")), \
-             patch("deep_research.brain", test_brain):
-
+        with (
+            patch.object(pipeline, "generate_search_queries", return_value=["query 1"]),
+            patch("src.darius_ai.core.deep_research._search_duckduckgo", return_value=mock_sources),
+            patch("src.darius_ai.core.deep_research._fetch_page_content", return_value="Contenido extraído de prueba"),
+            patch("src.darius_ai.core.deep_research.get_ai_response", return_value=(mock_report, "OpenAI")),
+            patch("src.darius_ai.core.deep_research.brain", test_brain),
+        ):
             spoken_messages = []
             res = pipeline.run_research(
                 topic="Arquitectura de Microservicios",

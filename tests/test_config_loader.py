@@ -1,14 +1,16 @@
 import threading
 
-from config_loader import _DEFAULTS, _SCHEMA, _deep_merge, _validate_types, cfg
+from src.darius_ai.core.config_loader import _DEFAULTS, _SCHEMA, _deep_merge, _validate_types, cfg
 
 
 class TestValidateTypes:
     def test_valid_types_pass_unchanged(self):
         data = {
             "gemini": {
-                "model": "gemini-pro", "max_tokens": 500,
-                "temperature": 0.5, "history_turns": 5,
+                "model": "gemini-pro",
+                "max_tokens": 500,
+                "temperature": 0.5,
+                "history_turns": 5,
             },
         }
         result = _validate_types(data, _SCHEMA)

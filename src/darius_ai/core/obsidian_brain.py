@@ -20,15 +20,34 @@ import logging
 import re
 from pathlib import Path
 
-from config_loader import cfg
+from src.darius_ai.core.config_loader import cfg
 
 log = logging.getLogger("DARIUS.Obsidian")
 
 
 _RESERVED_DOS_NAMES = {
-    "CON", "PRN", "AUX", "NUL",
-    "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
-    "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
 }
 
 
@@ -59,11 +78,7 @@ class ObsidianBrain:
             return self._vault_dir
 
         configured = self._custom_path or cfg.obsidian_vault_path
-        path = (
-            Path(configured).expanduser().resolve()
-            if configured
-            else Path.home() / "Documents" / "Obsidian Vault"
-        )
+        path = Path(configured).expanduser().resolve() if configured else Path.home() / "Documents" / "Obsidian Vault"
 
         try:
             path.mkdir(parents=True, exist_ok=True)
@@ -156,7 +171,7 @@ class ObsidianBrain:
         markdown = (
             f"---\n"
             f"tipo: investigacion\n"
-            f"tema: \"{safe_topic}\"\n"
+            f'tema: "{safe_topic}"\n'
             f"fecha_creacion: '{now_iso}'\n"
             f"tags:\n"
             f"{tags_yaml}\n"
@@ -236,12 +251,14 @@ class ObsidianBrain:
                 # Extraer cuerpo sin frontmatter
                 body = re.sub(r"^---[\s\S]*?---\n", "", text).strip()
                 preview = body[:300] + ("..." if len(body) > 300 else "")
-                matches.append({
-                    "title": file.stem,
-                    "path": str(file.relative_to(vault)),
-                    "score": total_score,
-                    "snippet": preview,
-                })
+                matches.append(
+                    {
+                        "title": file.stem,
+                        "path": str(file.relative_to(vault)),
+                        "score": total_score,
+                        "snippet": preview,
+                    }
+                )
 
         matches.sort(key=lambda x: x["score"], reverse=True)
         return matches[:max_results]
@@ -292,11 +309,13 @@ class ObsidianBrain:
                 text = file.read_text(encoding="utf-8", errors="ignore")
                 body = re.sub(r"^---[\s\S]*?---\n", "", text).strip()
                 preview = body[:200] + ("..." if len(body) > 200 else "")
-                results.append({
-                    "title": file.stem,
-                    "path": str(file.relative_to(vault)),
-                    "snippet": preview,
-                })
+                results.append(
+                    {
+                        "title": file.stem,
+                        "path": str(file.relative_to(vault)),
+                        "snippet": preview,
+                    }
+                )
             except Exception as e:
                 log.debug(f"No se pudo leer memoria '{file}': {e}")
                 continue

@@ -3,7 +3,7 @@
 import datetime
 from pathlib import Path
 
-from obsidian_brain import ObsidianBrain, _sanitize_filename
+from src.darius_ai.core.obsidian_brain import ObsidianBrain, _sanitize_filename
 
 
 class TestSanitizeFilename:

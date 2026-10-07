@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from PIL import Image
 
-from screen_vision import ScreenVisionEngine
+from src.darius_ai.core.screen_vision import ScreenVisionEngine
 
 
 def test_screen_vision_capture_mocked():
@@ -41,9 +41,10 @@ def test_screen_vision_analyze_screen_mocked():
     test_img = Image.new("RGB", (800, 600), color="green")
     mock_resp = ("En la pantalla hay un editor de código abierto.", "Gemini (gemini-2.5-flash)")
 
-    with patch.object(engine, "capture_screen_image", return_value=test_img), \
-         patch("screen_vision.get_ai_response", return_value=mock_resp):
-
+    with (
+        patch.object(engine, "capture_screen_image", return_value=test_img),
+        patch("src.darius_ai.core.screen_vision.get_ai_response", return_value=mock_resp),
+    ):
         result = engine.analyze_screen(prompt="¿Qué estoy viendo?")
         assert "editor de código" in result
 
@@ -54,8 +55,9 @@ def test_screen_vision_analyze_screen_error_mocked():
     test_img = Image.new("RGB", (800, 600), color="red")
     mock_resp = ("Se detectó un error de sintaxis en la línea 42.", "OpenAI (gpt-4o-mini)")
 
-    with patch.object(engine, "capture_screen_image", return_value=test_img), \
-         patch("screen_vision.get_ai_response", return_value=mock_resp):
-
+    with (
+        patch.object(engine, "capture_screen_image", return_value=test_img),
+        patch("src.darius_ai.core.screen_vision.get_ai_response", return_value=mock_resp),
+    ):
         result = engine.analyze_screen_error(monitor_index=1)
         assert "error de sintaxis" in result

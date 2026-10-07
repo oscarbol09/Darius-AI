@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tts_cache import get_cached_wav_path, is_cached, play_cached_wav, save_pcm_to_wav
+from src.darius_ai.audio.tts_cache import get_cached_wav_path, is_cached, play_cached_wav, save_pcm_to_wav
 
 log = logging.getLogger("DARIUS.ElevenLabsTTS")
 
@@ -120,10 +120,7 @@ class ElevenLabsTTS:
 
     def _fetch_pcm_rest(self, text: str) -> bytes | None:
         """Llamada REST directa a ElevenLabs text-to-speech endpoint."""
-        url = (
-            f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}"
-            f"?output_format={self.output_format}"
-        )
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}?output_format={self.output_format}"
         payload = {
             "text": text,
             "model_id": self.model_id,

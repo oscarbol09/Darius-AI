@@ -28,7 +28,7 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
-from voice_filter import (  # noqa: E402
+from src.darius_ai.audio.voice_filter import (  # noqa: E402
     LISTEN_MODE_AUTO,
     LISTEN_MODE_NAME,
     LISTEN_MODE_PTT,
@@ -37,12 +37,12 @@ from voice_filter import (  # noqa: E402
 )
 
 # ── Constantes de main.py ─────────────────────────────────────────────────────
-ASSISTANT_NAME         = "darius"
+ASSISTANT_NAME = "darius"
 NAME_SIMILARITY_CUTOFF = 0.60
-MIC_ENERGY_THRESHOLD   = 3000
-MIC_PAUSE_THRESHOLD    = 0.8
-MIC_LISTEN_TIMEOUT     = 5
-MIC_PHRASE_LIMIT       = 10
+MIC_ENERGY_THRESHOLD = 3000
+MIC_PAUSE_THRESHOLD = 0.8
+MIC_LISTEN_TIMEOUT = 5
+MIC_PHRASE_LIMIT = 10
 MIN_WORDS_WITHOUT_NAME = 99
 
 
@@ -65,7 +65,7 @@ def _build_wav_in_memory(samples: list[int], rate: int = 16000) -> io.BytesIO:
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
         wf.setnchannels(1)
-        wf.setsampwidth(2)       # paInt16 = 2 bytes
+        wf.setsampwidth(2)  # paInt16 = 2 bytes
         wf.setframerate(rate)
         wf.writeframes(raw)
     buf.seek(0)
@@ -75,6 +75,7 @@ def _build_wav_in_memory(samples: list[int], rate: int = 16000) -> io.BytesIO:
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 1 — FILTRO DE MODO NOMBRE
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestNameModeFilter(unittest.TestCase):
     """Prueba el filtro de activación en modo NOMBRE."""
@@ -105,8 +106,9 @@ class TestNameModeFilter(unittest.TestCase):
 
     def test_accepts_phonetic_variant_dario(self):
         sim = SequenceMatcher(None, ASSISTANT_NAME, "dario").ratio()
-        self.assertGreater(sim, NAME_SIMILARITY_CUTOFF,
-            f"'dario' score {sim:.2f} debe superar umbral {NAME_SIMILARITY_CUTOFF}")
+        self.assertGreater(
+            sim, NAME_SIMILARITY_CUTOFF, f"'dario' score {sim:.2f} debe superar umbral {NAME_SIMILARITY_CUTOFF}"
+        )
         ok, cmd = _process_recognized_text("dario sube el volumen", LISTEN_MODE_NAME)
         self.assertTrue(ok, "'dario' debería ser aceptado como variante de 'darius'")
         self.assertEqual(cmd, "sube el volumen")
@@ -124,6 +126,7 @@ class TestNameModeFilter(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 2 — MODO AUTO
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestAutoModeFilter(unittest.TestCase):
     """El modo AUTO debe aceptar cualquier texto sin restricciones de nombre."""
@@ -154,6 +157,7 @@ class TestAutoModeFilter(unittest.TestCase):
 #  TEST 3 — MODO PTT
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPTTModeFilter(unittest.TestCase):
     """En modo PTT el nombre nunca se exige — el gesto de la tecla es el trigger."""
 
@@ -178,24 +182,24 @@ class TestPTTModeFilter(unittest.TestCase):
 #  TEST 4 — SERIALIZACIÓN WAV EN MEMORIA (flujo PTT)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPTTWAVSerialization(unittest.TestCase):
     """
     Verifica que la serialización de frames PyAudio a WAV en memoria
     produzca un archivo válido que speech_recognition pueda leer.
     """
 
-    def _generate_sine_samples(self, freq: int = 440, duration_ms: int = 200,
-                                rate: int = 16000) -> list[int]:
+    def _generate_sine_samples(self, freq: int = 440, duration_ms: int = 200, rate: int = 16000) -> list[int]:
         """Genera muestras de una onda sinusoidal como int16."""
         import math
+
         n_samples = int(rate * duration_ms / 1000)
         amplitude = 8000
-        return [int(amplitude * math.sin(2 * math.pi * freq * i / rate))
-                for i in range(n_samples)]
+        return [int(amplitude * math.sin(2 * math.pi * freq * i / rate)) for i in range(n_samples)]
 
     def test_wav_buffer_is_valid_wav(self):
         samples = self._generate_sine_samples()
-        buf     = _build_wav_in_memory(samples)
+        buf = _build_wav_in_memory(samples)
         # Verificar que el buffer es un WAV válido leyendo su cabecera
         buf.seek(0)
         header = buf.read(4)
@@ -203,23 +207,22 @@ class TestPTTWAVSerialization(unittest.TestCase):
 
     def test_wav_buffer_has_correct_params(self):
         samples = self._generate_sine_samples(duration_ms=500)
-        buf     = _build_wav_in_memory(samples, rate=16000)
+        buf = _build_wav_in_memory(samples, rate=16000)
         buf.seek(0)
         with wave.open(buf) as wf:
-            self.assertEqual(wf.getnchannels(), 1,    "Debe ser mono")
-            self.assertEqual(wf.getsampwidth(), 2,    "Debe ser 16-bit (paInt16)")
-            self.assertEqual(wf.getframerate(), 16000,"Sample rate debe ser 16000 Hz")
+            self.assertEqual(wf.getnchannels(), 1, "Debe ser mono")
+            self.assertEqual(wf.getsampwidth(), 2, "Debe ser 16-bit (paInt16)")
+            self.assertEqual(wf.getframerate(), 16000, "Sample rate debe ser 16000 Hz")
 
     def test_wav_buffer_sample_count(self):
-        rate    = 16000
-        ms      = 300
+        rate = 16000
+        ms = 300
         samples = self._generate_sine_samples(duration_ms=ms, rate=rate)
-        buf     = _build_wav_in_memory(samples, rate=rate)
+        buf = _build_wav_in_memory(samples, rate=rate)
         buf.seek(0)
         with wave.open(buf) as wf:
             n_frames = wf.getnframes()
-        self.assertEqual(n_frames, len(samples),
-            f"Frames esperados: {len(samples)}, obtenidos: {n_frames}")
+        self.assertEqual(n_frames, len(samples), f"Frames esperados: {len(samples)}, obtenidos: {n_frames}")
 
     def test_empty_frames_produces_valid_wav(self):
         """Frames vacíos (usuario soltó la tecla sin hablar) deben producir WAV válido."""
@@ -236,14 +239,13 @@ class TestPTTWAVSerialization(unittest.TestCase):
             self.skipTest("speech_recognition no instalado")
 
         samples = self._generate_sine_samples(freq=440, duration_ms=500)
-        buf     = _build_wav_in_memory(samples)
+        buf = _build_wav_in_memory(samples)
 
         try:
             with sr.AudioFile(buf) as source:
                 recognizer = sr.Recognizer()
                 audio = recognizer.record(source)
-            self.assertIsNotNone(audio,
-                "sr.AudioFile debe poder leer el buffer WAV generado")
+            self.assertIsNotNone(audio, "sr.AudioFile debe poder leer el buffer WAV generado")
         except Exception as e:
             self.fail(f"sr.AudioFile lanzó excepción con WAV válido: {e}")
 
@@ -252,6 +254,7 @@ class TestPTTWAVSerialization(unittest.TestCase):
 #  TEST 5 — CONFIGURACIÓN DEL RECOGNIZER
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestRecognizerConfiguration(unittest.TestCase):
     """
     Verifica que el Recognizer de main.py se configura con los valores correctos.
@@ -259,22 +262,18 @@ class TestRecognizerConfiguration(unittest.TestCase):
 
     def test_energy_threshold_value(self):
         self.assertGreater(MIC_ENERGY_THRESHOLD, 0)
-        self.assertLess(MIC_ENERGY_THRESHOLD, 10000,
-            "Energy threshold muy alto podría no detectar voz normal")
+        self.assertLess(MIC_ENERGY_THRESHOLD, 10000, "Energy threshold muy alto podría no detectar voz normal")
 
     def test_pause_threshold_reasonable(self):
-        self.assertGreater(MIC_PAUSE_THRESHOLD, 0.3,
-            "Pause threshold muy bajo causaría cortes prematuros")
-        self.assertLess(MIC_PAUSE_THRESHOLD, 2.0,
-            "Pause threshold muy alto causaría esperas largas")
+        self.assertGreater(MIC_PAUSE_THRESHOLD, 0.3, "Pause threshold muy bajo causaría cortes prematuros")
+        self.assertLess(MIC_PAUSE_THRESHOLD, 2.0, "Pause threshold muy alto causaría esperas largas")
 
     def test_listen_timeout_positive(self):
         self.assertGreater(MIC_LISTEN_TIMEOUT, 0)
 
     def test_phrase_limit_positive(self):
         self.assertGreater(MIC_PHRASE_LIMIT, 0)
-        self.assertGreater(MIC_PHRASE_LIMIT, MIC_LISTEN_TIMEOUT,
-            "phrase_time_limit debe ser mayor que listen timeout")
+        self.assertGreater(MIC_PHRASE_LIMIT, MIC_LISTEN_TIMEOUT, "phrase_time_limit debe ser mayor que listen timeout")
 
     def test_recognizer_configured_correctly(self):
         """Verifica que configure_listener() aplica los valores de las constantes."""
@@ -284,19 +283,20 @@ class TestRecognizerConfiguration(unittest.TestCase):
             self.skipTest("speech_recognition no instalado")
 
         r = sr.Recognizer()
-        r.energy_threshold         = MIC_ENERGY_THRESHOLD
+        r.energy_threshold = MIC_ENERGY_THRESHOLD
         r.dynamic_energy_threshold = True
-        r.pause_threshold          = MIC_PAUSE_THRESHOLD
-        r.non_speaking_duration    = 0.5
+        r.pause_threshold = MIC_PAUSE_THRESHOLD
+        r.non_speaking_duration = 0.5
 
         self.assertEqual(r.energy_threshold, MIC_ENERGY_THRESHOLD)
-        self.assertEqual(r.pause_threshold,  MIC_PAUSE_THRESHOLD)
+        self.assertEqual(r.pause_threshold, MIC_PAUSE_THRESHOLD)
         self.assertTrue(r.dynamic_energy_threshold)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 6 — INTEGRACIÓN REAL DE MICRÓFONO (opcional)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestLiveMicrophone(unittest.TestCase):
     """
@@ -317,6 +317,7 @@ class TestLiveMicrophone(unittest.TestCase):
         self._skip_if_not_live()
         try:
             import speech_recognition as sr
+
             mics = sr.Microphone.list_microphone_names()
             self.assertGreater(len(mics), 0, "No se detectaron micrófonos")
             print(f"\n[LIVE] Micrófonos disponibles ({len(mics)}):")
@@ -351,15 +352,14 @@ class TestLiveMicrophone(unittest.TestCase):
             self.skipTest("speech_recognition no instalado")
 
         r = sr.Recognizer()
-        r.energy_threshold         = MIC_ENERGY_THRESHOLD
+        r.energy_threshold = MIC_ENERGY_THRESHOLD
         r.dynamic_energy_threshold = True
-        r.pause_threshold          = MIC_PAUSE_THRESHOLD
+        r.pause_threshold = MIC_PAUSE_THRESHOLD
 
         print(f"\n[LIVE] Di algo en español ({MIC_LISTEN_TIMEOUT}s de timeout)...")
         try:
             with sr.Microphone() as source:
-                audio = r.listen(source, timeout=MIC_LISTEN_TIMEOUT,
-                                 phrase_time_limit=MIC_PHRASE_LIMIT)
+                audio = r.listen(source, timeout=MIC_LISTEN_TIMEOUT, phrase_time_limit=MIC_PHRASE_LIMIT)
             text = r.recognize_google(audio, language="es-ES").lower()
             print(f"[LIVE] Reconocido: '{text}'")
             self.assertIsInstance(text, str)
@@ -381,22 +381,20 @@ class TestLiveMicrophone(unittest.TestCase):
 
         r = sr.Recognizer()
         r.energy_threshold = MIC_ENERGY_THRESHOLD
-        r.pause_threshold  = MIC_PAUSE_THRESHOLD
+        r.pause_threshold = MIC_PAUSE_THRESHOLD
 
         print("\n[LIVE] Di 'darius qué hora es' (modo NOMBRE)...")
         try:
             with sr.Microphone() as source:
-                audio = r.listen(source, timeout=MIC_LISTEN_TIMEOUT,
-                                 phrase_time_limit=MIC_PHRASE_LIMIT)
-            text   = r.recognize_google(audio, language="es-ES").lower()
+                audio = r.listen(source, timeout=MIC_LISTEN_TIMEOUT, phrase_time_limit=MIC_PHRASE_LIMIT)
+            text = r.recognize_google(audio, language="es-ES").lower()
             print(f"[LIVE] STT: '{text}'")
             ok, cmd = _process_recognized_text(text, LISTEN_MODE_NAME)
             print(f"[LIVE] Filtro NOMBRE: aceptado={ok}, comando='{cmd}'")
             if ok:
                 print("[LIVE] ✓ Comando procesado correctamente")
             else:
-                print("[LIVE] ✗ Comando descartado por filtro NOMBRE "
-                      "(¿dijiste 'darius' al inicio?)")
+                print("[LIVE] ✗ Comando descartado por filtro NOMBRE (¿dijiste 'darius' al inicio?)")
         except sr.WaitTimeoutError:
             self.skipTest("Timeout de audio")
         except sr.UnknownValueError:
