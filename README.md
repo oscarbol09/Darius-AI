@@ -12,7 +12,7 @@
 </p>
 
 > 📖 **Sitio Web de Documentación Oficial:** [oscarbol09.github.io/Darius-AI](https://oscarbol09.github.io/Darius-AI/)  
-> 🚀 **¿Quieres usar Darius AI sin instalar Python?** Descarga el instalador oficial **[DariusAI-Setup-v7.0.0.exe](https://github.com/oscarbol09/Darius-AI/releases/latest)** en la sección de Releases. Se instala en segundos en tu equipo sin requerir permisos de administrador.
+> 🚀 **¿Quieres usar Darius AI sin instalar Python?** Descarga el instalador oficial **[DariusAI-Setup-Latest.exe](https://github.com/oscarbol09/Darius-AI/releases/latest)** en la sección de Releases. Se instala en segundos en tu equipo sin requerir permisos de administrador.
 
 **Darius AI** es un asistente de escritorio por voz y automatización nativa para Windows con arquitectura BYOK (*Bring Your Own Key*), automatización antropomórfica de GUI (*Computer Use*), cerebro de memoria en Obsidian y renderizado visual a 60 FPS.
 
@@ -131,7 +131,7 @@ Si tienes instalado [Inno Setup 6](https://jrsoftware.org/isdl.php), compila el 
 iscc installer.iss
 ```
 
-Esto generará `Output/DariusAI-Setup-v7.0.0.exe`, un instalador ligero que se instala en el directorio de usuario (`%LOCALAPPDATA%\Programs\DariusAI`) sin solicitar permisos de administrador.
+Esto generará `Output/DariusAI-Setup-Latest.exe`, un instalador ligero que se instala en el directorio de usuario (`%LOCALAPPDATA%\Programs\DariusAI`) sin solicitar permisos de administrador.
 
 ### 4. Configurar la Bóveda de Obsidian y Espacio de Trabajo (Opcional)
 

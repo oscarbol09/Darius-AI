@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "darius-ai"
-version = "7.0.0"
+version = "7.1.0"
 description = "Asistente de inteligencia artificial nativo para Windows con control por voz y automatización"
 authors = [
     { name = "Oscarbol09", email = "oscarbol09@users.noreply.github.com" },
