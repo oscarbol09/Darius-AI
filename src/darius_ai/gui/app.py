@@ -166,21 +166,21 @@ def volume_up():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMasterVolumeLevelScalar(min(1.0, _volume_ctrl.GetMasterVolumeLevelScalar() + 0.1), None)
     else:
-        subprocess.run(  # noqa: S603["nircmd.exe", "changesysvolume", "5000"], shell=False)  # noqa: S607
+        subprocess.run(["nircmd.exe", "changesysvolume", "5000"], shell=False)  # noqa: S607
 
 
 def volume_down():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMasterVolumeLevelScalar(max(0.0, _volume_ctrl.GetMasterVolumeLevelScalar() - 0.1), None)
     else:
-        subprocess.run(  # noqa: S603["nircmd.exe", "changesysvolume", "-5000"], shell=False)  # noqa: S607
+        subprocess.run(["nircmd.exe", "changesysvolume", "-5000"], shell=False)  # noqa: S607
 
 
 def volume_mute():
     if PYCAW_AVAILABLE:
         _volume_ctrl.SetMute(1, None)
     else:
-        subprocess.run(  # noqa: S603["nircmd.exe", "mutesysvolume", "1"], shell=False)  # noqa: S607
+        subprocess.run(["nircmd.exe", "mutesysvolume", "1"], shell=False)  # noqa: S607
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2345,7 +2345,7 @@ class DariusFinal(ctk.CTk):
             self._pending_action = {
                 "desc": "Apagar el equipo en 10 segundos",
                 "confirm": True,
-                "_fn": lambda: subprocess.run(  # noqa: S603
+                "_fn": lambda: subprocess.run(
                     [os.environ["WINDIR"] + "\\System32\\shutdown.exe", "/s", "/t", "10"],  # noqa: S603,E501
                     shell=False,
                     check=False,
@@ -2359,7 +2359,7 @@ class DariusFinal(ctk.CTk):
             self._pending_action = {
                 "desc": "Reiniciar el equipo en 10 segundos",
                 "confirm": True,
-                "_fn": lambda: subprocess.run(  # noqa: S603
+                "_fn": lambda: subprocess.run(
                     [os.environ["WINDIR"] + "\\System32\\shutdown.exe", "/r", "/t", "10"],  # noqa: S603,E501
                     shell=False,
                     check=False,
