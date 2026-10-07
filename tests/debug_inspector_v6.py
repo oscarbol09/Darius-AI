@@ -619,8 +619,8 @@ def print_benchmark_report():
     print(f"    Total aliases:   {report['total_aliases_a']}")
     print(f"    ✓ Pasaron:       {GREEN}{passed_a}{RESET}")
     print(
-        f"    ✗ Fallaron:      {RED if report['failed_roundtrip_a'] else GREEN}{len(report['failed_roundtrip_a'])}{RESET}"
-    )  # noqa: E501
+        f"    ✗ Fallaron:      {RED if report['failed_roundtrip_a'] else GREEN}{len(report['failed_roundtrip_a'])}{RESET}"  # noqa: E501
+    )
     print(f"    Tiempo promedio: {report['avg_time_ms_a']:.4f} ms/alias")
 
     if report["failed_roundtrip_a"]:
@@ -633,8 +633,8 @@ def print_benchmark_report():
     print(f"    Total aliases:   {report['total_aliases_b']}")
     print(f"    ✓ Pasaron:       {GREEN}{passed_b}{RESET}")
     print(
-        f"    ✗ Fallaron:      {RED if report['failed_roundtrip_b'] else GREEN}{len(report['failed_roundtrip_b'])}{RESET}"
-    )  # noqa: E501
+        f"    ✗ Fallaron:      {RED if report['failed_roundtrip_b'] else GREEN}{len(report['failed_roundtrip_b'])}{RESET}"  # noqa: E501
+    )
     print(f"    Tiempo promedio: {report['avg_time_ms_b']:.4f} ms/alias")
 
     if report["failed_roundtrip_b"]:

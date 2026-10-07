@@ -1101,13 +1101,13 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
 
         elif open_window:
             if atype == "powershell":
-                subprocess.Popen(
-                    [_PS, "-NoExit", "-Command", run],  # noqa: S603
+                subprocess.Popen(  # noqa: S603
+                    [_PS, "-NoExit", "-Command", run],
                     creationflags=subprocess.CREATE_NEW_CONSOLE,
                 )
             else:
-                subprocess.Popen(
-                    [_CMD, "/k", run],  # noqa: S603
+                subprocess.Popen(  # noqa: S603
+                    [_CMD, "/k", run],
                     creationflags=subprocess.CREATE_NEW_CONSOLE,
                 )
             return True, ""
@@ -1139,8 +1139,8 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
             else:
-                subprocess.Popen(
-                    [_CMD, "/c", run],  # noqa: S603
+                subprocess.Popen(  # noqa: S603
+                    [_CMD, "/c", run],
                     creationflags=subprocess.CREATE_NO_WINDOW,
                 )
             return True, ""

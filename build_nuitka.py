@@ -38,8 +38,7 @@ def main():
     except ImportError:
         print("[*] Instalando Nuitka y aceleradores (zstandard, ordered-set)...")
         subprocess.run(
-            [sys.executable, "-m", "pip", "install", "nuitka>=2.4.0", "zstandard", "ordered-set"],
-            check=True
+            [sys.executable, "-m", "pip", "install", "nuitka>=2.4.0", "zstandard", "ordered-set"], check=True
         )
 
     # 3. Construir comando Nuitka
@@ -48,7 +47,8 @@ def main():
 
     cmd = [
         sys.executable,
-        "-m", "nuitka",
+        "-m",
+        "nuitka",
         "--standalone",
         "--low-memory",
         "--lto=no",
