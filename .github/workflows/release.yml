@@ -101,22 +101,27 @@ jobs:
       - name: Compilar Instalador de Windows con Inno Setup
         run: |
           mkdir dist-installer -Force
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          $TAG = "${{ github.ref_name }}"
+          if (!$TAG -or $TAG -eq "") { $TAG = "${{ inputs.tag_name }}" }
+          $RAW_VERSION = $TAG.TrimStart('v')
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$RAW_VERSION" "/DMyOutputBaseFilename=DariusAI-Setup-$TAG" installer.iss
 
       - name: Generar paquete portable .ZIP
         run: |
-          Compress-Archive -Path dist\main.dist\* -DestinationPath dist-installer\DariusAI-v7.0.0-windows-x64-portable.zip -Force
+          $TAG = "${{ github.ref_name }}"
+          if (!$TAG -or $TAG -eq "") { $TAG = "${{ inputs.tag_name }}" }
+          Compress-Archive -Path dist\main.dist\* -DestinationPath "dist-installer\DariusAI-$TAG-windows-x64-portable.zip" -Force
 
       - name: Publicar GitHub Release y adjuntar binarios
         uses: softprops/action-gh-release@v2
         with:
-          name: Darius AI v7.0.0 — Standalone Installer & Acoustic Automation Edition
+          name: Darius AI ${{ github.ref_name || inputs.tag_name }} — Standalone Installer & Acoustic Automation Edition
           tag_name: ${{ github.ref_name || inputs.tag_name }}
           draft: false
           prerelease: false
           generate_release_notes: true
           files: |
-            dist-installer/DariusAI-Setup-v7.0.0.exe
-            dist-installer/DariusAI-v7.0.0-windows-x64-portable.zip
+            dist-installer/DariusAI-Setup-*.exe
+            dist-installer/DariusAI-*-windows-x64-portable.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

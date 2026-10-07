@@ -4,7 +4,9 @@
 ; ==============================================================================
 
 #define MyAppName "Darius AI"
+#ifndef MyAppVersion
 #define MyAppVersion "7.0.0"
+#endif
 #define MyAppPublisher "Oscarbol09"
 #define MyAppURL "https://github.com/oscarbol09/Darius-AI"
 #define MyAppExeName "DariusAI.exe"
@@ -21,7 +23,10 @@ DefaultDirName={localappdata}\Programs\DariusAI
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=dist-installer
-OutputBaseFilename=DariusAI-Setup-v7.0.0
+#ifndef MyOutputBaseFilename
+#define MyOutputBaseFilename "DariusAI-Setup-v7.0.0"
+#endif
+OutputBaseFilename={#MyOutputBaseFilename}
 SetupIconFile=assets\darius.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
