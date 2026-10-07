@@ -13,6 +13,16 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+
+# -- Inyeccion de Versin Dinmica SRE --
+import os
+
+raw_tag = os.environ.get("GITHUB_REF_NAME", "7.0.0").lstrip("v")
+parts = raw_tag.split(".")
+while len(parts) < 4:
+    parts.append("0")
+win_version = ".".join(parts[:4])
+# ---------------------------------------
 from pathlib import Path
 
 
@@ -69,8 +79,8 @@ def main():
         f"--windows-icon-from-ico={icon_path}",
         "--company-name=Oscarbol09",
         "--product-name=Darius AI",
-        "--file-version=7.0.0.0",
-        "--product-version=7.0.0.0",
+        f"--file-version={win_version}",
+        f"--product-version={win_version}",
         "--file-description=Darius AI - Asistente de Escritorio y Automatizacion por Voz",
         "--copyright=Copyright (C) 2026 Oscarbol09 (https://github.com/oscarbol09/Darius-AI)",
         "--output-dir=dist",
