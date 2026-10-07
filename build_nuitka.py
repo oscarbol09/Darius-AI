@@ -13,17 +13,15 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 # -- Inyeccion de Versin Dinmica SRE --
-import os
-
 raw_tag = os.environ.get("GITHUB_REF_NAME", "7.0.0").lstrip("v")
 parts = raw_tag.split(".")
 while len(parts) < 4:
     parts.append("0")
 win_version = ".".join(parts[:4])
 # ---------------------------------------
-from pathlib import Path
 
 
 def main():
