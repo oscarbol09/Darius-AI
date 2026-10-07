@@ -649,11 +649,11 @@ class TestCmdPatterns(unittest.TestCase):
         re.IGNORECASE
     )
     _RE_VISION_SCREEN_TEST = re.compile(
-        r"\b(qu[eé]\s+hay\s+en\s+(mi\s+)?pantalla|analiza\s+(mi\s+)?pantalla|lee\s+(la\s+)?pantalla|analiza\s+(este\s+)?error\s+(en\s+pantalla)?|mira\s+(la\s+)?pantalla|qu[eé]\s+estoy\s+viendo|captura\s+(de\s+)?pantalla)\b",  # noqa: E501
+        r"\b(qu[eé]\s+hay\s+en\s+(mi\s+)?pantalla|analiza\s+(mi\s+)?pantalla|lee\s+(la\s+)?pantalla|analiza\s+(este\s+)?error\s+(en\s+pantalla)?|mira\s+(la\s+)?pantalla|qu[eé]\s+estoy\s+viendo|captura\s+(de\s+)?pantalla)\b",
         re.IGNORECASE
     )
     _RE_DEEP_RESEARCH_TEST = re.compile(
-        r"\b(investiga\s+(a\s+fondo|profundamente|exhaustivamente|sobre)?|investigaci[oó]n\s+profunda\s+(sobre|de)?|haz\s+una\s+investigaci[oó]n\s+(sobre|de)?)\s+(.+)$",  # noqa: E501
+        r"\b(investiga\s+(a\s+fondo|profundamente|exhaustivamente|sobre)?|investigaci[oó]n\s+profunda\s+(sobre|de)?|haz\s+una\s+investigaci[oó]n\s+(sobre|de)?)\s+(.+)$",
         re.IGNORECASE
     )
     _RE_PLANNER_GOAL_TEST = re.compile(

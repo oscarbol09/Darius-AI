@@ -39,7 +39,7 @@ def main():
         print("[*] Instalando Nuitka y aceleradores (zstandard, ordered-set)...")
         subprocess.run(
             [sys.executable, "-m", "pip", "install", "nuitka>=2.4.0", "zstandard", "ordered-set"],
-            check=True  # noqa: S603
+            check=True
         )
 
     # 3. Construir comando Nuitka

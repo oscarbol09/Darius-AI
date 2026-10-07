@@ -310,7 +310,7 @@ class HumanGUIAutomator:
                 elif char == " ":
                     time.sleep(random.uniform(char_delay_base * 0.8, char_delay_base * 1.5))  # noqa: S311
                 else:
-                    jitter = random.gauss(0, char_delay_base * 0.3)  # noqa: S311
+                    jitter = random.gauss(0, char_delay_base * 0.3)
                     delay = max(0.015, char_delay_base + jitter)
                     time.sleep(delay)
 

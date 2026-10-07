@@ -75,7 +75,7 @@ class TTSWorker:
 
             except Exception as e:
                 log.error(f"Error en síntesis TTS: {e}")
-                with contextlib.suppress(Exception):  # noqa: F821
+                with contextlib.suppress(Exception):
                     sapi_speaker.Speak(text)
             finally:
                 self.is_speaking.clear()

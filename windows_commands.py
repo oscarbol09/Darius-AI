@@ -929,23 +929,23 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
 
         elif open_window:
             if atype == "powershell":
-                subprocess.Popen([_PS, "-NoExit", "-Command", run],  # noqa: S603,S607
+                subprocess.Popen([_PS, "-NoExit", "-Command", run],  # noqa: S603
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
             else:
-                subprocess.Popen([_CMD, "/k", run],  # noqa: S603,S607
+                subprocess.Popen([_CMD, "/k", run],  # noqa: S603
                                  creationflags=subprocess.CREATE_NEW_CONSOLE)
             return True, ""
 
         elif return_out:
             if atype == "powershell":
                 result = subprocess.run(  # noqa: S603
-                    [_PS, "-NonInteractive", "-Command", run],  # noqa: S607
+                    [_PS, "-NonInteractive", "-Command", run],
                     capture_output=True, text=True, timeout=15,
                     encoding="utf-8", errors="replace"
                 )
             else:
                 result = subprocess.run(  # noqa: S603
-                    [_CMD, "/c", run],  # noqa: S607
+                    [_CMD, "/c", run],
                     capture_output=True, text=True, timeout=15, encoding="utf-8", errors="replace"
                 )
             output = (result.stdout or result.stderr or "Sin salida").strip()
@@ -957,18 +957,18 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
         else:
             if atype == "powershell":
                 subprocess.Popen(  # noqa: S603
-                    [_PS, "-NonInteractive", "-WindowStyle", "Hidden", "-Command", run],  # noqa: S607
+                    [_PS, "-NonInteractive", "-WindowStyle", "Hidden", "-Command", run],
                     creationflags=subprocess.CREATE_NO_WINDOW
                 )
             else:
-                subprocess.Popen([_CMD, "/c", run],  # noqa: S603,S607
+                subprocess.Popen([_CMD, "/c", run],  # noqa: S603
                                  creationflags=subprocess.CREATE_NO_WINDOW)
             return True, ""
 
     except subprocess.TimeoutExpired:
         log.error(f"[WinCMD] Timeout: {run[:60]}")
         return False, "El comando tardó demasiado."
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.error(f"[WinCMD] Error en run_action: {e}")
         return False, str(e)
 
@@ -987,11 +987,11 @@ def _launch(cmd: str, fallback_cmd: str | None = None) -> bool:
             return True
         # 2. Snap-ins de MMC (.msc)
         if cmd.endswith(".msc"):
-            subprocess.Popen([_MMC, cmd], creationflags=detached)  # noqa: S603,S607
+            subprocess.Popen([_MMC, cmd], creationflags=detached)  # noqa: S603
             return True
         # 3. Applets del Panel de Control (.cpl)
         if cmd.endswith(".cpl"):
-            subprocess.Popen([_CONTROL, cmd], creationflags=detached)  # noqa: S603,S607
+            subprocess.Popen([_CONTROL, cmd], creationflags=detached)  # noqa: S603
             return True
         # 4. Ejecutable con ruta absoluta
         if Path(cmd).is_file():
@@ -1001,16 +1001,16 @@ def _launch(cmd: str, fallback_cmd: str | None = None) -> bool:
         #    Se usa shell=True para que Windows los localice en PATH igual que
         #    si el usuario los escribiera en Ejecutar (Win+R). DETACHED evita
         #    que el proceso herede la consola de Darius.
-        subprocess.Popen([_CMD, "/c", cmd], creationflags=detached)  # noqa: S603,S607
+        subprocess.Popen([_CMD, "/c", cmd], creationflags=detached)  # noqa: S603
         return True
     except FileNotFoundError:
         if fallback_cmd:
             try:
-                subprocess.Popen([_CMD, "/c", fallback_cmd], creationflags=detached)  # noqa: S603,S607
+                subprocess.Popen([_CMD, "/c", fallback_cmd], creationflags=detached)  # noqa: S603
                 return True
-            except Exception:
+            except Exception:  # noqa: BLE001
                 log.warning(f"[WinCMD] fallback '{fallback_cmd}' también falló")
         return False
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.error(f"[WinCMD] _launch error: {e}")
         return False

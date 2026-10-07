@@ -78,7 +78,7 @@ def get_monitor_rects() -> list[tuple[int, int, int, int]]:
         ctypes.windll.user32.EnumDisplayMonitors(None, None, _callback, 0)
         collected.sort(key=lambda t: (t[0], t[1]))
         return collected or [(0, 0, 1920, 1080)]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         log.warning(f"Error enumerando monitores: {exc}")
         return [(0, 0, 1920, 1080)]
 
@@ -208,7 +208,7 @@ def get_process_main_hwnd(target_exe_name: str) -> int | None:
         if not candidates:
             return None
         return max(candidates, key=lambda t: t[0])[1]
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         log.warning(f"Error buscando ventana de {target_exe_name}: {exc}")
         return None
 
@@ -233,7 +233,7 @@ def bring_window_to_foreground(hwnd: int) -> bool:
         if tid_fg and tid_tgt:
             user32.AttachThreadInput(tid_fg, tid_tgt, False)
         return True
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         log.warning(f"Error dando foco a ventana {hwnd}: {e}")
         return False
 
@@ -249,7 +249,7 @@ def send_f11_fullscreen(hwnd: int) -> None:
         bring_window_to_foreground(hwnd)
         user32.keybd_event(_VK_F11, 0, 0, 0)
         user32.keybd_event(_VK_F11, 0, _KEYEVENTF_KEYUP, 0)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         log.warning(f"Error enviando F11: {exc}")
 
 
@@ -284,7 +284,7 @@ def snap_window_to_monitor(
         if fullscreen:
             user32.ShowWindow(hwnd, _SW_SHOWMAXIMIZED)
             send_f11_fullscreen(hwnd)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         log.warning(f"Error al ubicar ventana en monitor {monitor_index}: {exc}")
 
 
@@ -378,7 +378,7 @@ def play_spotify_or_song(uri_or_url: str) -> None:
         try:
             os.startfile(target)  # noqa: S606
             return
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             log.warning(f"os.startfile falló para '{target}': {e}")
     webbrowser.open(target)
 
