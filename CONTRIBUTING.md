@@ -43,9 +43,9 @@ ruff check .
 
 ## Estándares de Ingeniería y Arquitectura
 
-- **Seguridad en Subprocesos:** Prohibido el uso de `shell=True` en `subprocess`. Todas las invocaciones a utilidades del sistema deben pasar listas de argumentos validadas (`windows_commands.py`).
+- **Seguridad en Subprocesos:** Prohibido el uso de `shell=True` en `subprocess`. Todas las invocaciones a utilidades del sistema deben pasar listas de argumentos validadas (`src/darius_ai/system/windows_commands.py`).
 - **Rendimiento Gráfico en GUI:** En el visualizador de audio o componentes de dibujo en Canvas, no uses `canvas.delete("all")` dentro de bucles de animación continua. Actualiza las coordenadas atómicamente con `canvas.coords()` para evitar parpadeos y pausas de recolección de basura.
-- **Motor BYOK y Red:** Al añadir o modificar proveedores de IA en `ai_client.py`, utiliza interfaces compatibles con la API estándar de OpenAI basadas en `urllib` para mantener la base de dependencias ligera y portátil.
+- **Motor BYOK y Red:** Al añadir o modificar proveedores de IA en `src/darius_ai/core/ai_client.py`, utiliza interfaces compatibles con la API estándar de OpenAI basadas en `urllib` para mantener la base de dependencias ligera y portátil.
 - **Manejo Estructurado de Errores:** Captura excepciones específicas y registra los diagnósticos con `log.warning` o `log.error`. No silencies errores con bloques `except: pass` vacíos.
 - **Anotaciones de Tipo:** Incluye *type hints* en todas las funciones y métodos nuevos.
 - **Convención de Commits:** Utiliza [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`) explicando el **porqué** del cambio en el cuerpo del mensaje.

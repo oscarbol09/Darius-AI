@@ -42,14 +42,14 @@ configurado por el usuario (BYOK), y mantener un consumo mínimo de recursos (<9
 | **UI** | CustomTkinter + tkinter Canvas + NumPy | Tema oscuro Slate/Zinc nativo, soporte High-DPI, sin Electron |
 | **Animación** | `HighPerfWaveVisualizer` (NumPy + Canvas) | 60 FPS, actualización atómica `coords()`, 0 flicker, 0 fugas de memoria |
 | **Configuración GUI** | `BYOKSettingsModal` (`ctk.CTkToplevel`) | Gestión visual de proveedores, claves enmascaradas y ping en vivo |
-| **Disparador Acústico** | `acoustic_trigger.py` (sounddevice + NumPy) | Detección de doble aplauso en tiempo real, filtro adaptativo de ruido y auto-sondeo de micrófono |
+| **Disparador Acústico** | `src/darius_ai/audio/acoustic_trigger.py` (sounddevice + NumPy) | Detección de doble aplauso en tiempo real, filtro adaptativo de ruido y auto-sondeo de micrófono |
 | **Voz entrada** | SpeechRecognition + PyAudio | Google STT (es-ES) con calibración de ruido ambiental |
-| **Voz salida** | SAPI (`SpVoice`) + Edge-TTS + ElevenLabs | Síntesis nativa o neural en hilo COM desacoplado con caché SHA-256 en disco (`tts_cache.py`) |
-| **Espacio de Trabajo** | `workspace_manager.py` (Win32 User32) | Multi-monitor geometry, window snapping, IDE focus nativo (`AttachThreadInput`), rutinas Darius/Dev/Trading |
-| **Motor BYOK** | `ai_client.py` (Gemini SDK + OpenAI REST via `urllib`) | 7 proveedores soportados (Gemini, OpenAI, Groq, NIM, OpenRouter, Ollama, Custom) |
-| **Memoria** | `obsidian_brain.py` (Markdown + YAML) | Persistencia privada y portable en la bóveda local de Obsidian |
+| **Voz salida** | SAPI (`SpVoice`) + Edge-TTS + ElevenLabs | Síntesis nativa o neural en hilo COM desacoplado con caché SHA-256 en disco (`src/darius_ai/audio/tts_cache.py`) |
+| **Espacio de Trabajo** | `src/darius_ai/system/workspace_manager.py` (Win32 User32) | Multi-monitor geometry, window snapping, IDE focus nativo (`AttachThreadInput`), rutinas Darius/Dev/Trading |
+| **Motor BYOK** | `src/darius_ai/core/ai_client.py` (Gemini SDK + OpenAI REST via `urllib`) | 7 proveedores soportados (Gemini, OpenAI, Groq, NIM, OpenRouter, Ollama, Custom) |
+| **Memoria** | `src/darius_ai/core/obsidian_brain.py` (Markdown + YAML) | Persistencia privada y portable en la bóveda local de Obsidian |
 | **SO Windows** | pywin32, subprocess, PowerShell, PyCAW, winreg | Control del sistema operativo con listas de argumentos (`shell=False`) |
-| **Configuración** | `config_loader.py` (`config.json` + `.env`) | Merge jerárquico y validación de esquema con tipado fuerte |
+| **Configuración** | `src/darius_ai/core/config_loader.py` (`config.json` + `.env`) | Merge jerárquico y validación de esquema con tipado fuerte |
 | **Threading** | `threading` + `queue.Queue` | Manejo de colas COM para TTS y llamadas asíncronas de red |
 
 ---
@@ -58,73 +58,18 @@ configurado por el usuario (BYOK), y mantener un consumo mínimo de recursos (<9
 
 ```
 Darius-AI/
-├── .env                     <- Variables de entorno locales (GEMINI_API_KEY, ELEVENLABS_API_KEY...). Excluido de Git.
-├── .env.example             <- Plantilla de credenciales sin secretos.
-├── .gitignore               <- Excluye .env, *.log, cache, .vscode/, .venv/, audio_cache/, etc.
-├── .github/
-│   └── workflows/
-│       └── main_darius-ai.yml  <- CI: Ruff + Pytest matrix (Win 3.11/3.12) + Gitleaks + Pip-audit
-├── Agent.md                 <- ESTE ARCHIVO — Contexto maestro para IAs y desarrolladores
-├── README.md                <- Documentación técnica pública y guía de inicio rápido
-├── requirements.txt         <- Dependencias completas del entorno de ejecución en Windows
-├── requirements-dev.txt     <- Dependencias para pruebas y linting (pytest, ruff, pytest-subtests)
-├── pyproject.toml           <- Configuración de Ruff (line-length=120) y pytest
-├── config.json              <- Parámetros de configuración, credenciales BYOK y rutinas de workspace
-├── config_loader.py         <- Carga jerárquica de config.json con propiedades tipadas snake_case
-├── main.py                  <- NÚCLEO — Interfaz CustomTkinter, visualizador 60 FPS, enrutador de comandos, telemetría
-├── byok_settings.py         <- MODAL GUI — Configuración interactiva de proveedores LLM y prueba de latencia
-├── acoustic_trigger.py      <- DISPARADOR ACÚSTICO — Detección de doble aplauso en streaming y auto-sondeo de micro
-├── workspace_manager.py     <- ESPACIO DE TRABAJO — Multi-monitor Win32, snapping, IDE focus y rutinas de automatización
-├── tts_cache.py             <- CACHÉ DE AUDIO — Almacenamiento WAV local con hash SHA-256 (texto+voz+modelo)
-├── elevenlabs_tts_engine.py <- MOTOR TTS ELEVENLABS — Síntesis neural 24kHz con fallback streaming/REST
-├── edge_tts_engine.py       <- MOTOR TTS EDGE — Síntesis neural Microsoft Edge
-├── tts_worker.py            <- WORKER TTS — Despachador multi-motor (ElevenLabs > Edge > SAPI) desacoplado en hilo COM
-├── ai_client.py             <- MOTOR BYOK — Clientes Gemini, OpenAI, Groq, NVIDIA NIM, OpenRouter, Ollama
-├── obsidian_brain.py        <- CEREBRO — Gestión de notas diarias, memorias y búsqueda contextual en Obsidian
-├── screen_vision.py         <- VISIÓN & OCR — Captura atómica multi-monitor (mss) y análisis multimodal
-├── deep_research.py         <- DEEP RESEARCH — Investigación autónoma multi-fuente y reportes en Obsidian
-├── agent_planner.py         <- PLANIFICADOR AGÉNTICO — Descomposición de metas multi-paso y auto-recuperación
-├── self_test.py             <- DIAGNÓSTICO HERMÉTICO — Suite de auto-certificación sin efectos secundarios
-├── windows_commands.py      <- Catálogo de comandos del SO (_PS, _CMD, _MMC, _CONTROL, python actions)
-├── human_gui.py            <- AUTOMATIZACIÓN GUI — Curvas de Bézier cúbicas, tipeo estocástico Unicode y scraper web nativo
-├── agentic_bridge.py       <- PUENTE AGÉNTICO — Loop de ejecución de herramientas autónomas y fast-path CLI
-├── voice_filter.py          <- Filtro y matching fonético de nombre en texto
-├── stt_engine.py            <- Motor STT con soporte para calibración y backends
-│
-├── assets/                  <- Recursos gráficos oficiales (darius.ico, logo.png, logo_icon.png, logo_badge.png, social_preview.png, banner.png, generate_icon.py)
-├── docs/                    <- Documentación y activos visuales web (favicon.png, social_preview.png, banner.png)
-├── build_nuitka.py          <- SCRIPT DE COMPILACIÓN — Generación de binario nativo C standalone con Nuitka
-├── installer.iss            <- SCRIPT DE INSTALADOR — Generador de setup Windows con Inno Setup
-├── tests/
-│   ├── conftest.py          <- Configuración de pytest y fixtures compartidos
-│   ├── test_screen_vision.py<- Tests de captura en memoria y payloads multimodales
-│   ├── test_deep_research.py<- Tests de búsqueda multi-fuente y guardado en Obsidian
-│   ├── test_agent_planner.py<- Tests de descomposición de metas y canalización de contexto
-│   ├── test_self_test.py    <- Tests de la suite diagnóstica hermética
-│   ├── test_human_gui.py    <- Tests de trayectorias de Bézier, failsafe Win32 y scraper web
-│   ├── test_agentic_bridge.py <- Tests del motor de herramientas autónomas y tool execution
-│   ├── test_acoustic_trigger.py <- Tests de detección de aplausos, RMS mono y piso de ruido adaptativo
-│   ├── test_workspace_manager.py <- Tests de geometría multi-monitor, snapping de ventanas y rutinas
-│   ├── test_tts_cache.py    <- Tests de persistencia, hashing SHA-256 y atomicidad de caché WAV
-│   ├── test_settings_tts.py <- Tests de persistencia y configuración GUI de TTS y ElevenLabs
-│   ├── test_byok_providers.py  <- Tests del motor BYOK, resolución de claves y ping de conexión
-│   ├── test_commands_v6.py  <- Tests de comandos del sistema operativo y rutas absolutas
-│   ├── test_config_loader.py<- Tests de merge jerárquico y persistencia de configuración
-│   ├── test_gemini_v6.py    <- Tests de integración y limpieza de Markdown para Gemini
-│   ├── test_obsidian_brain.py <- Tests de persistencia de diario y memorias en Markdown/YAML
-│   └── test_voice_v6.py     <- Tests del subsistema de audio, filtros fonéticos y serialización WAV
-│
-├── CHANGELOG.md             <- Registro cronológico de cambios y versiones
-├── CONTRIBUTING.md          <- Guía de contribución y estándares de código
-├── SECURITY.md              <- Políticas de seguridad y tratamiento de credenciales
-│
-├── darius.log               <- Log rotativo del sistema (%APPDATA%\DariusAI en frozen / local en dev)
-├── chat_history.txt         <- Historial local de interacciones
-├── apps_cache.json          <- Caché de aplicaciones instaladas en Windows
-└── audio_cache/             <- Caché local en disco de audios sintetizados WAV (SHA-256)
-```
-
----
+├── .env                     <- Variables de entorno locales
+├── .github/                 <- Workflows CI/CD industriales
+├── build_nuitka.py          <- Script de compilacion AOT
+├── installer.iss            <- Empaquetador Inno Setup
+├── main.py                  <- Entrypoint ligero
+├── pyproject.toml           <- Metadatos y configuracion
+├── src/darius_ai/
+│   ├── audio/               <- TTS, STT, Mic, Wake words
+│   ├── core/                <- LLMs, Memoria Obsidian, Vision
+│   ├── gui/                 <- CustomTkinter, visualizadores
+│   └── system/              <- Comandos nativos, Workspace
+└── tests/                   <- Suite de pruebas unitarias
 
 ## 4. Flujo de Datos Principal
 
@@ -164,7 +109,7 @@ USUARIO HABLA / ESCRIBE
 
 ---
 
-## 5. Arquitectura del Motor BYOK (`ai_client.py`)
+## 5. Arquitectura del Motor BYOK (`src/darius_ai/core/ai_client.py`)
 
 ### 5.1 Proveedores Soportados y Configuración
 
@@ -213,7 +158,7 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 ## 6. Decisiones Arquitectónicas Clave
 
 ### D1 — Motor BYOK Multi-Proveedor con compatibilidad OpenAI
-**Decisión:** Centralizar todas las conexiones LLM en `ai_client.py` con una interfaz común y resolver credenciales desde `config.json` o `.env`. Esto permite al usuario cambiar de proveedor en un clic o usar modelos locales con Ollama sin recompilar ni alterar código.
+**Decisión:** Centralizar todas las conexiones LLM en `src/darius_ai/core/ai_client.py` con una interfaz común y resolver credenciales desde `config.json` o `.env`. Esto permite al usuario cambiar de proveedor en un clic o usar modelos locales con Ollama sin recompilar ni alterar código.
 
 ### D2 — Visualizador Vectorial de 60 FPS con NumPy sobre Canvas
 **Decisión:** Utilizar `numpy.sin()` para generar 3 capas de ondas sinusoidales armónicas con desfase continuo, pre-instanciar los objetos de línea en `tkinter.Canvas` y actualizar sus posiciones exclusivamente mediante `canvas.coords(line_id, *points)`. Se prohíbe el uso de `canvas.delete("all")` para evitar la recolección de basura continua y el parpadeo de pantalla.
@@ -228,10 +173,10 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 **Decisión:** `win32event.CreateMutex` con identificador global. Si la aplicación ya está abierta, muestra un diálogo informativo y finaliza con `sys.exit(0)`, evitando colisiones de micrófono y archivos.
 
 ### D6 — Subprocesos con Rutas Completas y `shell=False`
-**Decisión:** Todos los subprocesos de `windows_commands.py` utilizan `creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` y listas de argumentos validadas. Se prohíbe `shell=True` para eliminar riesgos de inyección de comandos.
+**Decisión:** Todos los subprocesos de `src/darius_ai/system/windows_commands.py` utilizan `creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` y listas de argumentos validadas. Se prohíbe `shell=True` para eliminar riesgos de inyección de comandos.
 
 ### D7 — Memoria y Persistencia Local en Bóveda de Obsidian
-**Decisión:** Las memorias, diarios y preferencias se guardan en la bóveda local de Obsidian en formato Markdown plano con frontmatter YAML (`obsidian_brain.py`), garantizando privacidad, portabilidad y propiedad total de los datos por parte del usuario.
+**Decisión:** Las memorias, diarios y preferencias se guardan en la bóveda local de Obsidian en formato Markdown plano con frontmatter YAML (`src/darius_ai/core/obsidian_brain.py`), garantizando privacidad, portabilidad y propiedad total de los datos por parte del usuario.
 
 ### D8 — Calidad de Código Estricta con Ruff
 **Decisión:** El pipeline de integración continua valida el 100% del código con `ruff check .` bajo límite de línea de 120 caracteres. No se permiten errores de linter en el repositorio.
@@ -249,19 +194,19 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 **Decisión:** Compilar la aplicación a binario nativo de Windows mediante **Nuitka** (`build_nuitka.py`) con plugins de CustomTkinter y SoundDevice, generando un ejecutable optimizado que elimina falsos positivos en antivirus (Windows Defender) y arranca en milisegundos. Para aislar los datos mutables del usuario, `config_loader.get_user_data_dir()` redirige la persistencia (`config.json`, logs, cachés) a `%APPDATA%\DariusAI` en modo congelado (`sys.frozen`), protegiendo la carpeta de instalación de bloqueos de permisos de UAC. El instalador con **Inno Setup** (`installer.iss`) instala en `{localappdata}\Programs\DariusAI` sin requerir elevación de administrador.
 
 ### D13 — Modal Gráfico Dual (LLM + TTS/ElevenLabs) con Prueba en Vivo
-**Decisión:** Integrar toda la configuración de motores de síntesis vocal (SAPI5, Edge-TTS, ElevenLabs) directamente en la interfaz gráfica (`byok_settings.py`), incluyendo clave de API enmascarada, selector de Voice ID, modelo neural, alternador de caché y botón de prueba auditiva en vivo (`🔊 PROBAR VOZ`). Los usuarios nunca necesitan manipular archivos `.env` ni editar JSON manualmente.
+**Decisión:** Integrar toda la configuración de motores de síntesis vocal (SAPI5, Edge-TTS, ElevenLabs) directamente en la interfaz gráfica (`src/darius_ai/gui/byok_settings.py`), incluyendo clave de API enmascarada, selector de Voice ID, modelo neural, alternador de caché y botón de prueba auditiva en vivo (`🔊 PROBAR VOZ`). Los usuarios nunca necesitan manipular archivos `.env` ni editar JSON manualmente.
 
 ### D14 — Cliente REST Nativo Zero-Overhead para Motores de IA
 **Decisión:** Conectar a Google Gemini, OpenAI, Groq, NVIDIA, OpenRouter y Ollama mediante llamadas HTTP/REST puras con `urllib.request` y `requests`, evitando SDKs monolíticos pesados (como `google-genai`) que autogeneran más de 160.000 líneas de modelos Pydantic y saturan el compilador C++ de Nuitka. Esto reduce el tiempo de compilación nativa a menos de 3 minutos y optimiza el consumo de RAM a <90 MB.
 
 ### D15 — Motor Autónomo Agentic Bridge y Fast-Path Router para Herramientas Locales
-**Decisión:** Dotar a Darius AI de capacidad de acción autónoma mediante `agentic_bridge.py` y un protocolo de Tool Calling agnóstico del proveedor (`[ACTION: tool_name(args)]`).
-1. **Fast-Path Router Local (0 ms):** Enrutamiento por expresiones regulares en `main.py` y `windows_commands.py` para comandos frecuentes de red (`ipconfig /flushdns`, renovación de IP), utilidades de desarrollador (`gh pr list`, `git status`) y diagnósticos de RAM (`Get-Process`).
+**Decisión:** Dotar a Darius AI de capacidad de acción autónoma mediante `src/darius_ai/core/agentic_bridge.py` y un protocolo de Tool Calling agnóstico del proveedor (`[ACTION: tool_name(args)]`).
+1. **Fast-Path Router Local (0 ms):** Enrutamiento por expresiones regulares en `main.py` y `src/darius_ai/system/windows_commands.py` para comandos frecuentes de red (`ipconfig /flushdns`, renovación de IP), utilidades de desarrollador (`gh pr list`, `git status`) y diagnósticos de RAM (`Get-Process`).
 2. **Autonomous Tool Loop Multi-Proveedor:** Los modelos LLM (Gemini, OpenAI, Groq, OpenRouter, Ollama) pueden invocar herramientas del sistema operativo o CLIs activos emitiendo la etiqueta estructurada de acción. Darius intercepta la llamada, ejecuta el binario local herméticamente con timeout de 8-10s y reinyecta la salida de consola al modelo para que sintetice una respuesta verbal ejecutiva.
 3. **Protocolo de Confirmación para Acciones Destructivas:** Las operaciones de solo lectura y diagnóstico se ejecutan de inmediato sin fricción; las operaciones modificadoras o destructivas (merges de PRs, borrado de archivos, reseteos forzados) activan un diálogo de confirmación por voz antes de proceder.
 
 ### D16 — Automatización de GUI Antropomórfica ("Computer Use") y Web Scraper Zero-Dependency
-**Decisión:** Implementar automatización del cursor del mouse, clics, hotkeys, digitación de teclado y extracción de páginas web mediante `human_gui.py` usando exclusivamente la Win32 API (`ctypes.windll.user32`) y la librería estándar (`urllib.request`, `html.parser`), sin dependencias pesadas ni binarios de terceros (evitando `pyautogui`, `selenium`, `playwright`).
+**Decisión:** Implementar automatización del cursor del mouse, clics, hotkeys, digitación de teclado y extracción de páginas web mediante `src/darius_ai/gui/human_gui.py` usando exclusivamente la Win32 API (`ctypes.windll.user32`) y la librería estándar (`urllib.request`, `html.parser`), sin dependencias pesadas ni binarios de terceros (evitando `pyautogui`, `selenium`, `playwright`).
 1. **Trayectorias de Bézier Cúbicas y Física Fitts:** Los desplazamientos del cursor calculan puntos de control estocásticos ortogonales y aplican perfiles de aceleración/desaceleración senoidales (*Ease-in / Ease-out*), añadiendo micro-jitter de 1-2px para emular fielmente el movimiento neuromuscular humano.
 2. **Digitación con Distribución Gaussiana y Soporte Unicode:** El tipeo utiliza pausas de variabilidad natural estocástica (WPM dinámico) e inyecta eventos `KEYEVENTF_UNICODE` (`0x0004`), garantizando la escritura universal de caracteres acentuados, eñes y caracteres especiales con total independencia del layout del teclado físico.
 3. **Mecanismo de Failsafe de Emergencia:** Se evalúa de manera atómica antes de cada sub-paso de movimiento o pulsación de tecla el cursor en la esquina superior izquierda `(0, 0)` o la bandera de interrupción activada por comando de voz (*"Darius, detente"*), abortando inmediatamente cualquier automatización activa y previniendo bucles incontrolados.
@@ -269,7 +214,7 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 
 ### D17 — Rediseño Orgánico de GUI Split-Pane, Licencia GNU GPL-3.0 y Atribución
 **Decisión:** Transformar la interfaz gráfica de Darius AI de una ventana vertical estilo móvil a una estación de trabajo de escritorio profesional Split-Pane (`880x620`), inspirada en estándares de diseño ergonómico y utilitario (Raycast, Linear, Claude Desktop, y principios de `uupm.cc` / UI UX Pro Max):
-1. **Paleta Semántica 60-30-10 y Tipografía Jerárquica (`gui_theme.py`):** Tokens de diseño Zinc/Slate (`#0B0F19`, `#0F1626`, `#131C2D`), tipografía limpia en Segoe UI y Consolas, y acentos de color intencionales (`#38BDF8`, `#10B981`, `#A855F7`, `#F59E0B`, `#F43F5E`) con contraste validado WCAG 2.2 AA.
+1. **Paleta Semántica 60-30-10 y Tipografía Jerárquica (`src/darius_ai/gui/gui_theme.py`):** Tokens de diseño Zinc/Slate (`#0B0F19`, `#0F1626`, `#131C2D`), tipografía limpia en Segoe UI y Consolas, y acentos de color intencionales (`#38BDF8`, `#10B981`, `#A855F7`, `#F59E0B`, `#F43F5E`) con contraste validado WCAG 2.2 AA.
 2. **Arquitectura Split-Pane con Vistas Modulares:**
    - **Sidebar Izquierda Fija (230px):** Marca oficial, navegación por pestañas (`💬 Conversación`, `⚡ Workspaces`, `🧠 Obsidian Brain`, `🛠 Sistema & Audio`), selector de modos de voz PTT/NOMBRE/AUTO, badges de telemetría de sistemas y acceso directo a ajustes.
    - **Main Studio Derecho Responsivo:** Header superior con visualizador vectorial a 60 FPS integrado (`170x36`), indicador de estado en vivo, botones de control rápido, contenedor dinámico de vistas y dock inferior de comandos.

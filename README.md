@@ -181,20 +181,20 @@ Puedes personalizar rutas y pantallas en `config.json`:
 
 | Comando de Voz | Acción Ejecutada | Módulo |
 | :--- | :--- | :--- |
-| **"Protocolo Darius"** / **"Modo Bienvenida"** | Maximiza IDE Cursor/Code en monitor 1, abre herramientas en monitor 2, ajusta audio y reproduce bienvenida | `workspace_manager.py` |
-| **"Modo desarrollo"** / **"Modo programar"** | Enfoca Cursor/Code en monitor principal y abre documentación técnica en monitor secundario | `workspace_manager.py` |
-| **"Modo trading"** / **"Modo finanzas"** | Abre TradingView y Finviz en monitores 1 y 2 para análisis de mercado | `workspace_manager.py` |
-| **"¿Cuántos monitores tengo?"** | Consulta Win32 `EnumDisplayMonitors` y describe dimensiones, posición y monitor primario | `workspace_manager.py` |
-| **"Organizar pantallas"** / **"Organizar ventanas"** | Distribuye las ventanas principales en cuadrícula según la topología multi-monitor | `workspace_manager.py` |
-| **"Pantalla completa"** / **"F11"** | Envía tecla `F11` a la ventana activa mediante eventos de teclado de Windows | `workspace_manager.py` |
-| **"¿Qué hay en mi pantalla?"** / **"Analiza mi pantalla"** | Captura atómica con `mss` y análisis visual multimodal con el LLM activo | `screen_vision.py` |
-| **"Analiza este error en pantalla"** | Detecta stacktraces, diálogos de error y fallos de compilación con OCR | `screen_vision.py` |
-| **"Investiga a fondo sobre [tema]"** | Pipeline de Deep Research web multi-fuente y guardado de informe en Obsidian | `deep_research.py` |
-| **"Planifica [meta compleja]"** | Descomposición agéntica en pasos ordenados con auto-recuperación | `agent_planner.py` |
-| **"Anota en mi diario que..."** | Inserta entrada con hora en la nota diaria (`Diario/YYYY-MM-DD.md`) de Obsidian | `obsidian_brain.py` |
-| **"Recuerda que..."** | Almacena memoria permanente con tags y timestamp en `Darius/Memorias/` | `obsidian_brain.py` |
-| **"Subir / Bajar volumen"** | Modifica el nivel de volumen maestro del endpoint de audio con PyCAW | `windows_commands.py` |
-| **"Abrir [aplicación]"** | Búsqueda difusa y ejecución aislada (`shell=False`) de software instalado | `windows_commands.py` |
+| **"Protocolo Darius"** / **"Modo Bienvenida"** | Maximiza IDE Cursor/Code en monitor 1, abre herramientas en monitor 2, ajusta audio y reproduce bienvenida | `src/darius_ai/system/workspace_manager.py` |
+| **"Modo desarrollo"** / **"Modo programar"** | Enfoca Cursor/Code en monitor principal y abre documentación técnica en monitor secundario | `src/darius_ai/system/workspace_manager.py` |
+| **"Modo trading"** / **"Modo finanzas"** | Abre TradingView y Finviz en monitores 1 y 2 para análisis de mercado | `src/darius_ai/system/workspace_manager.py` |
+| **"¿Cuántos monitores tengo?"** | Consulta Win32 `EnumDisplayMonitors` y describe dimensiones, posición y monitor primario | `src/darius_ai/system/workspace_manager.py` |
+| **"Organizar pantallas"** / **"Organizar ventanas"** | Distribuye las ventanas principales en cuadrícula según la topología multi-monitor | `src/darius_ai/system/workspace_manager.py` |
+| **"Pantalla completa"** / **"F11"** | Envía tecla `F11` a la ventana activa mediante eventos de teclado de Windows | `src/darius_ai/system/workspace_manager.py` |
+| **"¿Qué hay en mi pantalla?"** / **"Analiza mi pantalla"** | Captura atómica con `mss` y análisis visual multimodal con el LLM activo | `src/darius_ai/core/screen_vision.py` |
+| **"Analiza este error en pantalla"** | Detecta stacktraces, diálogos de error y fallos de compilación con OCR | `src/darius_ai/core/screen_vision.py` |
+| **"Investiga a fondo sobre [tema]"** | Pipeline de Deep Research web multi-fuente y guardado de informe en Obsidian | `src/darius_ai/core/deep_research.py` |
+| **"Planifica [meta compleja]"** | Descomposición agéntica en pasos ordenados con auto-recuperación | `src/darius_ai/core/agent_planner.py` |
+| **"Anota en mi diario que..."** | Inserta entrada con hora en la nota diaria (`Diario/YYYY-MM-DD.md`) de Obsidian | `src/darius_ai/core/obsidian_brain.py` |
+| **"Recuerda que..."** | Almacena memoria permanente con tags y timestamp en `Darius/Memorias/` | `src/darius_ai/core/obsidian_brain.py` |
+| **"Subir / Bajar volumen"** | Modifica el nivel de volumen maestro del endpoint de audio con PyCAW | `src/darius_ai/system/windows_commands.py` |
+| **"Abrir [aplicación]"** | Búsqueda difusa y ejecución aislada (`shell=False`) de software instalado | `src/darius_ai/system/windows_commands.py` |
 
 ---
 
@@ -238,7 +238,7 @@ Puedes personalizar rutas y pantallas en `config.json`:
 ### Decisiones de Diseño
 
 - **¿Por qué Canvas + NumPy para la animación en lugar de un WebView?** Un WebView o Electron añadiría cientos de megabytes de sobrecarga en memoria. El visualizador vectorial con NumPy calcula armónicos matemáticos en microsegundos y actualiza las coordenadas de Canvas atómicamente, manteniendo el consumo total de la aplicación por debajo de 90 MB de RAM a 60 FPS constantes.
-- **¿Por qué una interfaz compatible con OpenAI en el cliente BYOK?** La especificación de API de OpenAI se ha convertido en el estándar de la industria. Al implementar un llamador universal en `ai_client.py` con `urllib`, Darius puede comunicarse con OpenAI, Groq, NVIDIA NIM, OpenRouter, vLLM, LocalAI y Ollama sin requerir SDKs pesados de terceros.
+- **¿Por qué una interfaz compatible con OpenAI en el cliente BYOK?** La especificación de API de OpenAI se ha convertido en el estándar de la industria. Al implementar un llamador universal en `src/darius_ai/core/ai_client.py` con `urllib`, Darius puede comunicarse con OpenAI, Groq, NVIDIA NIM, OpenRouter, vLLM, LocalAI y Ollama sin requerir SDKs pesados de terceros.
 - **¿Por qué Obsidian en Markdown plano?** Los archivos Markdown son portables, legibles directamente por el usuario, inmunes a bloqueos de proveedores y editables con cualquier herramienta de texto.
 - **¿Por qué llamadas a subprocesos sin `shell=True`?** Para evitar vulnerabilidades de inyección de comandos al procesar nombres de archivos o argumentos capturados por voz.
 
