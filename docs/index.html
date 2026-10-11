@@ -25,7 +25,7 @@
         <img src="assets/logo_icon.png" alt="Darius AI Logo" class="brand-logo">
         <div class="brand-info">
           <span class="brand-title">DARIUS AI</span>
-          <span class="brand-version">v7.0.0 STABLE</span>
+          <span class="brand-version">v7.1.0 STABLE</span>
         </div>
       </div>
 
@@ -43,8 +43,12 @@
           <a href="#vision" class="nav-link"><span class="icon">👁</span> Visión & OCR MSS</a>
           <a href="#deep-research" class="nav-link"><span class="icon">🔬</span> Deep Research</a>
           <a href="#planner" class="nav-link"><span class="icon">🧭</span> Agent Planner</a>
+          <a href="#dossiers" class="nav-link"><span class="icon">📂</span> Dossiers & OSINT</a>
+          <a href="#sentinel" class="nav-link"><span class="icon">🛡</span> Centinela Perceptual</a>
           <a href="#obsidian" class="nav-link"><span class="icon">🧠</span> Obsidian Brain</a>
+          <a href="#audio-sfx" class="nav-link"><span class="icon">🎵</span> Audio FX Procedural</a>
           <a href="#voz-tts" class="nav-link"><span class="icon">🔊</span> Voz & Síntesis (TTS)</a>
+          <a href="#telemetry" class="nav-link"><span class="icon">⚡</span> Telemetría & HUD</a>
         </div>
 
         <div class="nav-group">
@@ -97,7 +101,7 @@
 
           <div class="hero-cta-group">
             <a href="https://github.com/oscarbol09/Darius-AI/releases/latest" class="btn-header btn-primary btn-lg" target="_blank" rel="noopener">
-              Descargar Instalador v7.0.0 (Win64)
+              Descargar Instalador v7.1.0 (Win64)
             </a>
             <a href="#instalacion" class="btn-header btn-ghost btn-lg">
               Guía de Instalación Local
@@ -121,6 +125,16 @@
               <p class="card-desc">Persistencia directa en archivos Markdown locales para bitácora diaria y memorias permanentes con inyección de contexto.</p>
             </div>
             <div class="card">
+              <span class="card-icon">📂</span>
+              <h3 class="card-title">Dossiers & OSINT</h3>
+              <p class="card-desc">Síntesis estructurada de fichas analíticas sobre personas o empresas con perfiles sociales, hooks y alertas de riesgo.</p>
+            </div>
+            <div class="card">
+              <span class="card-icon">🛡</span>
+              <h3 class="card-title">Centinela Perceptual</h3>
+              <p class="card-desc">Monitoreo pasivo por webcam (<1% CPU) para auto-wake al llegar, auto-sleep y alerta de privacidad anti-espías.</p>
+            </div>
+            <div class="card">
               <span class="card-icon">👁</span>
               <h3 class="card-title">Visión de Pantalla MSS</h3>
               <p class="card-desc">Captura ultra-rápida en memoria (<15ms) con análisis visual de bugs, stacktraces y lectura OCR asistida por LLMs.</p>
@@ -142,7 +156,7 @@
             <div class="tab-content active" id="tab-exe">
               <p>Ideal si deseas usar Darius AI de inmediato sin necesidad de tener Python ni compiladores instalados en tu computadora:</p>
               <ol>
-                <li>Descarga el instalador <strong><code>DariusAI-Setup-v7.0.0.exe</code></strong> desde <a href="https://github.com/oscarbol09/Darius-AI/releases/latest" target="_blank" rel="noopener">Releases de GitHub</a>.</li>
+                <li>Descarga el instalador <strong><code>DariusAI-Setup-v7.1.0.exe</code></strong> desde <a href="https://github.com/oscarbol09/Darius-AI/releases/latest" target="_blank" rel="noopener">Releases de GitHub</a>.</li>
                 <li>Ejecuta el archivo. El asistente se instalará de forma aislada en tu perfil de usuario (<code>%LOCALAPPDATA%\Programs\DariusAI</code>) sin requerir permisos de administrador.</li>
                 <li>Lanza <strong>Darius AI</strong> desde el menú de inicio o el acceso directo del escritorio.</li>
               </ol>
@@ -351,6 +365,111 @@ Darius AI:
           </ul>
         </section>
 
+        <!-- ── Section: Target Dossier & OSINT ────────────────────────────── -->
+        <section id="dossiers">
+          <h2>Motor de Dossiers e Inteligencia Estructurada (OSINT)</h2>
+          <p>
+            El módulo <code>target_dossier.py</code> sintetiza fichas de inteligencia analítica sobre personas, organizaciones, repositorios y tecnologías, archivándolas automáticamente en tu bóveda de Obsidian en <code>Darius/Dossiers/</code>.
+          </p>
+          <ul>
+            <li><strong>Estructura Frontmatter YAML:</strong> Indexa categoría, rol, organización, enlaces sociales verificados y fecha de generación.</li>
+            <li><strong>Conversation Hooks:</strong> Puntos de entrada y temas clave para reuniones y entrevistas.</li>
+            <li><strong>Alertas de Riesgo (Risk Flags):</strong> Señales de alerta sobre litigios, controversias o fallos previos.</li>
+            <li><strong>Búsqueda Neuronal con Exa API:</strong> Soporte opcional para búsqueda semántica profunda en la web con <code>EXA_API_KEY</code>.</li>
+            <li><strong>Resumen Fonético TTS:</strong> Genera una síntesis ejecutiva concisa para que Darius te la relate oralmente por voz.</li>
+          </ul>
+
+          <div class="code-box">
+            <div class="code-header">
+              <span class="code-lang">Comandos de Voz / Texto</span>
+              <button class="btn-copy">Copiar</button>
+            </div>
+            <pre><code>"Genera un dossier sobre Anthropic"
+"Dossier de Sam Altman para reunión"
+"Investiga la empresa Databricks y genera un dossier"</code></pre>
+          </div>
+        </section>
+
+        <!-- ── Section: Webcam Sentinel ──────────────────────────────────── -->
+        <section id="sentinel">
+          <h2>Centinela Perceptual de Presencia Humana</h2>
+          <p>
+            Inspirado en módulos de visión antropomórfica, <code>webcam_sentinel.py</code> ejecuta un hilo pasivo en segundo plano que monitorea la presencia física frente al monitor con bajo muestreo (1 a 2 FPS) y un consumo inferior al <strong>1% de CPU</strong>:
+          </p>
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Evento Detectado</th>
+                  <th>Condición Lógica</th>
+                  <th>Acción Desencadenada</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Llegada de Usuario</strong> (<code>on_user_arrived</code>)</td>
+                  <td>Rostro detectado tras ausencia prolongada con debounce de 2 fotogramas</td>
+                  <td>Despierta al asistente y activa la rutina de bienvenida ("Protocolo Darius").</td>
+                </tr>
+                <tr>
+                  <td><strong>Ausencia Prolongada</strong> (<code>on_user_left</code>)</td>
+                  <td>Cero presencia durante más de 120 segundos</td>
+                  <td>Pausa multimedia o activa el modo reposo del espacio de trabajo.</td>
+                </tr>
+                <tr>
+                  <td><strong>Alerta de Hombro</strong> (<code>on_shoulder_surfer</code>)</td>
+                  <td>Detección de más de un rostro frente a la pantalla</td>
+                  <td>Emite aviso sonoro táctico de privacidad alertando sobre observadores externos.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ── Section: Audio SFX Procedural ─────────────────────────────── -->
+        <section id="audio-sfx">
+          <h2>Motor de Efectos de Sonido Procedurales en Memoria</h2>
+          <p>
+            El módulo <code>sound_effects.py</code> genera tonos tácticos y confirmaciones auditivas en tiempo real mediante síntesis matemática directa de formas de onda (senoidales, cuadradas, triangulares) con <strong>NumPy</strong> y <strong>sounddevice</strong>:
+          </p>
+          <ul>
+            <li><strong>0 KB de Almacenamiento en Disco:</strong> No requiere descargar ni empaquetar archivos <code>.wav</code> o <code>.mp3</code>; todo se calcula en memoria en microsegundos.</li>
+            <li><strong>Latencia Ultra-Baja (&lt;5 ms):</strong> Reproducción asíncrona no bloqueante con envolventes suaves de ataque y decaimiento anti-clipping.</li>
+            <li><strong>Catálogo Táctico:</strong> <code>target_lock</code>, <code>success_chime</code>, <code>scan_pulse</code>, <code>click_tone</code> y tonos de alerta.</li>
+            <li><strong>Control Interactivo:</strong> Botón <code>🔊 SFX / 🔇 MUTE</code> integrado en la GUI y comandos por voz para alternar el audio.</li>
+          </ul>
+        </section>
+
+        <!-- ── Section: Voz & Síntesis (TTS) ─────────────────────────────── -->
+        <section id="voz-tts">
+          <h2>Voz & Síntesis (TTS) Multi-Motor con Caché SHA-256</h2>
+          <p>
+            Darius AI desacopla la generación de audio de la interfaz gráfica a través de una cola de trabajo COM concurrente y un despachador jerárquico multi-motor:
+          </p>
+          <ol>
+            <li><strong>ElevenLabs (Neural de Alta Fidelidad):</strong> Streaming PCM 24kHz con catálogo de voces (Adam, Rachel, Antoni, etc.).</li>
+            <li><strong>Edge-TTS (Neural en la Nube):</strong> Síntesis neural gratuita en español con voces naturales de Microsoft.</li>
+            <li><strong>SAPI5 (Local de Windows):</strong> Motor nativo offline 100% local que funciona sin conexión ni configuración previa.</li>
+          </ol>
+          <div class="callout callout-tip">
+            <span>💾</span>
+            <div><strong>Caché Local SHA-256:</strong> Las frases recurrentes de confirmación ("Entendido", "Modo desarrollo listo", saludos) se guardan en disco local indexadas por su hash criptográfico. Se reproducen con <strong>0 ms de latencia</strong> y <strong>0 consumo de cuota de API</strong>.</div>
+          </div>
+        </section>
+
+        <!-- ── Section: Telemetría & HUD ─────────────────────────────────── -->
+        <section id="telemetry">
+          <h2>Telemetría Agéntica & Barra HUD en Tiempo Real</h2>
+          <p>
+            La observabilidad del sistema se gestiona con <code>telemetry_tracker.py</code> y la barra inferior <code>TelemetryBarWidget</code> en CustomTkinter:
+          </p>
+          <ul>
+            <li><strong>Medición de Latencias:</strong> El decorador <code>@trace_step</code> registra la duración exacta en milisegundos de cada llamada de IA, escaneo visual o comando de sistema.</li>
+            <li><strong>Ticker Continuo Rotativo:</strong> El Command Dock de la GUI muestra una tira interactiva que rota automáticamente las actividades recientes del enjambre agéntico.</li>
+            <li><strong>Depuración Diagnóstica:</strong> Permite detectar inmediatamente cuellos de botella en APIs de red o herramientas locales lentas.</li>
+          </ul>
+        </section>
+
         <!-- ── Section: Comandos ─────────────────────────────────────────── -->
         <section id="comandos">
           <h2>Catálogo de Comandos de Voz y Automatización</h2>
@@ -379,6 +498,31 @@ Darius AI:
                   <td><code>"Modo trading"</code></td>
                   <td>Distribuye TradingView y Finviz/Binance en los monitores</td>
                   <td><code>workspace_manager.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Genera un dossier sobre [objetivo]"</code></td>
+                  <td>Sintetiza ficha analítica estructurada con ganchos y alertas en Obsidian</td>
+                  <td><code>target_dossier.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Activa el centinela"</code> / <code>"Modo vigilancia"</code></td>
+                  <td>Inicia centinela pasivo de presencia por webcam (&lt;1% CPU) con alerta anti-espía</td>
+                  <td><code>webcam_sentinel.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Silenciar / Activar efectos de sonido"</code></td>
+                  <td>Alterna el motor de audio procedural en memoria con respuesta táctica</td>
+                  <td><code>sound_effects.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"¿Qué hay en mi pantalla?"</code></td>
+                  <td>Captura atómica MSS (&lt;15ms) y análisis visual con el LLM activo</td>
+                  <td><code>screen_vision.py</code></td>
+                </tr>
+                <tr>
+                  <td><code>"Investiga a fondo sobre [tema]"</code></td>
+                  <td>Investigación multi-fuente DuckDuckGo y reporte académico en Obsidian</td>
+                  <td><code>deep_research.py</code></td>
                 </tr>
                 <tr>
                   <td><code>"Limpiar DNS"</code></td>

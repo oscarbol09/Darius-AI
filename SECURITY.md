@@ -4,7 +4,8 @@
 
 | Versión | Estado de Soporte |
 | :--- | :--- |
-| **6.x** | ✅ Desarrollo activo y soporte de seguridad |
+| **7.x** | ✅ Desarrollo activo y soporte de seguridad |
+| **6.x** | ⚠️ Mantenimiento crítico y parches de seguridad |
 | **< 6.0** | ❌ Sin soporte |
 
 ---

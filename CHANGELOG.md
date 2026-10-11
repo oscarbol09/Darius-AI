@@ -1,5 +1,35 @@
 # Changelog
 
+## [7.1.0] - 2026-10-11 — Tactical Intelligence & Perceptual Sentinel Edition
+
+### Agregado
+- **Motor de Efectos de Sonido Procedurales en Memoria (`sound_effects.py`):**
+  - Síntesis matemática directa de formas de onda (senoidales, cuadradas, triangulares) con NumPy y envolventes suaves anti-clipping.
+  - Catálogo de SFX de interfaz y HUD tácticos: `play_target_lock()`, `play_success_chime()`, `play_scan_pulse()`, `play_alert_tone()` y `play_click_tone()`.
+  - Cero consumo de archivos en disco (0 KB), reproducción asíncrona no bloqueante y botón interactivo `🔊 SFX / 🔇 MUTE` en la GUI.
+- **Motor de Dossiers de Inteligencia Estructurados (`target_dossier.py`):**
+  - Generación automatizada de fichas analíticas sobre personas, empresas, tecnologías o proyectos con resumen ejecutivo, trayectoria, perfiles sociales verificados, *conversation hooks* y señales de riesgo (*risk flags*).
+  - Persistencia estructurada en Obsidian Vault (`Darius/Dossiers/`) con Frontmatter YAML y callouts visuales de Markdown.
+  - Soporte opcional para búsqueda neuronal con Exa API (`EXA_API_KEY`) y resúmenes concisos adaptados para lectura verbal fluida por TTS.
+  - Nueva herramienta agéntica `target_dossier` integrada en el planificador autónomo (`agent_planner.py`).
+- **Centinela de Presencia Humana y Visión Perceptual (`webcam_sentinel.py`):**
+  - Monitoreo pasivo de presencia por webcam en segundo plano con control de FPS y consumo <1% CPU.
+  - Detección de eventos: llegada del usuario (`on_user_arrived`), alejamiento prolongado (`on_user_left`) y alerta de hombro / espía (`on_shoulder_surfer`).
+  - Máquina de estados con debounce de fotogramas y degradación elegante si no hay webcam o dependencias de OpenCV.
+- **Rastreador de Telemetría Agéntica & Barra HUD (`telemetry_tracker.py` & `telemetry_bar.py`):**
+  - Emisión de eventos agénticos en tiempo real con tiempos de ejecución en milisegundos (`@trace_step`).
+  - Widget `TelemetryBarWidget` montado en el Command Dock de la GUI principal con ticker rotativo automático de actividades.
+- **Tokens Tácticos Cyber / War Room en `gui_theme.py`:**
+  - Nuevos tokens `ACCENT_TACTICAL_GREEN`, `BG_TACTICAL_DARK`, `BG_TACTICAL_PANEL` y `BORDER_TACTICAL`.
+- **Suites de Pruebas Unitarias Robustas:**
+  - `tests/test_sound_effects.py` (12 pruebas)
+  - `tests/test_target_dossier.py` (7 pruebas)
+  - `tests/test_webcam_sentinel.py` (5 pruebas)
+  - `tests/test_telemetry_tracker.py` (5 pruebas)
+  - `tests/test_telemetry_bar.py` (2 pruebas)
+  - `tests/test_agent_planner.py` (4 pruebas actualizadas)
+  - Total de pruebas automáticas elevado a 272 pruebas pasando al 100%.
+
 ## [7.0.0] - 2026-09-19 — Workspace & Acoustic Automation Edition
 
 ### Agregado

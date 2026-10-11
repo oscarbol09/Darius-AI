@@ -29,6 +29,8 @@ Darius AI se basa en dos pilares de ingeniería:
 
 ---
 
+## Capacidades y Arquitectura de Módulos
+
 - **Disparador Acústico por Doble Aplauso:**
   - Detección en tiempo real de picos acústicos transitorios (aplausos) sobre streaming PCM con `sounddevice` y `numpy`.
   - Piso de ruido adaptativo exponencial que ajusta el umbral automáticamente al entorno sonoro.
@@ -57,6 +59,17 @@ Darius AI se basa en dos pilares de ingeniería:
 - **Visualizador Vectorial a 60 FPS y Telemetría en Vivo:**
   - Onda sinusoidal armónica de 3 capas calculada con **NumPy** y proyectada sobre `tkinter.Canvas` atómico (0 flicker, <90 MB RAM).
   - Indicadores de telemetría en tiempo real: estado del micrófono, monitores detectados, motor TTS y botón de conmutación de aplausos.
+- **Motor de Efectos de Sonido Procedurales en Memoria (`sound_effects.py`):**
+  - Síntesis matemática directa de tonos senoidales, triangulares y cuadrados con `numpy` y `sounddevice` (0 KB de archivos en disco, latencia <5ms).
+  - Confirmaciones tácticas de interfaz (`target_lock`, `success_chime`, `scan_pulse`, `click_tone`) y botón interactivo `🔊 SFX / 🔇 MUTE`.
+- **Motor de Dossiers de Inteligencia y OSINT (`target_dossier.py`):**
+  - Síntesis automatizada de fichas analíticas sobre personas, empresas y repositorios guardadas en Obsidian (`Darius/Dossiers/`).
+  - Extracción de trayectoria, perfiles sociales verificados, *conversation hooks* y señales de riesgo (*risk flags*).
+  - Soporte integrado de búsqueda neuronal semántica con **Exa API** (`EXA_API_KEY`).
+- **Centinela Perceptual de Presencia Humana (`webcam_sentinel.py`):**
+  - Monitoreo pasivo en segundo plano por webcam (<1% CPU) para auto-wake al sentarte, auto-sleep al ausentarte y alerta de hombro (*Shoulder-Surfer Alert*).
+- **Barra de Telemetría HUD Agéntica en GUI (`telemetry_bar.py`):**
+  - Ticker continuo en tiempo real integrado en el Command Dock que muestra la herramienta activa y su tiempo de respuesta en ms.
 - **Control por Voz y Modos de Activación:**
   - **Disparador Acústico:** Da dos aplausos seguidos para despertar al asistente inmediatamente.
   - **Push-to-Talk (PTT):** Mantén presionada una tecla (`Right Ctrl` por defecto) para hablar sin falsos positivos.
@@ -122,7 +135,7 @@ pip install nuitka zstandard
 python build_nuitka.py
 ```
 
-El script genera la carpeta `dist/DariusAI.dist/` que contiene `DariusAI.exe`, sus recursos y librerías DLL empaquetadas.
+El script genera la carpeta `dist/main.dist/` que contiene `DariusAI.exe`, sus recursos y librerías DLL empaquetadas.
 
 ### Crear el Instalador de Windows (Inno Setup)
 Si tienes instalado [Inno Setup 6](https://jrsoftware.org/isdl.php), compila el script para generar el instalador final:
@@ -193,6 +206,9 @@ Puedes personalizar rutas y pantallas en `config.json`:
 | **"Planifica [meta compleja]"** | Descomposición agéntica en pasos ordenados con auto-recuperación | `src/darius_ai/core/agent_planner.py` |
 | **"Anota en mi diario que..."** | Inserta entrada con hora en la nota diaria (`Diario/YYYY-MM-DD.md`) de Obsidian | `src/darius_ai/core/obsidian_brain.py` |
 | **"Recuerda que..."** | Almacena memoria permanente con tags y timestamp en `Darius/Memorias/` | `src/darius_ai/core/obsidian_brain.py` |
+| **"Genera un dossier sobre [objetivo]"** | Sintetiza ficha de inteligencia con ganchos de conversación y alertas en Obsidian | `src/darius_ai/core/target_dossier.py` |
+| **"Activa el centinela"** / **"Modo vigilancia"** | Inicia monitoreo pasivo por webcam (<1% CPU) para detección de presencia y alertas | `src/darius_ai/core/webcam_sentinel.py` |
+| **"Silenciar / Activar efectos de sonido"** | Alterna el motor de audio procedural en memoria con respuesta táctica | `src/darius_ai/audio/sound_effects.py` |
 | **"Subir / Bajar volumen"** | Modifica el nivel de volumen maestro del endpoint de audio con PyCAW | `src/darius_ai/system/windows_commands.py` |
 | **"Abrir [aplicación]"** | Búsqueda difusa y ejecución aislada (`shell=False`) de software instalado | `src/darius_ai/system/windows_commands.py` |
 
@@ -208,6 +224,7 @@ Puedes personalizar rutas y pantallas en `config.json`:
 │   │     HighPerfWaveVisualizer        │  │      BYOKSettingsModal        │  │
 │   │  NumPy 60 FPS · Canvas Atómico    │  │  Configuración y Ping en Vivo │  │
 │   └───────────────────────────────────┘  └───────────────────────────────┘  │
+│   [TelemetryBarWidget: HUD Ticker ms]    [SFX Procedural Button 🔊/🔇]     │
 │   [Pill: Micro Calibrado]  [Pill: Monitores]  [Pill: TTS]  [Toggle: Clap]   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                    DISPARADORES Y ENRUTADOR DE COMANDOS                     │
@@ -218,12 +235,19 @@ Puedes personalizar rutas y pantallas en `config.json`:
 │        Hilo streaming               Hilo principal             Hilo daemon  │
 │      [sounddevice audio]       [dispatch de comandos]    [Gemini/OpenAI/Oll]│
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                    GESTIÓN DE ESPACIO DE TRABAJO Y TTS                      │
-│   ┌───────────────────────────────────┐  ┌───────────────────────────────┐  │
-│   │    WorkspaceManager (Win32)       │  │   TTSWorker Multi-Motor       │  │
-│   │  Multi-Monitor · Snap · Focus IDE │  │ ElevenLabs + DiskCache + SAPI │  │
-│   └───────────────────────────────────┘  └───────────────────────────────┘  │
-│         EnumDisplayMonitors / User32            audio_cache/ (SHA-256)      │
+│             PERCEPCIÓN, AUDIO PROCEDURAL Y GESTIÓN DE WORKSPACE             │
+│  ┌──────────────────────┐  ┌───────────────────────┐  ┌──────────────────┐  │
+│  │   Webcam Sentinel    │  │  Procedural Audio SFX │  │  WorkspaceManager│  │
+│  │  (Presencia <1% CPU) │  │  (NumPy en memoria)   │  │   (Win32 User32) │  │
+│  └──────────────────────┘  └───────────────────────┘  └──────────────────┘  │
+│       cv2 / auto-sleep             0 KB en disco            Multi-Monitor   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                 INTELIGENCIA AGÉNTICA Y SÍNTESIS DE VOZ                     │
+│  ┌──────────────────────┐  ┌───────────────────────┐  ┌──────────────────┐  │
+│  │  Agentic Planner     │  │    Target Dossier     │  │    TTSWorker     │  │
+│  │ (Multi-step planner) │  │ (OSINT / Exa API)     │  │  (ElevenLabs+SAPI│  │
+│  └──────────────────────┘  └───────────────────────┘  └──────────────────┘  │
+│        @trace_step                 YAML Frontmatter       audio_cache/ SHA256│
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                       CEREBRO Y MEMORIA LOCAL                               │
 │                          obsidian_brain.py                                  │
@@ -259,7 +283,7 @@ Para ejecutar la suite de pruebas automatizadas:
 ```powershell
 pip install -r requirements-dev.txt
 
-# Ejecutar suite de pruebas unitarias e integración (sin llamadas de red externas)
+# Ejecutar suite de 272 pruebas unitarias e integración (sin llamadas de red externas)
 pytest tests/ -v -m "not live"
 
 # Validar estándares y calidad de código con Ruff

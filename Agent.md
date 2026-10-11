@@ -5,7 +5,7 @@
 > arquitectura real del sistema, las decisiones de diseño ya tomadas y las
 > reglas que debes respetar para no romper el comportamiento existente.
 >
-> Última actualización: Versión 7.0.0 — Disparador acústico por doble aplauso, gestión multi-monitor Win32, automatización de espacio de trabajo, motor ElevenLabs con caché SHA-256 en disco, arquitectura BYOK multi-proveedor, visualizador 60 FPS con NumPy, memoria en Obsidian — Septiembre 2026.
+> Última actualización: Versión 7.1.0 — Motor de dossiers de inteligencia estructurados (Obsidian / Exa), centinela perceptual de presencia por webcam, efectos de sonido procedurales NumPy en memoria, rastreador de telemetría y barra HUD en CustomTkinter — Octubre 2026.
 
 ---
 
@@ -43,10 +43,14 @@ configurado por el usuario (BYOK), y mantener un consumo mínimo de recursos (<9
 | **Animación** | `HighPerfWaveVisualizer` (NumPy + Canvas) | 60 FPS, actualización atómica `coords()`, 0 flicker, 0 fugas de memoria |
 | **Configuración GUI** | `BYOKSettingsModal` (`ctk.CTkToplevel`) | Gestión visual de proveedores, claves enmascaradas y ping en vivo |
 | **Disparador Acústico** | `src/darius_ai/audio/acoustic_trigger.py` (sounddevice + NumPy) | Detección de doble aplauso en tiempo real, filtro adaptativo de ruido y auto-sondeo de micrófono |
+| **Audio FX Procedural** | `src/darius_ai/audio/sound_effects.py` (NumPy + sounddevice / winsound) | Síntesis en memoria de tonos e interfaz táctica sin archivos WAV/MP3 en disco (0 KB) |
 | **Voz entrada** | SpeechRecognition + PyAudio | Google STT (es-ES) con calibración de ruido ambiental |
 | **Voz salida** | SAPI (`SpVoice`) + Edge-TTS + ElevenLabs | Síntesis nativa o neural en hilo COM desacoplado con caché SHA-256 en disco (`src/darius_ai/audio/tts_cache.py`) |
 | **Espacio de Trabajo** | `src/darius_ai/system/workspace_manager.py` (Win32 User32) | Multi-monitor geometry, window snapping, IDE focus nativo (`AttachThreadInput`), rutinas Darius/Dev/Trading |
 | **Motor BYOK** | `src/darius_ai/core/ai_client.py` (Gemini SDK + OpenAI REST via `urllib`) | 7 proveedores soportados (Gemini, OpenAI, Groq, NIM, OpenRouter, Ollama, Custom) |
+| **Dossiers & OSINT** | `src/darius_ai/core/target_dossier.py` (LLM + Exa API + Obsidian) | Fichas estructuradas de inteligencia sobre personas/empresas con ganchos de conversación y alertas |
+| **Visión Centinela** | `src/darius_ai/core/webcam_sentinel.py` (Webcam + OpenCV / Haar) | Monitoreo pasivo de presencia humana (<1% CPU), auto-wake, auto-sleep y alerta de hombro |
+| **Telemetría & HUD** | `src/darius_ai/core/telemetry_tracker.py` + `telemetry_bar.py` | Trazabilidad en tiempo real con latencias en ms y ticker rotativo en Command Dock |
 | **Memoria** | `src/darius_ai/core/obsidian_brain.py` (Markdown + YAML) | Persistencia privada y portable en la bóveda local de Obsidian |
 | **SO Windows** | pywin32, subprocess, PowerShell, PyCAW, winreg | Control del sistema operativo con listas de argumentos (`shell=False`) |
 | **Configuración** | `src/darius_ai/core/config_loader.py` (`config.json` + `.env`) | Merge jerárquico y validación de esquema con tipado fuerte |
@@ -65,11 +69,12 @@ Darius-AI/
 ├── main.py                  <- Entrypoint ligero
 ├── pyproject.toml           <- Metadatos y configuracion
 ├── src/darius_ai/
-│   ├── audio/               <- TTS, STT, Mic, Wake words
-│   ├── core/                <- LLMs, Memoria Obsidian, Vision
-│   ├── gui/                 <- CustomTkinter, visualizadores
+│   ├── audio/               <- TTS, STT, Mic, Wake words, Sound Effects (sound_effects.py)
+│   ├── core/                <- LLMs, Memoria Obsidian, Vision, Dossiers (target_dossier.py), Sentinel, Telemetría
+│   ├── gui/                 <- CustomTkinter, visualizadores, TelemetryBar, Ajustes
 │   └── system/              <- Comandos nativos, Workspace
-└── tests/                   <- Suite de pruebas unitarias
+└── tests/                   <- Suite de 272 pruebas unitarias
+```
 
 ## 4. Flujo de Datos Principal
 
@@ -220,6 +225,18 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
    - **Main Studio Derecho Responsivo:** Header superior con visualizador vectorial a 60 FPS integrado (`170x36`), indicador de estado en vivo, botones de control rápido, contenedor dinámico de vistas y dock inferior de comandos.
 3. **Licencia Copyleft Fuerte (GNU GPL-3.0):** Implementación del archivo `LICENSE` bajo la GNU General Public License v3.0 con `Copyright (C) 2026 Oscarbol09`, protegiendo el código contra apropiación o comercialización cerrada de terceros sin costo alguno ($0).
 4. **Atribución de Autoría Discreta:** Enlace permanente y no intrusivo en el pie de la barra lateral (`🛠 Desarrollado por @Oscarbol09 • GPLv3`) enlazado directamente al perfil de GitHub `https://github.com/oscarbol09/Darius-AI`.
+
+### D18 — Motor de Efectos de Sonido Procedurales en Memoria (NumPy SFX)
+**Decisión:** Generar tonos de interfaz y confirmaciones tácticas mediante síntesis de ondas directa (senoidal, cuadrada, triangular) con `numpy` y `sounddevice` (`src/darius_ai/audio/sound_effects.py`), eliminando la necesidad de empaquetar o descargar archivos de audio `.wav` o `.mp3` en disco (0 KB footprint). Provee latencia <5ms y fallback transparente a `winsound.Beep`.
+
+### D19 — Motor de Dossiers e Inteligencia de Objetivos (Target Dossier Engine)
+**Decisión:** Desarrollar un sintetizador agéntico de entidades (`src/darius_ai/core/target_dossier.py`) capaz de investigar personas, organizaciones, repositorios y tecnologías, estructurándolos en fichas con Frontmatter YAML en `Darius/Dossiers/` de Obsidian. Extrae roles, historial, enlaces sociales, *conversation hooks* y señales de alerta (*risk flags*), integrando opcionalmente la API de Exa para búsquedas neuronales semánticas rápidas.
+
+### D20 — Centinela Perceptual de Presencia Humana (Webcam Sentinel)
+**Decisión:** Implementar un hilo pasivo de visión en segundo plano (`src/darius_ai/core/webcam_sentinel.py`) con bajo muestreo (1-2 FPS, <1% CPU) que monitoriza la webcam para detectar automáticamente la llegada del usuario al escritorio (desencadenando rutinas de bienvenida), su ausencia prolongada o alertas de privacidad si hay más de una persona detrás de la pantalla (*shoulder surfer alert*).
+
+### D21 — Rastreador de Telemetría Agéntica y HUD Ticker en GUI
+**Decisión:** Incorporar observabilidad estructurada en tiempo real mediante `src/darius_ai/core/telemetry_tracker.py` y el componente de interfaz `TelemetryBarWidget` (`src/darius_ai/gui/telemetry_bar.py`) en el Command Dock inferior de CustomTkinter. Proporciona visibilidad en tiempo real de qué agente o herramienta está operando y su latencia en milisegundos, reduciendo la incertidumbre del usuario durante tareas asíncronas.
 
 ---
 
