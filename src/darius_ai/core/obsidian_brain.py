@@ -18,7 +18,9 @@ from __future__ import annotations
 import datetime
 import logging
 import re
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from src.darius_ai.core.config_loader import cfg
 
@@ -134,7 +136,7 @@ class ObsidianBrain:
         self,
         topic: str,
         content: str,
-        sources: list[dict | str] | None = None,
+        sources: Sequence[dict[str, Any] | str] | None = None,
         tags: list[str] | None = None,
     ) -> Path:
         """
@@ -234,7 +236,7 @@ class ObsidianBrain:
         if not words:
             return []
 
-        matches = []
+        matches: list[dict[str, Any]] = []
         for file in vault.rglob("*.md"):
             try:
                 text = file.read_text(encoding="utf-8", errors="ignore")
@@ -260,7 +262,7 @@ class ObsidianBrain:
                     }
                 )
 
-        matches.sort(key=lambda x: x["score"], reverse=True)
+        matches.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
         return matches[:max_results]
 
     def get_memory_context(self, query: str = "") -> str:

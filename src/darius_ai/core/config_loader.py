@@ -21,6 +21,7 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger("DARIUS.Config")
 
@@ -524,7 +525,7 @@ _SCHEMA: dict = {
 
 def _get_default(path_parts: list[str]) -> object:
     """Navega _DEFAULTS siguiendo path_parts."""
-    node = _DEFAULTS
+    node: Any = _DEFAULTS
     for p in path_parts:
         if isinstance(node, dict):
             node = node.get(p)

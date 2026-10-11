@@ -50,7 +50,15 @@ def test_check_tool_contracts():
 def test_run_self_test_structure():
     results = run_self_test()
     assert isinstance(results, list)
-    assert len(results) >= 6
+    assert len(results) >= 7
     for r in results:
         assert isinstance(r, CheckResult)
         assert r.status in ("PASS", "WARN", "FAIL")
+
+
+def test_check_tactical_intelligence():
+    from src.darius_ai.core.self_test import check_tactical_intelligence
+
+    res = check_tactical_intelligence()
+    assert res.status == "PASS"
+    assert "SFX procedural OK" in res.detail

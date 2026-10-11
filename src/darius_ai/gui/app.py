@@ -1241,6 +1241,12 @@ class DariusFinal(ctk.CTk):
             command=self._on_text_submit,
         ).pack(side="right", padx=(0, 10), pady=8)
 
+        # 2.4 Bottom Telemetry HUD Bar (Inspirado en JARVIS)
+        from src.darius_ai.gui.telemetry_bar import TelemetryBarWidget
+
+        self.telemetry_bar = TelemetryBarWidget(self.main_studio_frame)
+        self.telemetry_bar.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
+
     def _show_page(self, page_id: str):
         if page_id == "settings":
             self._open_byok_settings()
@@ -1361,6 +1367,13 @@ class DariusFinal(ctk.CTk):
         if not text:
             return
         self.text_input.delete(0, "end")
+
+        from src.darius_ai.audio.sound_effects import get_sfx_engine
+        from src.darius_ai.core.telemetry_tracker import get_telemetry_tracker
+
+        get_sfx_engine().play_click_tone()
+        get_telemetry_tracker().push_event("user", f"Comando: '{text[:40]}'", status="running")
+
         self.add_to_chat(USER_NAME, text)
         self._append_chat_file(USER_NAME.upper(), text)
         threading.Thread(target=self.execute_command, args=(text,), daemon=True, name="text-cmd").start()
@@ -2393,6 +2406,9 @@ class DariusFinal(ctk.CTk):
             with self._pending_lock:
                 entry = self._pending_action
                 self._pending_action = None
+            if not entry:
+                self.talk("No hay ninguna acción pendiente de confirmación.")
+                return
             self.set_status("LISTO", "gray")
             self.talk(f"Ejecutando: {entry['desc']}.")
             if "_fn" in entry:
@@ -2401,8 +2417,12 @@ class DariusFinal(ctk.CTk):
                 self._execute_action(entry)
         elif any(w in t for w in ["cancelar", "cancela", "no", "abortar", "detener"]):
             with self._pending_lock:
-                desc = self._pending_action["desc"]
+                entry = self._pending_action
                 self._pending_action = None
+            if not entry:
+                self.talk("No hay ninguna acción pendiente para cancelar.")
+                return
+            desc = entry.get("desc", "desconocida")
             self.set_status("LISTO", "gray")
             self.talk(f"Acción cancelada: {desc}.")
         else:

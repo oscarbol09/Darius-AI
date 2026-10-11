@@ -31,14 +31,24 @@ select = ["E", "F", "W", "I", "N", "UP", "S", "B", "SIM"]
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-testpaths = ["."]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "--tb=short"
+markers = [
+    "live: pruebas que realizan llamadas de red o hardware en vivo (excluidas en CI hermético)",
+]
 
 [tool.coverage.run]
-source = ["."]
+source = ["src"]
 omit = ["test_*.py", ".venv/*", "antenv/*"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+[tool.pyright]
+executionEnvironments = [
+  { root = "." }
+]
+extraPaths = ["."]
+

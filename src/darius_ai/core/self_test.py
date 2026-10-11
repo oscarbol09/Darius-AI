@@ -16,15 +16,21 @@ import os
 import sys
 from dataclasses import dataclass
 
-if hasattr(sys.stdout, "reconfigure"):
-    with contextlib.suppress(Exception):
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+# Asegurar raíz del proyecto en sys.path
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
 
-from src.darius_ai.core.ai_client import resolve_provider_key
-from src.darius_ai.core.config_loader import cfg
-from src.darius_ai.core.obsidian_brain import brain
-from src.darius_ai.core.screen_vision import vision_engine
-from src.darius_ai.system.workspace_manager import get_monitor_count, get_monitor_rects
+reconf = getattr(sys.stdout, "reconfigure", None)
+if callable(reconf):
+    with contextlib.suppress(Exception):
+        reconf(encoding="utf-8", errors="replace")
+
+from src.darius_ai.core.ai_client import resolve_provider_key  # noqa: E402
+from src.darius_ai.core.config_loader import cfg  # noqa: E402
+from src.darius_ai.core.obsidian_brain import brain  # noqa: E402
+from src.darius_ai.core.screen_vision import vision_engine  # noqa: E402
+from src.darius_ai.system.workspace_manager import get_monitor_count, get_monitor_rects  # noqa: E402
 
 
 @dataclass
@@ -122,7 +128,7 @@ def check_tool_contracts() -> CheckResult:
         actions_count = len(SYSTEM_ACTIONS)
 
         try:
-            from main import _CMD_PATTERNS
+            from src.darius_ai.gui.app import _CMD_PATTERNS
 
             patterns_count = len(_CMD_PATTERNS)
             patterns_msg = f"{patterns_count} patrones regex de voz"
@@ -138,6 +144,30 @@ def check_tool_contracts() -> CheckResult:
         return CheckResult("TOOL CONTRACTS", "FAIL", f"Error validando contratos de herramientas: {e}")
 
 
+def check_tactical_intelligence() -> CheckResult:
+    """Verifica los módulos de síntesis procedural, telemetría y dossiers."""
+    try:
+        from src.darius_ai.audio.sound_effects import generate_tone_wave
+        from src.darius_ai.core.target_dossier import get_dossier_engine
+        from src.darius_ai.core.telemetry_tracker import get_telemetry_tracker
+
+        wave = generate_tone_wave(freq=440.0, duration=0.01)
+        tracker = get_telemetry_tracker()
+        dossier_engine = get_dossier_engine()
+        tracker_ready = tracker is not None
+        dossier_ready = dossier_engine is not None
+
+        if len(wave) > 0 and tracker_ready and dossier_ready:
+            detail_msg = (
+                f"SFX procedural OK ({len(wave)} muestras en memoria) | "
+                "TelemetryTracker activo | TargetDossierEngine listo"
+            )
+            return CheckResult("TACTICAL & TELEMETRY", "PASS", detail_msg)
+        return CheckResult("TACTICAL & TELEMETRY", "WARN", "Subsistemas tácticos con respuesta parcial")
+    except Exception as e:
+        return CheckResult("TACTICAL & TELEMETRY", "WARN", f"Diagnóstico táctico: {e}")
+
+
 def run_self_test() -> list[CheckResult]:
     """Ejecuta la suite completa de certificación hermética y devuelve los resultados."""
     checks = [
@@ -146,6 +176,7 @@ def run_self_test() -> list[CheckResult]:
         check_obsidian_vault(),
         check_byok_providers(),
         check_vision_pipeline(),
+        check_tactical_intelligence(),
         check_tool_contracts(),
     ]
     return checks
