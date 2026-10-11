@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Nombre del Tag / Versión (ej. v7.0.0)'
+        description: 'Nombre del Tag / Versión (ej. v7.1.0)'
         required: false
-        default: 'v7.0.0'
+        default: 'v7.1.0'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -112,10 +112,15 @@ jobs:
           if (!$TAG -or $TAG -eq "") { $TAG = "${{ inputs.tag_name }}" }
           Compress-Archive -Path dist\main.dist\* -DestinationPath "dist-installer\DariusAI-$TAG-windows-x64-portable.zip" -Force
 
+      - name: Generar Ledger Criptográfico SHA-256 (SHA256SUMS.txt)
+        run: |
+          Get-FileHash dist-installer\* -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $($_.Path | Split-Path -Leaf)" } | Out-File -Encoding ascii dist-installer\SHA256SUMS.txt
+          Get-Content dist-installer\SHA256SUMS.txt
+
       - name: Publicar GitHub Release y adjuntar binarios
         uses: softprops/action-gh-release@v2
         with:
-          name: Darius AI ${{ github.ref_name || inputs.tag_name }} — Standalone Installer & Acoustic Automation Edition
+          name: Darius AI ${{ github.ref_name || inputs.tag_name }}
           tag_name: ${{ github.ref_name || inputs.tag_name }}
           draft: false
           prerelease: false
@@ -123,5 +128,6 @@ jobs:
           files: |
             dist-installer/DariusAI-Setup-*.exe
             dist-installer/DariusAI-*-windows-x64-portable.zip
+            dist-installer/SHA256SUMS.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

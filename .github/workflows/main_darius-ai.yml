@@ -100,13 +100,16 @@ jobs:
         run: >
           python -m pytest tests/ -v
           --junitxml=test-results-${{ matrix.python-version }}.xml
-          --cov=.
+          --cov=src
           --cov-report=term-missing
+          --cov-report=xml:coverage-${{ matrix.python-version }}.xml
           -m "not live"
 
-      - name: Subir artefacto con resultados de pruebas
+      - name: Subir artefacto con resultados de pruebas y cobertura
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-python-${{ matrix.python-version }}
-          path: test-results-${{ matrix.python-version }}.xml
+          path: |
+            test-results-${{ matrix.python-version }}.xml
+            coverage-${{ matrix.python-version }}.xml
