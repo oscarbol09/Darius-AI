@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from src.darius_ai.core.deep_research import DeepResearchPipeline, _clean_html_text
+from src.darius_ai.core.deep_research import DeepResearchPipeline, _clean_html_text, _fetch_page_content
 from src.darius_ai.core.obsidian_brain import ObsidianBrain
 
 
@@ -38,6 +38,21 @@ def test_generate_search_queries_mocked():
         queries = pipeline.generate_search_queries("fugas de memoria en python", count=3)
         assert len(queries) == 3
         assert "python async memory leak" in queries
+
+
+def test_generate_search_queries_fallback():
+    """Verifica que si el LLM falla, se generen consultas heurísticas de rescate."""
+    pipeline = DeepResearchPipeline()
+    with patch("src.darius_ai.core.deep_research.get_ai_response", side_effect=Exception("Timeout")):
+        queries = pipeline.generate_search_queries("Rust async tokio", count=3)
+        assert len(queries) == 3
+        assert any("Rust async tokio" in q for q in queries)
+
+
+def test_fetch_page_content_handles_errors():
+    """Verifica que URLs inválidas o con fallos de red devuelvan string vacío sin excepciones."""
+    res = _fetch_page_content("http://127.0.0.1:9999/nonexistent-dummy-path-xyz")
+    assert res == ""
 
 
 def test_run_research_full_flow_mocked():
@@ -81,3 +96,22 @@ def test_run_research_full_flow_mocked():
             content = report_path.read_text(encoding="utf-8")
             assert "Informe de Investigación: Arquitectura de Microservicios" in content
             assert "https://example.com/1" in content
+
+
+def test_run_research_no_obsidian_and_synthesis_error():
+    """Verifica la ejecución cuando save_to_obsidian es False y el LLM falla en la síntesis."""
+    pipeline = DeepResearchPipeline()
+
+    with (
+        patch.object(pipeline, "generate_search_queries", return_value=["query test"]),
+        patch("src.darius_ai.core.deep_research._search_duckduckgo", return_value=[]),
+        patch("src.darius_ai.core.deep_research.get_ai_response", side_effect=RuntimeError("LLM out of quota")),
+    ):
+        res = pipeline.run_research(
+            topic="Test Offline",
+            depth="quick",
+            save_to_obsidian=False,
+        )
+        assert res["ok"] is True
+        assert res["obsidian_path"] == ""
+        assert "Error al sintetizar el informe" in res["report"]

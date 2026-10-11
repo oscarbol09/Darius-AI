@@ -58,6 +58,10 @@ HERRAMIENTAS DISPONIBLES:
 9. speak
    - text: string (mensaje de confirmación o síntesis verbal)
 
+10. target_dossier
+   - target_name: string (nombre del objetivo o persona)
+   - category: "person" | "company" | "repository" | "topic" (opcional)
+
 REGLAS OBLIGATORIAS:
 - Devuelve ÚNICAMENTE un objeto JSON válido con la clave 'steps' (lista de objetos).
 - Cada paso debe contener: 'tool' (nombre de la herramienta) y 'params' (objeto con sus parámetros).
@@ -191,6 +195,17 @@ class AgentPlannerEngine:
                 txt = p.get("text", "") or prev_result
                 return True, txt
 
+            elif t == "target_dossier":
+                from src.darius_ai.core.target_dossier import get_dossier_engine
+
+                target = p.get("target_name", "") or prev_result or "objetivo"
+                cat = p.get("category", "person")
+                engine = get_dossier_engine()
+                dossier = engine.synthesize_dossier(target, category=cat, raw_research_text=prev_result)
+                saved_path = engine.save_to_obsidian(dossier)
+                summary_txt = dossier.to_speech_summary()
+                return True, f"Dossier de {dossier.target_name} generado en Obsidian ({saved_path}): {summary_txt}"
+
             return False, f"Herramienta desconocida: {t}"
 
         except Exception as e:
@@ -206,11 +221,21 @@ class AgentPlannerEngine:
         """
         Orquesta el ciclo completo: genera el plan, ejecuta cada paso en secuencia y reporta resultados.
         """
+        from src.darius_ai.audio.sound_effects import get_sfx_engine
+        from src.darius_ai.core.telemetry_tracker import get_telemetry_tracker
+
+        tracker = get_telemetry_tracker()
+        sfx = get_sfx_engine()
+
+        tracker.push_event("agent_planner", f"Planificando meta: '{goal[:50]}'", status="running")
+        sfx.play_scan_pulse()
+
         if status_fn:
             status_fn("🧠 PLANIFICANDO META…", "#A855F7")
 
         steps = self.create_plan(goal)
         if not steps:
+            tracker.push_event("agent_planner", "Fallo al generar plan de acción", status="error")
             return {"ok": False, "error": "No se pudo generar un plan de acción."}
 
         step_results = []
@@ -220,6 +245,9 @@ class AgentPlannerEngine:
         for i, step in enumerate(steps, 1):
             tool = step.get("tool", "unknown")
             params = step.get("params", {})
+
+            tracker.push_event(tool, f"Paso {i}/{len(steps)}: {tool}", status="running")
+            sfx.play_target_lock()
 
             if status_fn:
                 status_fn(f"⚡ PASO {i}/{len(steps)}: {tool.upper()[:16]}", "#38BDF8")
@@ -238,10 +266,19 @@ class AgentPlannerEngine:
             if ok:
                 success_count += 1
                 last_output = output
+                tracker.push_event(tool, f"Paso {i} completado con éxito", status="success")
             else:
                 log.warning(f"[Planner] Paso {i} falló: {output}")
+                tracker.push_event(tool, f"Paso {i} falló: {output[:40]}", status="error")
 
         summary = f"Meta completada: '{goal}'. Se ejecutaron {success_count} de {len(steps)} pasos correctamente."
+
+        if success_count > 0:
+            sfx.play_success_chime()
+            tracker.push_event("agent_planner", f"Meta completada ({success_count}/{len(steps)} OK)", status="success")
+        else:
+            sfx.play_alert_tone()
+            tracker.push_event("agent_planner", "Meta fallida en todos los pasos", status="error")
 
         if speak_fn:
             # Si el último paso fue una herramienta informativa, hablar su salida
