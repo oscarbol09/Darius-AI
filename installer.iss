@@ -1,18 +1,18 @@
 ; ==============================================================================
-; Inno Setup Script para DARIUS AI (v7.0.0)
+; Inno Setup Script para DARIUS AI (v7.1.0)
 ; Genera un instalador profesional de un solo archivo para Windows sin requerir Python.
 ; ==============================================================================
 
 #define MyAppName "Darius AI"
 #ifndef MyAppVersion
-#define MyAppVersion "7.0.0"
+#define MyAppVersion "7.1.0"
 #endif
 #define MyAppPublisher "Oscarbol09"
 #define MyAppURL "https://github.com/oscarbol09/Darius-AI"
 #define MyAppExeName "DariusAI.exe"
 
 [Setup]
-AppId={{D4R1U5-A1-W1ND0W5-V700}}
+AppId={{D4R1U5-A1-W1ND0W5-V710}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -24,7 +24,7 @@ DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=dist-installer
 #ifndef MyOutputBaseFilename
-#define MyOutputBaseFilename "DariusAI-Setup-v7.0.0"
+#define MyOutputBaseFilename "DariusAI-Setup-v7.1.0"
 #endif
 OutputBaseFilename={#MyOutputBaseFilename}
 SetupIconFile=assets\darius.ico

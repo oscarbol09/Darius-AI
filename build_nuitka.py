@@ -15,8 +15,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-# -- Inyeccion de Versin Dinmica SRE --
-raw_tag = os.environ.get("GITHUB_REF_NAME", "7.0.0").lstrip("v")
+# -- Inyección de Versión Dinámica SRE --
+raw_tag = os.environ.get("GITHUB_REF_NAME", "7.1.0").lstrip("v")
 parts = raw_tag.split(".")
 while len(parts) < 4:
     parts.append("0")
@@ -29,7 +29,7 @@ def main():
     os.chdir(root_dir)
 
     print("=" * 70)
-    print("  DARIUS AI — COMPILACIÓN NATIVA STANDALONE CON NUITKA (v7.0.0)")
+    print("  DARIUS AI — COMPILACIÓN NATIVA STANDALONE CON NUITKA (v7.1.0)")
     print("=" * 70)
 
     # 1. Asegurar icono
@@ -39,7 +39,13 @@ def main():
         print("\n[*] Generando icono de la aplicación...")
         subprocess.run([sys.executable, str(icon_script)], check=True)  # noqa: S603
 
-    # 2. Verificar dependencias de build
+    # 2. Asegurar archivo de configuración base
+    config_path = root_dir / "config.json"
+    if not config_path.exists():
+        print("\n[*] Creando config.json base para empaquetado...")
+        config_path.write_text('{"assistant": {"name": "darius"}}', encoding="utf-8")
+
+    # 3. Verificar dependencias de build
     print("\n[*] Verificando herramientas de compilación...")
     try:
         import nuitka  # noqa: F401
@@ -49,7 +55,7 @@ def main():
             [sys.executable, "-m", "pip", "install", "nuitka>=2.4.0", "zstandard", "ordered-set"], check=True
         )
 
-    # 3. Construir comando Nuitka
+    # 4. Construir comando Nuitka
     output_dir = root_dir / "dist"
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -68,6 +74,7 @@ def main():
         "--noinclude-unittest-mode=nofollow",
         "--noinclude-setuptools-mode=nofollow",
         "--nofollow-import-to=tests,pytest,unittest",
+        "--include-package=src",
         "--include-package=customtkinter",
         "--include-package-data=customtkinter",
         "--include-package=speech_recognition",
