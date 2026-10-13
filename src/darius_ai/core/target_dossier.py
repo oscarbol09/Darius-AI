@@ -2,7 +2,7 @@
 target_dossier.py — Motor de Inteligencia y Dossiers Estructurados para DARIUS AI
 ==================================================================================
 Genera fichas de inteligencia táctica estructuradas sobre personas, empresas, proyectos,
-repositorios o tecnologías. Inspirado en la arquitectura de síntesis de dossiers de JARVIS.
+repositorios o tecnologías. Arquitectura táctica de síntesis de dossiers de Darius AI.
 
 Características:
   1. Extracción de entidades estructuradas: biografía, carrera, enlaces sociales,

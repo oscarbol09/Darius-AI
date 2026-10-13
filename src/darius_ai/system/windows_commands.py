@@ -541,6 +541,43 @@ SYSTEM_ACTIONS: dict[str, dict] = {
         "desc": "Ver estado del repositorio Git",
         "return_output": True,
     },
+    "resumen del dia": {
+        "action": {"type": "python", "run": "daily_digest"},
+        "aliases": [
+            "briefing matutino",
+            "dame el resumen del dia",
+            "resumen ejecutivo",
+            "informe del dia",
+            "buenos dias darius",
+            "briefing del dia",
+            "como esta el dia",
+        ],
+        "desc": "Resumen ejecutivo y briefing matutino",
+        "return_output": True,
+    },
+    "perfil de usuario": {
+        "action": {"type": "python", "run": "user_profile"},
+        "aliases": [
+            "quien soy yo",
+            "mis preferencias",
+            "ver mi perfil",
+            "informacion de usuario",
+            "datos de perfil",
+        ],
+        "desc": "Ver perfil y preferencias del usuario",
+        "return_output": True,
+    },
+    "auditoria de seguridad": {
+        "action": {"type": "python", "run": "security_audit"},
+        "aliases": [
+            "estado de seguridad",
+            "auditoria perimetral",
+            "revisar seguridad",
+        ],
+        "desc": "Auditoría perimetral y estado de seguridad",
+        "return_output": True,
+    },
+
     "procesos que mas consumen": {
         "action": {
             "type": "powershell",
@@ -953,6 +990,322 @@ $ip     = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlia
         "desc": "Ver información de monitores conectados",
         "return_output": True,
     },
+    "pausar musica": {
+        "action": {"type": "python", "run": "media_play_pause"},
+        "aliases": [
+            "pausar reproduccion",
+            "reanudar musica",
+            "reanudar reproduccion",
+            "play pause musica",
+            "pausar cancion",
+            "reanudar cancion",
+            "control musica pausa",
+        ],
+        "desc": "Alternar reproducción/pausa multimedia",
+        "return_output": True,
+    },
+    "siguiente cancion": {
+        "action": {"type": "python", "run": "media_next"},
+        "aliases": [
+            "siguiente pista",
+            "pasar cancion",
+            "avanzar cancion",
+            "cancion siguiente",
+            "pista siguiente",
+            "cambiar cancion",
+        ],
+        "desc": "Avanzar a la siguiente pista multimedia",
+        "return_output": True,
+    },
+    "anterior cancion": {
+        "action": {"type": "python", "run": "media_prev"},
+        "aliases": [
+            "anterior pista",
+            "cancion anterior",
+            "pista anterior",
+            "retroceder cancion",
+            "volver a la pista anterior",
+        ],
+        "desc": "Retroceder a la pista multimedia anterior",
+        "return_output": True,
+    },
+    "detener musica": {
+        "action": {"type": "python", "run": "media_stop"},
+        "aliases": [
+            "parar musica",
+            "detener reproduccion",
+            "stop musica",
+            "parar reproduccion",
+        ],
+        "desc": "Detener reproducción multimedia",
+        "return_output": True,
+    },
+    "subir volumen sistema": {
+        "action": {"type": "python", "run": "media_vol_up"},
+        "aliases": [
+            "sube el volumen",
+            "subir el volumen del sistema",
+            "aumentar volumen",
+            "mas volumen",
+        ],
+        "desc": "Subir volumen multimedia",
+        "return_output": True,
+    },
+    "bajar volumen sistema": {
+        "action": {"type": "python", "run": "media_vol_down"},
+        "aliases": [
+            "baja el volumen",
+            "bajar el volumen del sistema",
+            "disminuir volumen",
+            "menos volumen",
+        ],
+        "desc": "Bajar volumen multimedia",
+        "return_output": True,
+    },
+    "silenciar volumen sistema": {
+        "action": {"type": "python", "run": "media_mute"},
+        "aliases": [
+            "mutear sonido",
+            "mutear sistema",
+            "silenciar audio",
+            "activar mute",
+            "quitar sonido",
+        ],
+        "desc": "Alternar silencio (mute) multimedia",
+        "return_output": True,
+    },
+    "diagnostico integral darius": {
+        "action": {"type": "python", "run": "darius_protocol"},
+        "aliases": [
+            "diagnostico darius",
+            "diagnostico de sistemas",
+            "auditoria de sistemas",
+            "telemetria darius",
+            "escaneo del sistema",
+        ],
+        "desc": "Ejecutar Protocolo Darius y Diagnóstico Integral de Sistemas",
+        "return_output": True,
+    },
+    "consulta de humor darius": {
+        "action": {"type": "python", "run": "darius_wit"},
+        "aliases": [
+            "broma de darius",
+            "chiste de darius",
+            "dime un chiste",
+            "cuentame un chiste",
+        ],
+        "desc": "Obtener réplica de humor inteligente Darius",
+        "return_output": True,
+    },
+    "titulares de noticias": {
+        "action": {"type": "python", "run": "news_headlines"},
+        "aliases": [
+            "ultimas noticias",
+            "noticias de hoy",
+            "titulares de tecnologia",
+            "noticias tecnologicas",
+            "noticias de actualidad",
+            "que pasa en el mundo",
+            "resumen de noticias",
+        ],
+        "desc": "Consultar los titulares más relevantes de noticias",
+        "return_output": True,
+    },
+    "definir palabra": {
+        "action": {"type": "python", "run": "lexicon_lookup"},
+        "aliases": [
+            "definicion de palabra",
+            "que significa",
+            "consulta de diccionario",
+            "buscar en diccionario",
+            "lexico de palabra",
+        ],
+        "desc": "Consultar significado y definición en el oráculo léxico",
+        "return_output": True,
+    },
+    "reproducir en youtube": {
+        "action": {"type": "python", "run": "youtube_search"},
+        "aliases": [
+            "buscar en youtube",
+            "abrir youtube",
+            "poner video en youtube",
+            "ver en youtube",
+            "video de youtube",
+        ],
+        "desc": "Buscar y reproducir en YouTube en el navegador predeterminado",
+        "return_output": True,
+    },
+    "leer texto de pantalla": {
+        "action": {"type": "python", "run": "ocr_screen"},
+        "aliases": [
+            "ocr de pantalla",
+            "escanear texto pantalla",
+            "leer pantalla",
+            "transcribir pantalla",
+            "extraer texto pantalla",
+            "ocr visual",
+        ],
+        "desc": "Escanear y transcribir texto visual de la pantalla (OCR)",
+        "return_output": True,
+    },
+    "verificacion biometrica": {
+        "action": {"type": "python", "run": "biometric_auth"},
+        "aliases": [
+            "reconocimiento facial",
+            "verificar identidad",
+            "escanear rostro",
+            "quien soy darius",
+            "autenticacion biometrica",
+            "desbloqueo facial",
+        ],
+        "desc": "Ejecutar reconocimiento facial biométrico y verificación de presencia",
+        "return_output": True,
+    },
+    "iniciar temporizador": {
+        "action": {"type": "python", "run": "darius_timer_create"},
+        "aliases": [
+            "poner temporizador",
+            "cuenta regresiva",
+            "alarma de temporizador",
+            "iniciar cuenta atras",
+            "temporizador",
+        ],
+        "desc": "Iniciar cuenta regresiva con aviso acústico Darius",
+        "return_output": True,
+    },
+    "cancelar temporizador": {
+        "action": {"type": "python", "run": "darius_timer_cancel"},
+        "aliases": [
+            "detener temporizador",
+            "cancelar cuenta atras",
+            "apagar alarma temporizador",
+            "quitar temporizador",
+        ],
+        "desc": "Cancelar temporizadores activos",
+        "return_output": True,
+    },
+    "consultar temporizador": {
+        "action": {"type": "python", "run": "darius_timer_status"},
+        "aliases": [
+            "cuanto tiempo queda",
+            "tiempo restante temporizador",
+            "estado del temporizador",
+            "cuanto falta en el temporizador",
+        ],
+        "desc": "Consultar tiempo restante de temporizadores activos",
+        "return_output": True,
+    },
+    "encender equipo remoto": {
+        "action": {"type": "python", "run": "wake_on_lan"},
+        "aliases": [
+            "wake on lan",
+            "encender pc remota",
+            "despertar pc",
+            "encender servidor",
+            "encender nas",
+            "despertar equipo",
+            "wol",
+        ],
+        "desc": "Transmitir paquete mágico Wake-on-LAN en la red local",
+        "return_output": True,
+    },
+    "silencio tactico": {
+        "action": {"type": "python", "run": "tactical_silence"},
+        "aliases": [
+            "silencio",
+            "callate",
+            "detener audio",
+            "silencio total",
+            "silencio darius",
+            "alto darius",
+            "callate darius",
+        ],
+        "desc": "Silenciar de inmediato todas las transmisiones de audio y medios",
+        "return_output": True,
+    },
+    "protocolo codigo rojo": {
+        "action": {"type": "python", "run": "emergency_lockdown"},
+        "aliases": [
+            "codigo rojo",
+            "bloqueo de emergencia",
+            "kill switch",
+            "lockdown",
+            "cerrar todo y bloquear",
+            "protocolo de emergencia",
+        ],
+        "desc": "Detener tareas, vaciar bitácoras y bloquear estación de trabajo",
+        "return_output": True,
+    },
+    "posicion estacion espacial": {
+        "action": {"type": "python", "run": "orbital_iss"},
+        "aliases": [
+            "donde esta la iss",
+            "posicion de la iss",
+            "estacion espacial internacional",
+            "rastrear iss",
+            "coordenadas de la iss",
+            "radar orbital iss",
+            "telemetria iss",
+        ],
+        "desc": "Rastrear posición orbital y telemetría de la Estación Espacial Internacional (ISS)",
+        "return_output": True,
+    },
+    "trafico aereo sobrevuelo": {
+        "action": {"type": "python", "run": "air_traffic"},
+        "aliases": [
+            "aviones sobrevolando",
+            "radar de aviones",
+            "trafico aereo",
+            "vuelos cercanos",
+            "escanear espacio aereo",
+            "que aviones pasan por aqui",
+            "radar ads b",
+        ],
+        "desc": "Escanear tráfico aéreo y transpondedores ADS-B en el espacio aéreo circundante",
+        "return_output": True,
+    },
+    "alerta sismica global": {
+        "action": {"type": "python", "run": "seismic_alert"},
+        "aliases": [
+            "terremotos recientes",
+            "actividad sismica",
+            "hay terremotos",
+            "alerta de sismo",
+            "reporte sismico",
+            "sensores sismicos",
+            "movimientos teluricos",
+        ],
+        "desc": "Consultar sensores sísmicos globales de USGS para terremotos recientes",
+        "return_output": True,
+    },
+    "clima espacial solar": {
+        "action": {"type": "python", "run": "space_weather"},
+        "aliases": [
+            "indice kp",
+            "tormenta solar",
+            "clima espacial",
+            "radiacion solar",
+            "tormenta geomagnetica",
+            "actividad solar",
+            "estado del clima espacial",
+        ],
+        "desc": "Consultar índice planetario Kp y clima espacial de NOAA SWPC",
+        "return_output": True,
+    },
+    "protocolo ojo de dios": {
+        "action": {"type": "python", "run": "gods_eye_protocol"},
+        "aliases": [
+            "ojo de dios",
+            "activar ojo de dios",
+            "radar global ojo de dios",
+            "situacion global",
+            "conciencia situacional",
+            "barrido global ojo de dios",
+            "informe ojo de dios",
+        ],
+        "desc": "Ejecutar barrido situacional integral de satélites, tráfico aéreo, sismos y clima espacial",
+        "return_output": True,
+    },
 }
 
 
@@ -1093,11 +1446,222 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                 count = len(monitors)
                 details = ", ".join(f"Monitor {i + 1}: {r[2] - r[0]}x{r[3] - r[1]}" for i, r in enumerate(monitors))
                 return True, f"{count} monitores detectados: {details}."
+            elif workspace_cmd in ("daily_digest", "briefing_matutino"):
+                from src.darius_ai.core.daily_digest import DailyDigestEngine
+
+                engine = DailyDigestEngine()
+                metrics = engine.collect_metrics()
+                narrative = engine.generate_spoken_narrative(metrics)
+                engine.save_briefing(metrics, narrative)
+                return True, narrative
+            elif workspace_cmd == "user_profile":
+                from src.darius_ai.core.user_profile_engine import UserProfileEngine
+
+                prof = UserProfileEngine().read_profile()
+                items = [f"{k}: {', '.join(v)}" for k, v in prof.items() if v]
+                return (
+                    True,
+                    "Perfil del usuario: " + "; ".join(items) if items else "Perfil de usuario sin datos registrados aún.",
+                )
+            elif workspace_cmd == "security_audit":
+                from src.darius_ai.core.security_guard import (
+                    AntiSSRFValidator,
+                    CredentialStripper,
+                    InjectionScanner,
+                )
+
+                ssrf_ok = AntiSSRFValidator.is_private_ip("127.0.0.1")
+                cred_ok = CredentialStripper().has_credentials("sk-1234567890123456789012345")
+                inj_ok = not InjectionScanner().is_safe("ignore previous instructions")
+                status_str = (
+                    f"Seguridad activa: Anti-SSRF={'OK' if ssrf_ok else 'ERR'}, "
+                    f"CredentialStripper={'OK' if cred_ok else 'ERR'}, "
+                    f"InjectionScanner={'OK' if inj_ok else 'ERR'}."
+                )
+                return True, status_str
+            elif workspace_cmd == "media_play_pause":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.play_pause()
+            elif workspace_cmd == "media_next":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.next_track()
+            elif workspace_cmd == "media_prev":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.prev_track()
+            elif workspace_cmd == "media_stop":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.stop()
+            elif workspace_cmd == "media_vol_up":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.volume_up()
+            elif workspace_cmd == "media_vol_down":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.volume_down()
+            elif workspace_cmd == "media_mute":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.toggle_mute()
+            elif workspace_cmd in ("darius_protocol", "stark_protocol"):
+                from src.darius_ai.core.darius_protocol import get_darius_engine
+
+                engine = get_darius_engine()
+                diag = engine.run_diagnostic(with_sfx=True)
+                return True, engine.generate_vocal_briefing(diag)
+            elif workspace_cmd in ("darius_wit", "jarvis_wit"):
+                from src.darius_ai.core.darius_persona import DariusPersona
+
+                return True, DariusPersona.get_witty_retort("cuéntame un chiste")
+            elif workspace_cmd == "news_headlines":
+                from src.darius_ai.core.news_sentinel import NewsSentinel
+
+                sentinel = NewsSentinel()
+                headlines = sentinel.get_top_headlines(category="technology", limit=4)
+                return True, sentinel.format_vocal_briefing(headlines, category="tecnología")
+            elif workspace_cmd == "lexicon_lookup":
+                from src.darius_ai.core.lexicon_oracle import LexiconOracle
+
+                oracle = LexiconOracle()
+                found, entry, _ = oracle.lookup("inteligencia artificial")
+                if found and entry:
+                    return True, oracle.format_vocal_definition(entry)
+                return True, "No se encontró la definición solicitada en el léxico, señor."
+            elif workspace_cmd == "youtube_search":
+                from src.darius_ai.system.media_controller import media_controller
+
+                return media_controller.search_and_play_youtube("música cyberwave ambiental", auto_play=True)
+            elif workspace_cmd == "ocr_screen":
+                from src.darius_ai.core.visual_intel_ocr import VisualIntelOCR
+
+                ocr = VisualIntelOCR()
+                res = ocr.ocr_screen_region()
+                if res.text.strip():
+                    return True, f"Texto detectado en pantalla ({res.word_count} palabras):\n{res.text[:200]}..."
+                return True, "No se detectó texto legible en la pantalla, señor."
+            elif workspace_cmd == "biometric_auth":
+                from src.darius_ai.core.face_biometrics import get_face_biometrics_engine
+
+                engine = get_face_biometrics_engine()
+                res = engine.verify_live_user(timeout_seconds=2.0)
+                return True, engine.get_biometric_greeting(res)
+            elif workspace_cmd in ("darius_timer_create", "stark_timer_create"):
+                from src.darius_ai.core.darius_timer import get_darius_timer_manager
+
+                mgr = get_darius_timer_manager()
+                timer = mgr.create_timer(label="recordatorio", seconds=300.0)
+                return True, mgr.format_timer_speech(timer)
+            elif workspace_cmd in ("darius_timer_cancel", "stark_timer_cancel"):
+                from src.darius_ai.core.darius_timer import get_darius_timer_manager
+
+                mgr = get_darius_timer_manager()
+                active = mgr.list_active_timers()
+                for t in active:
+                    mgr.cancel_timer(t.id)
+                count = len(active)
+                return True, f"Se han cancelado {count} temporizador(es) activo(s), señor."
+            elif workspace_cmd in ("darius_timer_status", "stark_timer_status"):
+                from src.darius_ai.core.darius_timer import get_darius_timer_manager
+
+                mgr = get_darius_timer_manager()
+                active = mgr.list_active_timers()
+                if not active:
+                    return True, "No hay temporizadores activos en este momento, señor."
+                first = active[0]
+                return True, mgr.format_timer_speech(first)
+            elif workspace_cmd == "wake_on_lan":
+                from src.darius_ai.system.wol_dispatcher import get_wol_dispatcher
+
+                dispatcher = get_wol_dispatcher()
+                return dispatcher.dispatch_wake("gaming_rig", with_sfx=True)
+            elif workspace_cmd == "tactical_silence":
+                from src.darius_ai.core.darius_lockdown import get_darius_lockdown_engine
+
+                engine = get_darius_lockdown_engine()
+                return engine.trigger_tactical_silence()
+            elif workspace_cmd == "emergency_lockdown":
+                from src.darius_ai.core.darius_lockdown import get_darius_lockdown_engine
+
+                engine = get_darius_lockdown_engine()
+                return engine.trigger_emergency_lockdown(lock_workstation=True)
+            elif workspace_cmd == "orbital_iss":
+                from src.darius_ai.core.orbital_radar import get_orbital_radar
+
+                radar = get_orbital_radar()
+                ok, iss, alocution = radar.get_iss_position()
+                if ok and iss:
+                    return True, radar.format_vocal_telemetry(iss)
+                return True, alocution
+            elif workspace_cmd == "air_traffic":
+                from src.darius_ai.core.air_traffic_sentinel import get_air_traffic_sentinel
+
+                sentinel = get_air_traffic_sentinel()
+                ok, contacts, alocution = sentinel.scan_overhead()
+                if ok and contacts:
+                    return True, sentinel.format_vocal_radar(contacts)
+                return True, alocution
+            elif workspace_cmd == "seismic_alert":
+                from src.darius_ai.core.seismic_sensor import get_seismic_sensor
+
+                sensor = get_seismic_sensor()
+                ok, events, alocution = sensor.get_recent_earthquakes(min_magnitude=4.5)
+                if ok and events:
+                    return True, sensor.format_vocal_alert(events)
+                return True, alocution
+            elif workspace_cmd == "space_weather":
+                from src.darius_ai.core.space_weather_oracle import get_space_weather_oracle
+
+                oracle = get_space_weather_oracle()
+                ok, report, alocution = oracle.get_current_space_weather()
+                if ok and report:
+                    return True, oracle.format_vocal_briefing(report)
+                return True, alocution
+            elif workspace_cmd == "gods_eye_protocol":
+                from src.darius_ai.audio.sound_effects import get_sfx_engine
+                from src.darius_ai.core.air_traffic_sentinel import get_air_traffic_sentinel
+                from src.darius_ai.core.orbital_radar import get_orbital_radar
+                from src.darius_ai.core.seismic_sensor import get_seismic_sensor
+                from src.darius_ai.core.space_weather_oracle import get_space_weather_oracle
+
+                get_sfx_engine().play_sonar_ping(blocking=False)
+                radar = get_orbital_radar()
+                air = get_air_traffic_sentinel()
+                seismic = get_seismic_sensor()
+                space = get_space_weather_oracle()
+
+                _, iss, _ = radar.get_iss_position()
+                _, flights, _ = air.scan_overhead()
+                _, quakes, _ = seismic.get_recent_earthquakes(min_magnitude=4.5, limit=3)
+                _, sw, _ = space.get_current_space_weather()
+
+                sections = ["Protocolo Ojo de Dios activado, señor. Diagnóstico situacional global en línea:"]
+                if iss:
+                    sections.append(
+                        f"1. Órbita: ISS a {iss.altitude_km:.0f} km de altitud "
+                        f"sobre [{iss.latitude:.1f}°, {iss.longitude:.1f}°]."
+                    )
+                if flights:
+                    sections.append(f"2. Espacio aéreo: {len(flights)} aeronaves detectadas en radio táctico.")
+                else:
+                    sections.append("2. Espacio aéreo: Corredor aéreo local despejado.")
+                if quakes:
+                    sections.append(f"3. Sensores sísmicos: {len(quakes)} sismos >= M4.5 en las últimas 24h.")
+                else:
+                    sections.append("3. Sensores sísmicos: Corteza terrestre estable sin anomalías mayores.")
+                if sw:
+                    sections.append(f"4. Clima espacial: Índice Kp {sw.kp_index:.1f} ({sw.storm_level}).")
+
+                return True, "\n".join(sections)
             fn = action.get("fn")
             if callable(fn):
                 res = fn()
                 return True, str(res) if res is not None else ""
             return True, ""
+
 
         elif open_window:
             if atype == "powershell":

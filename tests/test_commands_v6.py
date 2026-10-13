@@ -371,6 +371,85 @@ class TestWinCmdTypeB(unittest.TestCase):
             "Output de TTS no debe superar 300 chars",
         )
 
+    def test_resolve_gods_eye_suite_actions(self):
+        """Verifica que las 5 acciones de Ojo de Dios resuelvan canónicamente."""
+        queries = [
+            ("donde esta la iss", "posicion estacion espacial"),
+            ("aviones sobrevolando", "trafico aereo sobrevuelo"),
+            ("terremotos recientes", "alerta sismica global"),
+            ("indice kp", "clima espacial solar"),
+            ("ojo de dios", "protocolo ojo de dios"),
+        ]
+        for query, expected_canonical in queries:
+            with self.subTest(query=query):
+                entry = resolve_action(query)
+                self.assertIsNotNone(entry, f"'{query}' debe resolver")
+                self.assertEqual(entry["canonical"], expected_canonical)
+
+    def test_run_gods_eye_actions(self):
+        """Verifica la ejecución mockeada de las acciones de Ojo de Dios."""
+        actions = [
+            "posicion estacion espacial",
+            "trafico aereo sobrevuelo",
+            "alerta sismica global",
+            "clima espacial solar",
+            "protocolo ojo de dios",
+        ]
+        for act_name in actions:
+            with self.subTest(action=act_name):
+                entry = resolve_action(act_name)
+                self.assertIsNotNone(entry)
+                success, output = run_action(entry)
+                self.assertTrue(success)
+                self.assertIsInstance(output, str)
+                self.assertGreater(len(output), 0)
+
+    def test_resolve_darius_core_actions(self):
+        """Verifica que las acciones y aliases de Darius Core resuelvan canónicamente."""
+        queries = [
+            ("diagnostico integral darius", "diagnostico integral darius"),
+            ("diagnostico darius", "diagnostico integral darius"),
+            ("diagnostico de sistemas", "diagnostico integral darius"),
+            ("auditoria de sistemas", "diagnostico integral darius"),
+            ("telemetria darius", "diagnostico integral darius"),
+            ("escaneo del sistema", "diagnostico integral darius"),
+            ("consulta de humor darius", "consulta de humor darius"),
+            ("broma de darius", "consulta de humor darius"),
+            ("chiste de darius", "consulta de humor darius"),
+            ("dime un chiste", "consulta de humor darius"),
+            ("cuentame un chiste", "consulta de humor darius"),
+            ("iniciar temporizador", "iniciar temporizador"),
+            ("cancelar temporizador", "cancelar temporizador"),
+            ("consultar temporizador", "consultar temporizador"),
+            ("silencio tactico", "silencio tactico"),
+            ("silencio darius", "silencio tactico"),
+        ]
+        for query, expected_canonical in queries:
+            with self.subTest(query=query):
+                entry = resolve_action(query)
+                self.assertIsNotNone(entry, f"'{query}' debe resolver")
+                self.assertEqual(entry["canonical"], expected_canonical)
+
+    def test_run_darius_core_actions(self):
+        """Verifica la ejecución de las acciones de Darius Core."""
+        actions = [
+            "diagnostico integral darius",
+            "consulta de humor darius",
+            "iniciar temporizador",
+            "consultar temporizador",
+            "cancelar temporizador",
+            "silencio tactico",
+        ]
+        for act_name in actions:
+            with self.subTest(action=act_name):
+                entry = resolve_action(act_name)
+                self.assertIsNotNone(entry)
+                success, output = run_action(entry)
+                self.assertTrue(success)
+                self.assertIsInstance(output, str)
+                self.assertGreater(len(output), 0)
+
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 #  4. FUZZY MATCHING — SCORES Y UMBRALES

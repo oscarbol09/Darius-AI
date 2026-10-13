@@ -3,7 +3,7 @@ telemetry_tracker.py — Rastreador de Telemetría y Observabilidad Agéntica pa
 ========================================================================================
 Permite monitorizar, medir latencias y emitir eventos en tiempo real sobre la ejecución
 de agentes, herramientas de automatización y llamadas de red.
-Inspirado en la observabilidad Laminar y la barra de estado de JARVIS (StatusBar.tsx).
+Motor de Telemetría Darius y observabilidad de arquitectura nativa.
 """
 
 from __future__ import annotations

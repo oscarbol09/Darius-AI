@@ -1,7 +1,7 @@
 """
 telemetry_bar.py — Barra de Telemetría HUD y Feed de Eventos Agénticos para DARIUS AI
 ====================================================================================
-Componente de interfaz gráfica inspirado en la barra de estado y HUD táctico de JARVIS.
+Componente de interfaz gráfica para la barra de estado y HUD táctico de Darius AI.
 Muestra en tiempo real la actividad del enjambre de herramientas (IA, Visión, Dossiers,
 Web, Obsidian, SO) con rotación automática de eventos y control de audio procedural.
 """

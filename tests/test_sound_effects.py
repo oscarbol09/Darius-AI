@@ -79,6 +79,16 @@ class TestProceduralSFXEngine:
         assert mock_play.called
 
     @patch("src.darius_ai.audio.sound_effects.sounddevice.play")
+    def test_earcon_tick_plays(self, mock_play, sfx):
+        sfx.play_earcon_tick(blocking=True)
+        assert mock_play.called
+
+    @patch("src.darius_ai.audio.sound_effects.sounddevice.play")
+    def test_sonar_ping_plays(self, mock_play, sfx):
+        sfx.play_sonar_ping(blocking=True)
+        assert mock_play.called
+
+    @patch("src.darius_ai.audio.sound_effects.sounddevice.play")
     def test_disabled_sfx_does_not_play(self, mock_play, sfx):
         sfx.set_enabled(False)
         sfx.play_scan_pulse(blocking=True)

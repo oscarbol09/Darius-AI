@@ -3,7 +3,7 @@ sound_effects.py — Motor de Efectos de Sonido Procedurales en Memoria para DAR
 =====================================================================================
 Genera efectos de audio tácticos y de interfaz directamente mediante síntesis matemática
 de ondas (senoidales, cuadradas, triangulares) con envolvente exponencial anti-clipping.
-Inspirado en la síntesis Web Audio API de JARVIS (useSoundEffects.ts).
+Implementado mediante el motor de síntesis matemática procedural de Darius AI.
 
 Ventajas:
   1. Cero archivos de audio (.wav/.mp3) en disco (0 KB de footprint).
@@ -194,6 +194,37 @@ class ProceduralSFX:
         def _exec():
             click = generate_tone_wave(900.0, duration=0.025, wave_type="triangle", gain=0.18)
             self._play_buffer(click)
+
+        self._run_async(_exec, blocking=blocking)
+
+    def play_earcon_tick(self, blocking: bool = False) -> None:
+        """
+        Pulso acústico discreto de doble tono (880 Hz -> 1320 Hz) para telemetría
+        en segundo plano, integrado en la telemetría acústica de Darius AI.
+        """
+        def _exec():
+            tick1 = generate_tone_wave(880.0, duration=0.05, wave_type="sine", gain=0.12)
+            gap = np.zeros(int(self._sample_rate * 0.04), dtype=np.float32)
+            tick2 = generate_tone_wave(1320.0, duration=0.06, wave_type="sine", gain=0.12)
+            full = np.concatenate([tick1, gap, tick2])
+            self._play_buffer(full)
+
+        self._run_async(_exec, blocking=blocking)
+
+    def play_sonar_ping(self, blocking: bool = False) -> None:
+        """
+        Ping de radar/sonar cibernético a 480 Hz con armónico sutil a 960 Hz y decaimiento
+        para telemetría acústica de Darius AI.
+        """
+        def _exec():
+            sub = generate_tone_wave(480.0, duration=0.35, wave_type="sine", gain=0.22)
+            harmonic = generate_tone_wave(960.0, duration=0.25, wave_type="sine", gain=0.08)
+            # Mezclar armónico al inicio
+            pad_len = len(sub) - len(harmonic)
+            if pad_len > 0:
+                harmonic = np.pad(harmonic, (0, pad_len), mode="constant")
+            full = sub + harmonic
+            self._play_buffer(full)
 
         self._run_async(_exec, blocking=blocking)
 

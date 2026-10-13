@@ -219,14 +219,17 @@ def _get_system_time_context() -> str:
 
 
 def _build_system_instruction(prompt: str = "") -> str:
-    """Construye directrices de personalidad de Darius con tiempo local, Obsidian y herramientas."""
+    """Construye directrices de personalidad de mayordomo de Darius con tiempo local, Obsidian y herramientas."""
+    from src.darius_ai.core.darius_persona import DariusPersona
+
     time_context = _get_system_time_context()
+    darius_persona_block = DariusPersona.build_darius_system_prompt(
+        user_name=cfg.user_name,
+        assistant_name=cfg.assistant_name,
+    )
+
     base = (
-        f"Eres {cfg.assistant_name}, un asistente de inteligencia artificial "
-        f"amigable, conciso y preciso para Windows. Tu usuario es {cfg.user_name}. "
-        "Respondes siempre en español de forma natural, fluida y directa. "
-        "Evitas respuestas excesivamente largas a menos que el tema lo requiera. "
-        "Si no sabes algo, dilo honestamente.\n\n"
+        f"{darius_persona_block}\n\n"
         f"{time_context}\n\n"
         "[HERRAMIENTAS Y EJECUCIÓN AUTÓNOMA DEL SISTEMA]\n"
         "Tienes acceso a herramientas locales para interactuar con Windows, GitHub y la Web:\n"
@@ -239,7 +242,10 @@ def _build_system_instruction(prompt: str = "") -> str:
         "- [ACTION: human_type(texto)] -> Escribe texto en pantalla con cadencia mecanográfica humana.\n"
         "- [ACTION: human_click(x=100, y=200)] -> Realiza clic en coordenadas con física humana.\n"
         '- [ACTION: human_hotkey(keys="ctrl+v")] -> Presiona combinaciones de teclas.\n'
-        '- [ACTION: scrape_web(url="https://...")] -> Extrae contenido limpio de una página web.\n\n'
+        '- [ACTION: scrape_web(url="https://...")] -> Extrae contenido limpio de una página web.\n'
+        '- [ACTION: media_action(action="play_pause")] -> Control multimedia (play, next, prev, vol, mute).\n'
+        '- [ACTION: science_oracle(query="...")] -> Consulta enciclopédica o constantes físicas.\n'
+        "- [ACTION: stark_protocol()] -> Diagnóstico integral de armadura / sistemas Mark VII.\n\n"
         "REGLAS DE EJECUCIÓN:\n"
         "1. Si el usuario solicita consultar información, escribir texto, mover el mouse o scrapear la web, "
         "EMITE ÚNICAMENTE la acción correspondiente: `[ACTION: nombre_herramienta(args)]`.\n"
@@ -619,9 +625,15 @@ def get_ai_response(
     image_b64: str | None = None,
 ) -> tuple[str, str]:
     """
-    Ejecuta la consulta con el proveedor activo en BYOK.
-    Si el proveedor principal falla y el fallback está activado, escala ordenadamente.
+    Ejecuta la consulta con el proveedor activo en BYOK con personalidad Darius.
+    Si el prompt es ingenioso o cómico, el motor local de réplicas ingeniosas responde de inmediato.
     """
+    from src.darius_ai.core.darius_persona import DariusPersona
+
+    witty_retort = DariusPersona.get_witty_retort(prompt, fallback=False)
+    if witty_retort:
+        return witty_retort, "Darius Wit Engine"
+
     active = cfg.active_provider or "gemini"
     provider_callers = {
         "gemini": ask_gemini,
@@ -636,7 +648,10 @@ def get_ai_response(
 
     try:
         raw_text, provider = primary_fn(prompt, history, image_b64=image_b64)
-        return _resolve_agentic_tool_loop(raw_text, provider, primary_fn, prompt, history, image_b64=image_b64)
+        synth_text, final_prov = _resolve_agentic_tool_loop(
+            raw_text, provider, primary_fn, prompt, history, image_b64=image_b64
+        )
+        return DariusPersona.format_butler_response(synth_text, user_name=cfg.user_name), final_prov
     except Exception as primary_exc:
         log.warning(f"Proveedor principal '{active}' falló: {primary_exc}")
 
@@ -649,9 +664,10 @@ def get_ai_response(
             try:
                 log.info("Intentando fallback con OpenRouter...")
                 raw_text, provider = ask_openrouter(prompt, history, image_b64=image_b64)
-                return _resolve_agentic_tool_loop(
+                synth_text, final_prov = _resolve_agentic_tool_loop(
                     raw_text, provider, ask_openrouter, prompt, history, image_b64=image_b64
                 )
+                return DariusPersona.format_butler_response(synth_text, user_name=cfg.user_name), final_prov
             except Exception as fb_exc:
                 log.warning(f"Fallback OpenRouter falló: {fb_exc}")
 
@@ -661,11 +677,12 @@ def get_ai_response(
             try:
                 log.info("Intentando fallback con Gemini...")
                 raw_text, provider = ask_gemini(prompt, history, image_b64=image_b64)
-                return _resolve_agentic_tool_loop(raw_text, provider, ask_gemini, prompt, history, image_b64=image_b64)
+                synth_text, final_prov = _resolve_agentic_tool_loop(
+                    raw_text, provider, ask_gemini, prompt, history, image_b64=image_b64
+                )
+                return DariusPersona.format_butler_response(synth_text, user_name=cfg.user_name), final_prov
             except Exception as gemini_exc:
                 log.warning(f"Fallback Gemini falló: {gemini_exc}")
-
-        return _classify_error_message(primary_exc, active.upper()), "error"
 
         return _classify_error_message(primary_exc, active.upper()), "error"
 

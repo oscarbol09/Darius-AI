@@ -51,7 +51,7 @@ ACCENT_PURPLE: Final[str] = "#A855F7"  # Workspaces / Pensando / IA
 ACCENT_AMBER: Final[str] = "#F59E0B"  # Advertencia / Esperando Confirmación
 ACCENT_ROSE: Final[str] = "#F43F5E"  # Detenido / Error
 
-# Acentos Tácticos / Cyber Ops HUD (Inspirado en JARVIS)
+# Acentos Tácticos / Cyber Ops HUD (Darius Copilot)
 ACCENT_TACTICAL_GREEN: Final[str] = "#78B450"  # Verde fósforo militar HUD
 BG_TACTICAL_DARK: Final[str] = "#0A0D08"  # Fondo negro táctico
 BG_TACTICAL_PANEL: Final[str] = "#141A12"  # Panel militar

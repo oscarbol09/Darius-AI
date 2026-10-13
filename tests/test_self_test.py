@@ -62,3 +62,81 @@ def test_check_tactical_intelligence():
     res = check_tactical_intelligence()
     assert res.status == "PASS"
     assert "SFX procedural OK" in res.detail
+
+
+def test_check_proactivity_and_safety():
+    from src.darius_ai.core.self_test import check_proactivity_and_safety
+
+    res = check_proactivity_and_safety()
+    assert res.status == "PASS"
+    assert "LoopGuard OK" in res.detail
+
+
+def test_check_security_and_agentic_suite():
+    from src.darius_ai.core.self_test import check_security_and_agentic_suite
+
+    res = check_security_and_agentic_suite()
+    assert res.status == "PASS"
+    assert "Anti-SSRF OK" in res.detail
+
+
+def test_check_darius_core_suite():
+    from src.darius_ai.core.self_test import check_darius_core_suite
+
+    res = check_darius_core_suite()
+    assert res.status == "PASS"
+    assert res.name in ("DARIUS CORE & HUD", "DARIUS CORE SUITE")
+    assert "Persona OK" in res.detail
+    assert "Wit Engine OK" in res.detail
+    assert "Science Oracle OK" in res.detail
+    assert "Media Control OK" in res.detail
+    assert "Cyber Core HUD OK" in res.detail
+
+
+test_check_stark_jarvis_suite = test_check_darius_core_suite
+
+
+def test_check_multimodal_biometric_suite():
+    from src.darius_ai.core.self_test import check_multimodal_biometric_suite
+
+    res = check_multimodal_biometric_suite()
+    assert res.status == "PASS"
+    assert "NewsSentinel OK" in res.detail
+    assert "LexiconOracle OK" in res.detail
+    assert "FaceBiometrics OK" in res.detail
+    assert "VisualIntelOCR OK" in res.detail
+
+
+def test_check_darius_synapse_suite():
+    from src.darius_ai.core.self_test import check_darius_synapse_suite
+
+    res = check_darius_synapse_suite()
+    assert res.status == "PASS"
+    assert res.name == "SYNAPSE & LOCKDOWN"
+    assert "DariusTimer OK" in res.detail
+    assert "DialogueStack OK" in res.detail
+    assert "WOLDispatcher OK" in res.detail
+    assert "LockdownEngine OK" in res.detail
+
+
+test_check_kalliope_synapse_suite = test_check_darius_synapse_suite
+
+
+def test_check_situational_suite():
+    from src.darius_ai.core.self_test import check_situational_suite
+
+    res = check_situational_suite()
+    assert res.status == "PASS"
+    assert res.name == "SITUATIONAL INTELLIGENCE"
+    assert "OrbitalRadar OK" in res.detail
+    assert "AirTrafficSentinel OK" in res.detail
+    assert "SeismicSensor OK" in res.detail
+    assert "SpaceWeatherOracle OK" in res.detail
+
+
+# Retrocompatibilidad
+test_check_gods_eye_situational_suite = test_check_situational_suite
+
+
+
+

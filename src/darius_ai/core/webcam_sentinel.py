@@ -2,7 +2,7 @@
 webcam_sentinel.py — Centinela de Presencia Humana y Visión Perceptual para DARIUS AI
 =====================================================================================
 Monitorea de forma pasiva y eficiente en segundo plano el campo visual frente al PC
-mediante la webcam del usuario. Inspirado en el módulo HumanDetection de JARVIS.
+mediante la webcam del usuario. Arquitectura nativa de centinela visual Darius AI.
 
 Casos de Uso:
   1. Auto-Wake / Bienvenida: detecta cuando Óscar se sienta frente al PC y ejecuta
@@ -23,7 +23,10 @@ import threading
 import time
 from collections.abc import Callable
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.darius_ai.core.face_biometrics import FaceBiometricsEngine
 
 log = logging.getLogger("DARIUS.Sentinel")
 
@@ -55,11 +58,13 @@ class WebcamSentinel:
         check_interval_sec: float = 0.8,
         absence_threshold_sec: float = 120.0,
         arrival_debounce_frames: int = 2,
+        biometrics_engine: FaceBiometricsEngine | None = None,
     ):
         self._camera_index = camera_index
         self._check_interval_sec = check_interval_sec
         self._absence_threshold_sec = absence_threshold_sec
         self._arrival_debounce_frames = arrival_debounce_frames
+        self._biometrics_engine = biometrics_engine
 
         self._state = SentinelState.STOPPED
         self._thread: threading.Thread | None = None
@@ -78,7 +83,17 @@ class WebcamSentinel:
             "on_user_left": [],
             "on_shoulder_surfer": [],
             "on_frame_stats": [],
+            "on_biometric_verified": [],
         }
+
+    @property
+    def biometrics_engine(self) -> Any:
+        """Motor biométrico facial asociado al centinela."""
+        return self._biometrics_engine
+
+    @biometrics_engine.setter
+    def biometrics_engine(self, engine: Any) -> None:
+        self._biometrics_engine = engine
 
     @property
     def is_running(self) -> bool:
@@ -119,7 +134,26 @@ class WebcamSentinel:
             except Exception as e:
                 log.debug(f"[Sentinel] Error en handler '{event_name}': {e}")
 
-    def _process_detection(self, detected_count: int) -> None:
+    def _trigger_async_biometrics(self, face_roi: Any = None) -> None:
+        """Dispara la verificación biométrica en un hilo secundario para no bloquear el centinela."""
+        if self._biometrics_engine is None:
+            return
+
+        def _worker() -> None:
+            try:
+                if face_roi is not None:
+                    res = self._biometrics_engine.verify_face_frame(face_roi)
+                else:
+                    res = self._biometrics_engine.verify_live_user(
+                        timeout_seconds=2.0, camera_index=self._camera_index
+                    )
+                self._emit("on_biometric_verified", result=res)
+            except Exception as e:
+                log.debug(f"[Sentinel] Error en verificación biométrica asíncrona: {e}")
+
+        threading.Thread(target=_worker, daemon=True, name="SentinelBiometricAuth").start()
+
+    def _process_detection(self, detected_count: int, face_roi: Any = None) -> None:
         """
         Máquina de estados para procesar el conteo de personas detectadas en un fotograma.
         """
@@ -135,6 +169,8 @@ class WebcamSentinel:
                 self._is_user_present = True
                 log.info("[Sentinel] Usuario detectado frente al escritorio.")
                 self._emit("on_user_arrived", person_count=detected_count)
+                if self._biometrics_engine is not None:
+                    self._trigger_async_biometrics(face_roi)
 
             # Detectar si hay más de una persona
             if detected_count >= 2:
@@ -214,12 +250,16 @@ class WebcamSentinel:
                     continue
 
                 person_count = 0
+                face_roi = None
                 if face_cascade is not None:
                     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                     faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=4, minSize=(40, 40))
                     person_count = len(faces)
+                    if person_count > 0 and len(faces[0]) == 4:
+                        x, y, w, h = faces[0]
+                        face_roi = gray[y : y + h, x : x + w]
 
-                self._process_detection(person_count)
+                self._process_detection(person_count, face_roi=face_roi)
                 time.sleep(self._check_interval_sec)
 
         except Exception as e:

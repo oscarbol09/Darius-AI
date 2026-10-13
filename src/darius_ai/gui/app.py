@@ -1241,7 +1241,7 @@ class DariusFinal(ctk.CTk):
             command=self._on_text_submit,
         ).pack(side="right", padx=(0, 10), pady=8)
 
-        # 2.4 Bottom Telemetry HUD Bar (Inspirado en JARVIS)
+        # 2.4 Bottom Telemetry HUD Bar (Motor de Telemetría Darius)
         from src.darius_ai.gui.telemetry_bar import TelemetryBarWidget
 
         self.telemetry_bar = TelemetryBarWidget(self.main_studio_frame)
