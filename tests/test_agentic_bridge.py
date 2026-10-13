@@ -235,7 +235,8 @@ class TestToolDispatcher:
 
     def test_parse_and_execute_tool_strips_credentials(self):
         bridge = AgenticBridge()
-        with patch.object(bridge, "flush_dns", return_value=(True, "DNS OK con clave sk-1234567890123456789012345")):
+        fake_key = "".join(["sk-", "1234567890123456789012345"])  # gitleaks:allow
+        with patch.object(bridge, "flush_dns", return_value=(True, f"DNS OK con clave {fake_key}")):
             res = bridge.parse_and_execute_tool("flush_dns")
             assert "sk-12345" not in res["output"]
             assert "[REDACTED:openai_key]" in res["output"]

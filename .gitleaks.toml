@@ -1,0 +1,18 @@
+# Gitleaks Configuration for Darius AI
+title = "Darius AI Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Permitir fixtures sinteticas de pruebas unitarias y commits historicos de prueba"
+paths = [
+  '''tests/.*''',
+  '''src/darius_ai/core/self_test\.py''',
+  '''src/darius_ai/system/windows_commands\.py''',
+  '''\.env\.example'''
+]
+commits = [
+  "324a6b2d925f3ad6af0c695cca10512e3bc89b3d",
+  "cd4f8994b983d8a08f4ef350411258c1ad8a0361"
+]

@@ -1,0 +1,9 @@
+# Gitleaks ignore list for Darius AI
+# Synthetic test fixtures for credential stripping and security validation
+cd4f8994b983d8a08f4ef350411258c1ad8a0361:tests/test_agent_planner.py:generic-api-key:253
+cd4f8994b983d8a08f4ef350411258c1ad8a0361:tests/test_agent_planner.py:generic-api-key:254
+324a6b2d925f3ad6af0c695cca10512e3bc89b3d:tests/test_security_guard.py:generic-api-key:215
+324a6b2d925f3ad6af0c695cca10512e3bc89b3d:tests/test_security_guard.py:slack-bot-token:247
+324a6b2d925f3ad6af0c695cca10512e3bc89b3d:tests/test_security_guard.py:private-key:269
+324a6b2d925f3ad6af0c695cca10512e3bc89b3d:tests/test_security_guard.py:github-pat:235
+324a6b2d925f3ad6af0c695cca10512e3bc89b3d:tests/test_security_guard.py:github-oauth:236
