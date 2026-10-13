@@ -5,7 +5,8 @@
 > arquitectura real del sistema, las decisiones de diseño ya tomadas y las
 > reglas que debes respetar para no romper el comportamiento existente.
 >
-> Última actualización: Versión 7.1.0 — Motor de dossiers de inteligencia estructurados (Obsidian / Exa), centinela perceptual de presencia por webcam, efectos de sonido procedurales NumPy en memoria, rastreador de telemetría y barra HUD en CustomTkinter — Octubre 2026.
+> Última actualización: Versión 8.5.0 — Arquitectura Proactiva, Seguridad Avanzada y Telemetría Situacional: LoopGuard anti-bucles, ApprovalStore Human-in-the-Loop, Enrutador de Complejidad, Programador de Tareas, Briefing Ejecutivo Matutino, Registro de Habilidades Markdown y Suite Situacional Ojo de Dios — Octubre 2026.
+
 
 ---
 
@@ -238,7 +239,26 @@ Tanto en llamadas a Gemini como a los proveedores compatibles con OpenAI, `_buil
 ### D21 — Rastreador de Telemetría Agéntica y HUD Ticker en GUI
 **Decisión:** Incorporar observabilidad estructurada en tiempo real mediante `src/darius_ai/core/telemetry_tracker.py` y el componente de interfaz `TelemetryBarWidget` (`src/darius_ai/gui/telemetry_bar.py`) en el Command Dock inferior de CustomTkinter. Proporciona visibilidad en tiempo real de qué agente o herramienta está operando y su latencia en milisegundos, reduciendo la incertidumbre del usuario durante tareas asíncronas.
 
+### D22 — Guardián Determinista contra Bucles y Oscilación (`LoopGuard`)
+**Decisión:** Implementar `src/darius_ai/core/loop_guard.py` con hashing determinista SHA-256 de llamadas a herramientas (`tool_name` + argumentos canónicos), detección de oscilaciones ping-pong (período 2: $A \to B \to A \to B$ y período 3: $A \to B \to C \to A \to B \to C$), esquema *warn-before-block* y compresión de contexto en 4 fases para eliminar alucinaciones infinitas en planes agénticos.
+
+### D23 — Almacén SQLite Human-in-the-Loop y Control por Tiers (`ApprovalStore`)
+**Decisión:** Construir `src/darius_ai/core/approval_store.py` con base SQLite en modo WAL (`approvals.db`), clasificación de riesgo en 4 niveles (`TRIVIAL` auto-aprobado, `LOW` pregunta una vez y recuerda, `MEDIUM` configurable, `HIGH` siempre exige confirmación) y un parser NLP/vocal que reconoce aprobaciones en lenguaje natural (*"sí"*, *"aprobar"*, *"siempre permitir"*, *"rechazar"*) sin requerir llamadas costosas a LLMs.
+
+### D24 — Enrutador Multidimensional de Complejidad y Presupuesto de Tokens (`ComplexityRouter`)
+**Decisión:** Dotar a Darius AI de `src/darius_ai/core/complexity_router.py`, evaluando 5 señales ponderadas (longitud, sintaxis/código, indicadores de razonamiento, estructura y tono creativo) para clasificar consultas en 5 niveles de complejidad y asignar presupuestos dinámicos de tokens, duplicando el margen para modelos de razonamiento (DeepSeek-R1, OpenAI o-series) para evitar asfixia del CoT.
+
+### D25 — Programador de Tareas y Automatización en Segundo Plano (`TaskScheduler`)
+**Decisión:** Incorporar `src/darius_ai/core/task_scheduler.py` con almacenamiento SQLite persistente de tareas programadas (`ONCE`, `INTERVAL`, `CRON`), ejecutadas herméticamente mediante un hilo daemon ligero que sondea el estado del sistema sin consumo de CPU.
+
+### D26 — Motor de Briefing Ejecutivo Matutino (`DailyDigestEngine`)
+**Decisión:** Desarrollar `src/darius_ai/core/daily_digest.py`, que agrega telemetría del sistema operativo (RAM, CPU, disco), tareas pendientes y notas recientes de Obsidian, estado del repositorio Git y clima local, sintetizando una alocución vocal ejecutiva estrictamente menor a 200 palabras, sin marcadores markdown, persistida automáticamente en `Darius/Briefings/`.
+
+### D27 — Registro Dinámico de Habilidades Procedimentales en Markdown (`SkillRegistry`)
+**Decisión:** Implementar `src/darius_ai/core/skill_registry.py` para descubrir y cargar habilidades desde archivos Markdown con frontmatter YAML (compatibles con notas de Obsidian), permitiendo inyectar playbooks tácticos procedimentales en el catálogo del planificador agéntico sin alterar el código fuente.
+
 ---
+
 
 ## 7. Modos de Activación de Voz y Eventos
 

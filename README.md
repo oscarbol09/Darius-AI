@@ -31,6 +31,43 @@ Darius AI se basa en dos pilares de ingeniería:
 
 ## Capacidades y Arquitectura de Módulos
 
+- **Suite de Inteligencia Situacional y Telemetría Global:**
+  - **Radar Orbital y Rastreo ISS (`orbital_radar.py`):** Telemetría cinemática de la Estación Espacial Internacional (ISS) en tiempo real consumiendo APIs abiertas con Anti-SSRF, distancia geodésica esférica (fórmula de Haversine) y marcación azimutal respecto a tu ubicación.
+  - **Centinela de Tráfico Aéreo ADS-B (`air_traffic_sentinel.py`):** Escaneo táctico de aeronaves en el espacio aéreo circundante mediante transpondedores OpenSky Network y adsb.lol (callsign, altitud barométrica, velocidad, rumbo y proximidad).
+  - **Sensor Sísmico y Tectónico Global (`seismic_sensor.py`):** Monitorización en tiempo real de terremotos vía USGS GeoJSON ($M \ge 4.5$) con detección de alertas de tsunami.
+  - **Oráculo de Clima Espacial y Tormentas Solares (`space_weather_oracle.py`):** Índice Kp planetario de NOAA SWPC, categorización de tormentas geomagnéticas (G0 a G5) y evaluación de impacto en telecomunicaciones y satélites.
+  - **Telemetría Acústica Earcon y Sonar Ping (`sound_effects.py`):** Pulso acústico discreto de dos tonos (880 Hz / 1320 Hz) para telemetría en segundo plano y Sonar Ping cibernético procedural (480 Hz / 960 Hz).
+- **Personalidad Canónica Darius y Motor de Agudeza Británica (`darius_persona.py`):**
+  - Personalidad de copiloto mayordomo de alta inteligencia: cortesía británica inalterable, honorífico *"señor"*, agudeza seca (*dry wit*) y rigor analítico.
+  - Motor local de réplicas de humor sin latencia de red (`get_witty_retort`) y filtrado anti-*AI slop* con cadencia digna para TTS (`format_butler_response`).
+- **HUD Cyber Core Visualizer a 60 FPS (`cyber_core_visualizer.py`):**
+  - Visualizador vectorial sobre `tk.Canvas` con geometría polar precomputada en NumPy: anillo exterior segmentado de 12 arcos, escala táctica de 36 marcas en contrarrotación y núcleo central pulsante modulado por RMS de audio.
+  - Paleta cromática Cyber Core: Core Cyan (`#00F0FF`), Core Amber (`#E6AA38`), Core Crimson (`#C42B3B`), Core Emerald (`#00FF88`).
+- **Control Multimedia Global Win32 (`media_controller.py`):**
+  - Despachador de Virtual Keys (VK) mediante `user32.dll keybd_event` para Spotify, YouTube, VLC y reproductores globales sin requerir foco de ventana (`play_pause`, `next`, `prev`, `stop`, `vol_up`, `vol_down`, `mute`).
+- **Protocolo de Diagnóstico Integral Darius (`darius_protocol.py`):**
+  - Auditoría multivariable de sistemas: CPU, RAM, disco, energía AC/batería, latencia de red, geometría de pantallas, periféricos de audio y bóveda de Obsidian.
+  - Secuencia de audio procedural sincronizada y alocución verbal de alta precisión (*"Protocolo de Diagnóstico Integral Darius ejecutado con éxito, señor..."*).
+- **Oráculo Científico y Lookup Enciclopédico Rápido (`science_oracle.py`):**
+  - Resúmenes enciclopédicos con latencia reducida (<200 ms) vía Wikimedia REST API y base de datos de 15 constantes físicas fundamentales y 10 conversiones técnicas (Mach, eV, PSI, años luz, nudos).
+- **Centinela de Inteligencia de Noticias (`news_sentinel.py`):**
+  - Monitor asíncrono y resiliente de titulares con degradación graciosa (NewsAPI -> feeds RSS sindicados -> DuckDuckGo News), validación Anti-SSRF y alocución para briefings.
+- **Oráculo Léxico y Diccionario Bilingüe (`lexicon_oracle.py`):**
+  - Diccionario técnico bilingüe curado (IA, computación, física) + Free Dictionary API con fonética IPA, sinónimos y búsqueda difusa tolerante a fallos.
+- **Biometría Facial y Autenticación Sentry Darius (`face_biometrics.py`):**
+  - Verificación biométrica con métrica normalizada $[0.0, 1.0]$, fallback 3-tier (Óptico -> Desafío vocal/PIN -> Headless seguro) y alocución canónica de identidad.
+- **Extracción Visual OCR e Inteligencia de Pantalla (`visual_intel_ocr.py`):**
+  - Pipeline de preprocesamiento (CLAHE + Otsu) con descubrimiento dinámico de motor OCR en cascada (WinRT nativo -> Tesseract -> LLM multimodal) y extractor de stacktraces/código.
+- **Director de Medios y Reproducción en YouTube (`media_controller.py`):**
+  - Limpieza de consultas en lenguaje natural, apertura delegada en el navegador predeterminado del sistema y comando de auto-reproducción.
+- **Motor de Temporizadores Tácticos Darius (`darius_timer.py`):**
+  - Cuentas regresivas y alarmas multihilo con resolución milimétrica (<0.05s), alerta acústica procedural al expirar y alocución vocal estilizada de Darius.
+- **Pila de Sub-Diálogos LIFO Darius (`dialogue_stack.py`):**
+  - Autómata de pila pushdown LIFO para gestionar sub-diálogos anidados y confirmaciones interactivas con fast-path inteligente afirmativo/negativo y expiración temporal.
+- **Despachador Wake-on-LAN Multi-NIC (`wol_dispatcher.py`):**
+  - Emisión de Magic Packets UDP RFC a través de todas las interfaces activas y difusiones dirigidas para encender rigs de juego, servidores y NAS locales.
+- **Protocolo de Silencio Táctico y Bloqueo de Emergencia Darius (`darius_lockdown.py`):**
+  - Silencio táctico instantáneo (<15 ms), flush y checkpoints WAL en SQLite, y bloqueo de estación de trabajo Windows vía Win32 `user32.LockWorkStation()`.
 - **Disparador Acústico por Doble Aplauso:**
   - Detección en tiempo real de picos acústicos transitorios (aplausos) sobre streaming PCM con `sounddevice` y `numpy`.
   - Piso de ruido adaptativo exponencial que ajusta el umbral automáticamente al entorno sonoro.
@@ -70,11 +107,38 @@ Darius AI se basa en dos pilares de ingeniería:
   - Monitoreo pasivo en segundo plano por webcam (<1% CPU) para auto-wake al sentarte, auto-sleep al ausentarte y alerta de hombro (*Shoulder-Surfer Alert*).
 - **Barra de Telemetría HUD Agéntica en GUI (`telemetry_bar.py`):**
   - Ticker continuo en tiempo real integrado en el Command Dock que muestra la herramienta activa y su tiempo de respuesta en ms.
+- **Resumen Ejecutivo Matutino & Briefing Diario (`daily_digest.py`):**
+  - Síntesis hablada (<200 palabras) de telemetría de hardware, tareas pendientes de Obsidian, estado del repo Git y notas recientes con solo decir *"Darius, resumen del día"*.
+- **Seguridad Human-in-the-Loop & Control por Tiers (`approval_store.py`):**
+  - Almacén SQLite WAL para acciones destructivas o sensibles, con memoria de permisos y aprobación directa por voz (*"sí"*, *"aprobar"*, *"siempre permitir"*).
+- **Guardián Anti-Bucles y Compresión de Contexto (`loop_guard.py`):**
+  - Hashing determinista SHA-256 de herramientas, detección de ciclos oscilatorios ping-pong y compresión de contexto en 4 etapas.
+- **Programador de Tareas Autónomo en Segundo Plano (`task_scheduler.py`):**
+  - Automatización con tareas programadas (`interval`, `once`, `cron`) ejecutadas por un hilo daemon ligero.
+- **Enrutador de Complejidad y Triage de Modelos (`complexity_router.py`):**
+  - Análisis multidimensional de consultas para presupuestar tokens y seleccionar entre modelos locales ultrarrápidos y modelos frontera de razonamiento profundo.
+- **Registro de Habilidades Procedimentales en Markdown (`skill_registry.py`):**
+  - Extensibilidad dinámica: define nuevas habilidades en notas Markdown con frontmatter YAML sin tocar una sola línea de código Python.
+- **Seguridad Perimetral, Anti-SSRF y Scrubber de Credenciales (`security_guard.py`):**
+  - Filtro hermético anti-SSRF con validación de subredes privadas RFC 1918 y metadatos de nube.
+  - Redactor de credenciales y tokens (`CredentialStripper`) en salidas de consola y respuestas de voz.
+  - Escáner de inyecciones de prompt y jailbreaks (`InjectionScanner`) en 4 niveles de severidad.
+- **Sandbox AST y Ejecución Segura de Python (`safe_code_interpreter.py`):**
+  - Ejecutor Python con validación previa de AST, lista blanca estricta de librerías matemáticas/datos y estado en memoria persistente.
+- **Motor de Grafos DAG para Flujos Complejos (`workflow_dag.py`):**
+  - Orquestador de flujos acíclicos con ordenamiento de Kahn y ejecución concurrente por fases `execution_stages()`.
+- **Agente de Investigación Profunda con Citas (`deep_research_agent.py`):**
+  - Deconstrucción de preguntas en subconsultas de búsqueda, deduplicación de fuentes y reportes con citas `[1]`, `[2]`.
+- **Gestión Dinámica de Perfil de Usuario (`user_profile_engine.py`):**
+  - Extracción automática de preferencias, hábitos y stack tecnológico del usuario en `USER.md` en Obsidian Vault.
+- **Búsqueda Web Resiliente con Anti-SSRF y Caché LRU (`web_search_engine.py`):**
+  - Búsqueda multi-proveedor con validación de seguridad de URLs y caché in-memory de 15 minutos.
 - **Control por Voz y Modos de Activación:**
   - **Disparador Acústico:** Da dos aplausos seguidos para despertar al asistente inmediatamente.
   - **Push-to-Talk (PTT):** Mantén presionada una tecla (`Right Ctrl` por defecto) para hablar sin falsos positivos.
   - **Modo Nombre:** Escucha continua en segundo plano que se activa al detectar el nombre ("Darius").
   - **Modo Auto:** Procesa de forma inmediata cualquier frase capturada.
+
 
 ---
 

@@ -60,3 +60,6 @@ supabase/migrations/
 # Cobertura y temporales
 # =========================
 .coverage
+*.db
+*.db-wal
+*.db-shm
