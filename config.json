@@ -4,7 +4,7 @@
     "user_name": "Oscar"
   },
   "gemini": {
-    "model": "gemini-3.1-flash-lite",
+    "model": "gemini-3.5-flash-lite",
     "max_tokens": 800,
     "temperature": 0.7,
     "history_turns": 10
@@ -12,17 +12,17 @@
   "llm": {
     "active_provider": "gemini",
     "gemini_api_key": "",
-    "gemini_model": "gemini-3.1-flash-lite",
+    "gemini_model": "gemini-3.5-flash-lite",
     "openai_api_key": "",
     "openai_model": "gpt-4o-mini",
     "openrouter_api_key": "",
-    "openrouter_model": "google/gemma-3-27b-it:free",
+    "openrouter_model": "openrouter/free",
     "nvidia_api_key": "",
-    "nvidia_model": "meta/llama-3.1-70b-instruct",
+    "nvidia_model": "nvidia/llama-3.1-nemotron-70b-instruct",
     "groq_api_key": "",
     "groq_model": "llama-3.3-70b-versatile",
     "ollama_base_url": "http://localhost:11434/v1",
-    "ollama_model": "llama3.2",
+    "ollama_model": "llama3.2:3b",
     "custom_base_url": "http://localhost:1234/v1",
     "custom_api_key": "",
     "custom_model": "local-model",

@@ -33,46 +33,65 @@ from src.darius_ai.core.config_loader import cfg
 
 log = logging.getLogger("DARIUS.Settings")
 
-# Modelos populares sugeridos por proveedor de IA
+# Modelos populares sugeridos por proveedor de IA (Actualizados y verificados 2025/2026)
 PROVIDER_DEFAULT_MODELS: dict[str, list[str]] = {
     "gemini": [
-        "gemini-3.6-flash",
-        "gemini-3.8-flash",
+        "gemini-3.5-flash-lite",
         "gemini-3.1-flash-lite",
         "gemini-flash-latest",
         "gemini-flash-lite-latest",
-        "gemini-3.5-flash",
-        "gemini-3.7-flash",
+        "gemini-3.8-flash",
+        "gemini-3.6-flash",
+        "gemini-4-argon",
+        "gemini-pro-latest",
     ],
-    "openai": ["gpt-4o-mini", "gpt-4o", "o3-mini", "gpt-4.1", "gpt-3.5-turbo"],
+    "openai": [
+        "gpt-4o-mini",
+        "gpt-4o",
+        "o3-mini",
+        "o1",
+        "o1-mini",
+        "gpt-4.1",
+        "gpt-4.1-mini",
+    ],
     "openrouter": [
-        "google/gemma-3-27b-it:free",
-        "meta-llama/llama-3.3-70b-instruct:free",
-        "mistralai/mistral-small-3:free",
-        "nvidia/nemotron-3-super:free",
-        "meta-llama/llama-3-8b-instruct:free",
+        "openrouter/free",
+        "nvidia/nemotron-3-super-120b-a12b:free",
+        "nvidia/nemotron-3.5-lightning:free",
+        "google/gemma-4-31b-it:free",
+        "liquid/lfm-2.5-2.6b:free",
+        "meta-llama/llama-3.3-70b-instruct",
+        "google/gemini-2.5-flash",
         "openai/gpt-4o-mini",
-        "anthropic/claude-3.5-sonnet",
+        "deepseek/deepseek-chat",
+        "qwen/qwen-2.5-72b-instruct",
     ],
     "nvidia": [
-        "meta/llama-3.1-70b-instruct",
         "nvidia/llama-3.1-nemotron-70b-instruct",
-        "meta/llama-3.1-8b-instruct",
-        "mistralai/mixtral-8x22b-instruct-v0.1",
+        "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia/nemotron-4-340b-instruct",
+        "nvidia/nemotron-3.5-lightning-30b-a3b",
+        "mistralai/mistral-large-2-instruct",
+        "mistralai/mixtral-8x22b-v0.1",
+        "google/gemma-4-31b-it",
+        "deepseek-ai/deepseek-v4.1-flash",
     ],
     "groq": [
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
+        "deepseek-r1-distill-llama-70b",
         "gemma2-9b-it",
+        "qwen-2.5-32b",
     ],
     "ollama": [
-        "llama3.2",
-        "llama3.1",
-        "deepseek-r1:8b",
-        "mistral",
+        "llama3.2:3b",
+        "llama3.2:1b",
+        "llama3.3:70b",
+        "llama3.1:8b",
         "qwen2.5:7b",
-        "phi3",
+        "deepseek-r1:8b",
+        "mistral:7b",
+        "phi4:14b",
     ],
     "custom": [
         "local-model",
@@ -135,7 +154,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self._provider_data: dict[str, dict[str, str]] = {
             "gemini": {
                 "key": cfg.llm_gemini_api_key or resolve_provider_key("gemini"),
-                "model": cfg.llm_gemini_model or "gemini-3.6-flash",
+                "model": cfg.llm_gemini_model or "gemini-3.5-flash-lite",
                 "base_url": "",
             },
             "openai": {
@@ -145,12 +164,12 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             },
             "openrouter": {
                 "key": cfg.llm_openrouter_api_key or resolve_provider_key("openrouter"),
-                "model": cfg.llm_openrouter_model or "google/gemma-3-27b-it:free",
+                "model": cfg.llm_openrouter_model or "openrouter/free",
                 "base_url": "",
             },
             "nvidia": {
                 "key": cfg.llm_nvidia_api_key or resolve_provider_key("nvidia"),
-                "model": cfg.llm_nvidia_model or "meta/llama-3.1-70b-instruct",
+                "model": cfg.llm_nvidia_model or "nvidia/llama-3.1-nemotron-70b-instruct",
                 "base_url": "",
             },
             "groq": {
@@ -160,7 +179,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             },
             "ollama": {
                 "key": "",
-                "model": cfg.llm_ollama_model or "llama3.2",
+                "model": cfg.llm_ollama_model or "llama3.2:3b",
                 "base_url": cfg.llm_ollama_base_url or "http://localhost:11434/v1",
             },
             "custom": {
@@ -330,7 +349,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         self.llm_model_combo = ctk.CTkComboBox(
             self.llm_form_card,
-            values=["gemini-3.6-flash"],
+            values=["gemini-3.5-flash-lite"],
             font=("Consolas", 11),
             fg_color="#1F2937",
             border_color="#374151",

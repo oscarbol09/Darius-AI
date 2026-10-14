@@ -62,7 +62,7 @@ _DEFAULTS: dict = {
         "user_name": "Oscar",
     },
     "gemini": {
-        "model": "gemini-3.6-flash",
+        "model": "gemini-3.5-flash-lite",
         "max_tokens": 800,
         "temperature": 0.7,
         "history_turns": 10,
@@ -70,17 +70,17 @@ _DEFAULTS: dict = {
     "llm": {
         "active_provider": "gemini",
         "gemini_api_key": "",
-        "gemini_model": "gemini-3.6-flash",
+        "gemini_model": "gemini-3.5-flash-lite",
         "openai_api_key": "",
         "openai_model": "gpt-4o-mini",
         "openrouter_api_key": "",
-        "openrouter_model": "google/gemma-3-27b-it:free",
+        "openrouter_model": "openrouter/free",
         "nvidia_api_key": "",
-        "nvidia_model": "meta/llama-3.1-70b-instruct",
+        "nvidia_model": "nvidia/llama-3.1-nemotron-70b-instruct",
         "groq_api_key": "",
         "groq_model": "llama-3.3-70b-versatile",
         "ollama_base_url": "http://localhost:11434/v1",
-        "ollama_model": "llama3.2",
+        "ollama_model": "llama3.2:3b",
         "custom_base_url": "http://localhost:1234/v1",
         "custom_api_key": "",
         "custom_model": "local-model",
@@ -206,7 +206,7 @@ class _Config:
 
     @property
     def gemini_model(self) -> str:
-        return str(self.get("gemini", "model", default="gemini-3.6-flash"))
+        return str(self.get("gemini", "model", default="gemini-3.5-flash-lite"))
 
     @property
     def gemini_max_tokens(self) -> int:
@@ -300,7 +300,7 @@ class _Config:
 
     @property
     def llm_gemini_model(self) -> str:
-        return str(self.get("llm", "gemini_model", default="gemini-3.6-flash"))
+        return str(self.get("llm", "gemini_model", default="gemini-3.5-flash-lite"))
 
     @property
     def llm_openai_api_key(self) -> str:
@@ -316,7 +316,7 @@ class _Config:
 
     @property
     def llm_openrouter_model(self) -> str:
-        return str(self.get("llm", "openrouter_model", default="google/gemma-3-27b-it:free"))
+        return str(self.get("llm", "openrouter_model", default="openrouter/free"))
 
     @property
     def llm_nvidia_api_key(self) -> str:
@@ -324,7 +324,7 @@ class _Config:
 
     @property
     def llm_nvidia_model(self) -> str:
-        return str(self.get("llm", "nvidia_model", default="meta/llama-3.1-70b-instruct"))
+        return str(self.get("llm", "nvidia_model", default="nvidia/llama-3.1-nemotron-70b-instruct"))
 
     @property
     def llm_groq_api_key(self) -> str:
@@ -340,7 +340,7 @@ class _Config:
 
     @property
     def llm_ollama_model(self) -> str:
-        return str(self.get("llm", "ollama_model", default="llama3.2"))
+        return str(self.get("llm", "ollama_model", default="llama3.2:3b"))
 
     @property
     def llm_custom_base_url(self) -> str:
@@ -589,6 +589,30 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+DEPRECATED_MODELS_MIGRATION: dict[str, str] = {
+    # Gemini: modelos 1.x, 2.5 obsoletos o 3.6 saturado
+    "gemini-3.6-flash": "gemini-3.5-flash-lite",
+    "gemini-2.5-flash": "gemini-3.5-flash-lite",
+    "gemini-2.5-flash-lite": "gemini-3.5-flash-lite",
+    "gemini-2.5-pro": "gemini-3.1-pro-preview",
+    "gemini-1.0-pro": "gemini-3.5-flash-lite",
+    "gemini-pro": "gemini-3.5-flash-lite",
+    # OpenRouter: endpoints :free removidos
+    "google/gemma-3-27b-it:free": "openrouter/free",
+    "meta-llama/llama-3.3-70b-instruct:free": "openrouter/free",
+    "meta-llama/llama-3-8b-instruct:free": "openrouter/free",
+    "nvidia/nemotron-3-super:free": "nvidia/nemotron-3-super-120b-a12b:free",
+    # NVIDIA NIM: modelos retirados
+    "meta/llama-3.1-70b-instruct": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "meta/llama-3.1-8b-instruct": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "mistralai/mixtral-8x22b-instruct-v0.1": "mistralai/mixtral-8x22b-v0.1",
+    # Groq: modelos descomisionados
+    "mixtral-8x7b-32768": "llama-3.3-70b-versatile",
+    "llama3-70b-8192": "llama-3.3-70b-versatile",
+    "llama3-8b-8192": "llama-3.1-8b-instant",
+}
+
+
 def _load() -> _Config:
     data = _DEFAULTS.copy()
 
@@ -623,6 +647,27 @@ def _load() -> _Config:
 
     # Validación de tipos contra el schema; datos inválidos se reemplazan con defaults
     data = _validate_types(data, _SCHEMA)
+
+    # Migración de modelos deprecados para evitar errores 404 / 503
+    migrated = False
+    if "gemini" in data and isinstance(data["gemini"], dict):
+        g_model = data["gemini"].get("model")
+        if g_model in DEPRECATED_MODELS_MIGRATION:
+            data["gemini"]["model"] = DEPRECATED_MODELS_MIGRATION[g_model]
+            migrated = True
+    if "llm" in data and isinstance(data["llm"], dict):
+        for k in ("gemini_model", "openrouter_model", "nvidia_model", "groq_model"):
+            curr_m = data["llm"].get(k)
+            if curr_m in DEPRECATED_MODELS_MIGRATION:
+                data["llm"][k] = DEPRECATED_MODELS_MIGRATION[curr_m]
+                migrated = True
+
+    if migrated and _CONFIG_FILE.exists():
+        try:
+            _CONFIG_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            log.info("[Config] Modelos deprecados migrados automáticamente en config.json.")
+        except Exception as exc:
+            log.warning(f"[Config] No se pudo guardar migración de modelos: {exc}")
 
     return _Config(data)
 

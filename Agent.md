@@ -126,12 +126,12 @@ El motor de IA implementa un despachador unificado que resuelve credenciales de 
 
 | Proveedor | Identificador | Base URL | Modelo Default | Mecanismo |
 | :--- | :--- | :--- | :--- | :--- |
-| **Google Gemini** | `gemini` | N/A (Google GenAI SDK) | `gemini-3.6-flash` | `genai.Client(api_key=...)` |
+| **Google Gemini** | `gemini` | N/A (Google GenAI SDK) | `gemini-3.5-flash-lite` | `genai.Client(api_key=...)` |
 | **OpenAI** | `openai` | `https://api.openai.com/v1` | `gpt-4o-mini` | `_call_openai_compatible()` |
 | **Groq** | `groq` | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | `_call_openai_compatible()` |
-| **NVIDIA NIM** | `nvidia_nim` | `https://integrate.api.nvidia.com/v1` | `meta/llama-3.3-70b-instruct` | `_call_openai_compatible()` |
-| **OpenRouter** | `openrouter` | `https://openrouter.ai/api/v1` | `deepseek/deepseek-r1:free` | `_call_openai_compatible()` |
-| **Ollama** | `ollama` | `http://localhost:11434/v1` | `llama3.2` | `_call_openai_compatible()` |
+| **NVIDIA NIM** | `nvidia_nim` | `https://integrate.api.nvidia.com/v1` | `nvidia/llama-3.1-nemotron-70b-instruct` | `_call_openai_compatible()` |
+| **OpenRouter** | `openrouter` | `https://openrouter.ai/api/v1` | `openrouter/free` | `_call_openai_compatible()` |
+| **Ollama** | `ollama` | `http://localhost:11434/v1` | `llama3.2:3b` | `_call_openai_compatible()` |
 | **Personalizado** | `custom` | *Configurable por usuario* | *Configurable por usuario* | `_call_openai_compatible()` |
 
 ### 5.2 Llamador Universal OpenAI-Compatible (`_call_openai_compatible`)

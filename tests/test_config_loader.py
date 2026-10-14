@@ -51,8 +51,8 @@ class TestDefaults:
     def test_gemini_max_tokens_is_800(self):
         assert _DEFAULTS["gemini"]["max_tokens"] == 800
 
-    def test_gemini_default_model_is_3_6_flash(self):
-        assert _DEFAULTS["gemini"]["model"] == "gemini-3.6-flash"
+    def test_gemini_default_model_is_3_5_flash_lite(self):
+        assert _DEFAULTS["gemini"]["model"] == "gemini-3.5-flash-lite"
 
     def test_all_schema_keys_have_defaults(self):
         for key, expected_type in _SCHEMA.items():

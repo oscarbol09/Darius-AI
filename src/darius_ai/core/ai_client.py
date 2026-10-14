@@ -38,14 +38,14 @@ NVIDIA_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions"
 GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
 
 OPENROUTER_FREE_MODELS = [
-    "google/gemma-3-27b-it:free",
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-small-3:free",
-    "nvidia/nemotron-3-super:free",
-    "meta-llama/llama-3-8b-instruct:free",
-    "mistralai/mistral-7b-instruct:free",
-    "arcee-ai/arcee-trinity:free",
-    "qwen/qwen3-8b:free",
+    "openrouter/free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
+    "nvidia/nemotron-3.5-lightning:free",
+    "google/gemma-4-31b-it:free",
+    "liquid/lfm-2.5-2.6b:free",
+    "meta-llama/llama-3.3-70b-instruct",
+    "google/gemini-2.5-flash",
+    "openai/gpt-4o-mini",
 ]
 
 PROVIDER_NAMES = {
@@ -101,7 +101,7 @@ def _call_gemini_rest(
     timeout: int = 25,
 ) -> str:
     """Llama a la API oficial de Google Gemini vía REST sin dependencias externas pesadas."""
-    clean_model = model.strip() or "gemini-2.5-flash"
+    clean_model = model.strip() or "gemini-3.5-flash-lite"
     if "/" in clean_model:
         clean_model = clean_model.split("/")[-1]
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
@@ -387,30 +387,48 @@ def ask_gemini(
     history: list[dict] | None = None,
     image_b64: str | None = None,
 ) -> tuple[str, str]:
-    """Consulta a Google Gemini usando la clave configurada o entorno vía REST."""
+    """Consulta a Google Gemini usando la clave configurada o entorno vía REST con fallback defensivo."""
     api_key = resolve_provider_key("gemini")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY no está configurada")
 
     system_instruction = _build_system_instruction(prompt)
-    model = cfg.llm_gemini_model or cfg.gemini_model or "gemini-2.5-flash"
-    try:
-        text = _call_gemini_rest(
-            api_key=api_key,
-            model=model,
-            prompt=prompt,
-            system_instruction=system_instruction,
-            history=history,
-            image_b64=image_b64,
-            max_tokens=cfg.gemini_max_tokens,
-            temperature=cfg.gemini_temperature,
-        )
-        log.info(f"[Gemini] Respuesta obtenida ({len(text)} chars)")
-        return text, f"Gemini ({model})"
-    except Exception as exc:
-        error_msg = _classify_error_message(exc, "Gemini")
-        log.warning(f"[Gemini] Error: {exc}")
-        raise RuntimeError(error_msg) from exc
+    primary_model = cfg.llm_gemini_model or cfg.gemini_model or "gemini-3.5-flash-lite"
+    candidate_models = [primary_model]
+    for fb in ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"):
+        if fb not in candidate_models:
+            candidate_models.append(fb)
+
+    last_exc: Exception | None = None
+    for cand_model in candidate_models:
+        try:
+            text = _call_gemini_rest(
+                api_key=api_key,
+                model=cand_model,
+                prompt=prompt,
+                system_instruction=system_instruction,
+                history=history,
+                image_b64=image_b64,
+                max_tokens=cfg.gemini_max_tokens,
+                temperature=cfg.gemini_temperature,
+            )
+            if cand_model != primary_model:
+                log.info(
+                    f"[Gemini] Fallback de modelo exitoso: '{primary_model}' -> '{cand_model}' ({len(text)} chars)"
+                )
+            else:
+                log.info(f"[Gemini] Respuesta obtenida ({len(text)} chars)")
+            return text, f"Gemini ({cand_model})"
+        except Exception as exc:
+            log.warning(f"[Gemini] Modelo '{cand_model}' falló: {exc}")
+            last_exc = exc
+            err_str = str(exc)
+            # Solo rotar modelo si es error del modelo (404 no encontrado, 503 alta demanda, o no disponible)
+            if not any(code in err_str for code in ("404", "503", "400", "not available", "demand", "timed out")):
+                break
+
+    error_msg = _classify_error_message(last_exc or RuntimeError("Error desconocido en Gemini"), "Gemini")
+    raise RuntimeError(error_msg) from last_exc
 
 
 def ask_openai(
@@ -444,8 +462,8 @@ def ask_openrouter(
     if not api_key:
         raise RuntimeError("OPENROUTER_API_KEY no está configurada")
 
-    configured_model = cfg.llm_openrouter_model
-    models_to_try = [configured_model] if configured_model else []
+    configured_model = cfg.llm_openrouter_model or "openrouter/free"
+    models_to_try = [configured_model]
     for m in OPENROUTER_FREE_MODELS:
         if m not in models_to_try:
             models_to_try.append(m)
@@ -482,20 +500,39 @@ def ask_nvidia(
     history: list[dict] | None = None,
     image_b64: str | None = None,
 ) -> tuple[str, str]:
-    """Consulta a NVIDIA NIM."""
+    """Consulta a NVIDIA NIM con rotación defensiva."""
     api_key = resolve_provider_key("nvidia")
     if not api_key:
         raise RuntimeError("NVIDIA_API_KEY no está configurada")
-    model = cfg.llm_nvidia_model or "meta/llama-3.1-70b-instruct"
-    text = _call_openai_compatible(
-        endpoint=NVIDIA_ENDPOINT,
-        api_key=api_key,
-        model=model,
-        prompt=prompt,
-        history=history,
-        image_b64=image_b64,
-    )
-    return text, f"NVIDIA NIM ({model})"
+    primary_model = cfg.llm_nvidia_model or "nvidia/llama-3.1-nemotron-70b-instruct"
+    candidates = [primary_model]
+    for fb in (
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+        "nvidia/nemotron-4-340b-instruct",
+        "mistralai/mistral-large-2-instruct",
+        "mistralai/mixtral-8x22b-v0.1",
+    ):
+        if fb not in candidates:
+            candidates.append(fb)
+
+    last_err: Exception | None = None
+    for model in candidates:
+        try:
+            text = _call_openai_compatible(
+                endpoint=NVIDIA_ENDPOINT,
+                api_key=api_key,
+                model=model,
+                prompt=prompt,
+                history=history,
+                image_b64=image_b64,
+            )
+            return text, f"NVIDIA NIM ({model})"
+        except Exception as exc:
+            log.warning(f"[NVIDIA NIM] Modelo '{model}' falló: {exc}")
+            last_err = exc
+            continue
+
+    raise RuntimeError(f"Todos los modelos de NVIDIA NIM fallaron: {last_err}")
 
 
 def ask_groq(
@@ -503,20 +540,34 @@ def ask_groq(
     history: list[dict] | None = None,
     image_b64: str | None = None,
 ) -> tuple[str, str]:
-    """Consulta a Groq Cloud."""
+    """Consulta a Groq Cloud con rotación defensiva."""
     api_key = resolve_provider_key("groq")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY no está configurada")
-    model = cfg.llm_groq_model or "llama-3.3-70b-versatile"
-    text = _call_openai_compatible(
-        endpoint=GROQ_ENDPOINT,
-        api_key=api_key,
-        model=model,
-        prompt=prompt,
-        history=history,
-        image_b64=image_b64,
-    )
-    return text, f"Groq ({model})"
+    primary_model = cfg.llm_groq_model or "llama-3.3-70b-versatile"
+    candidates = [primary_model]
+    for fb in ("llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen-2.5-32b"):
+        if fb not in candidates:
+            candidates.append(fb)
+
+    last_err: Exception | None = None
+    for model in candidates:
+        try:
+            text = _call_openai_compatible(
+                endpoint=GROQ_ENDPOINT,
+                api_key=api_key,
+                model=model,
+                prompt=prompt,
+                history=history,
+                image_b64=image_b64,
+            )
+            return text, f"Groq ({model})"
+        except Exception as exc:
+            log.warning(f"[Groq] Modelo '{model}' falló: {exc}")
+            last_err = exc
+            continue
+
+    raise RuntimeError(f"Todos los modelos de Groq fallaron: {last_err}")
 
 
 def ask_ollama(
@@ -527,7 +578,7 @@ def ask_ollama(
     """Consulta a Ollama local."""
     base_url = (cfg.llm_ollama_base_url or "http://localhost:11434/v1").rstrip("/")
     endpoint = f"{base_url}/chat/completions"
-    model = cfg.llm_ollama_model or "llama3.2"
+    model = cfg.llm_ollama_model or "llama3.2:3b"
     text = _call_openai_compatible(
         endpoint=endpoint,
         api_key="ollama",
@@ -711,7 +762,7 @@ def test_provider_connection(
         if p == "gemini":
             if not effective_key:
                 return False, "Falta la API Key de Gemini.", 0.0
-            effective_model = model.strip() or cfg.llm_gemini_model or "gemini-2.5-flash"
+            effective_model = model.strip() or cfg.llm_gemini_model or "gemini-3.5-flash-lite"
             _ = _call_gemini_rest(
                 api_key=effective_key,
                 model=effective_model,
@@ -728,7 +779,7 @@ def test_provider_connection(
         elif p == "openrouter":
             if not effective_key:
                 return False, "Falta la API Key de OpenRouter.", 0.0
-            effective_model = model.strip() or "google/gemma-3-27b-it:free"
+            effective_model = model.strip() or "openrouter/free"
             _call_openai_compatible(
                 OPENROUTER_ENDPOINT,
                 effective_key,
@@ -740,7 +791,7 @@ def test_provider_connection(
         elif p == "nvidia":
             if not effective_key:
                 return False, "Falta la API Key de NVIDIA NIM.", 0.0
-            effective_model = model.strip() or "meta/llama-3.1-70b-instruct"
+            effective_model = model.strip() or "nvidia/llama-3.1-nemotron-70b-instruct"
             _call_openai_compatible(NVIDIA_ENDPOINT, effective_key, effective_model, test_prompt, max_tokens=10)
         elif p == "groq":
             if not effective_key:
