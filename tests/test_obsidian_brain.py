@@ -91,3 +91,28 @@ class TestObsidianBrainOperations:
         context = brain.get_memory_context("contraseña wifi")
         assert "Clave Wifi" in context
         assert "Secreta123" in context
+
+    def test_search_vault_fuzzy_phonetic(self, tmp_path: Path):
+        brain = ObsidianBrain(vault_path=tmp_path)
+        brain.save_memory(
+            "ThesisForge Proyecto",
+            "ThesisForge es un asistente inteligente para estructurar y redactar tesis académicas en formato APA 7.",
+            category="proyecto",
+        )
+
+        # Búsqueda con fonética española 'TesisForge' debe encontrar 'ThesisForge'
+        results = brain.search_vault("TesisForge")
+        assert len(results) >= 1
+        assert "ThesisForge" in results[0]["title"]
+        assert "asistente inteligente" in results[0]["snippet"]
+
+    def test_vault_path_autodiscovery(self, tmp_path: Path, monkeypatch):
+        fake_docs = tmp_path / "Documents"
+        fake_cerebro = fake_docs / "Cerebro(obsidian)"
+        fake_cerebro.mkdir(parents=True)
+
+        monkeypatch.setattr(Path, "home", lambda: tmp_path)
+        brain = ObsidianBrain(vault_path="")
+        resolved = brain.vault_path
+        assert resolved == fake_cerebro.resolve()
+

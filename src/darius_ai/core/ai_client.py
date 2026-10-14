@@ -219,6 +219,73 @@ def _get_system_time_context() -> str:
     )
 
 
+def _get_local_project_context(prompt: str) -> str:
+    """Extrae contexto y resúmenes de proyectos locales del usuario si se mencionan en la consulta."""
+    if not prompt or len(prompt.strip()) < 3:
+        return ""
+
+    import pathlib
+    import re
+
+    user_home = pathlib.Path.home()
+    roots = [
+        user_home / "Documents" / "Proyectos Personales GH",
+        user_home / "Documents" / "Proyectos Colaboración GH",
+    ]
+    prompt_norm = (
+        prompt.lower()
+        .replace("tesis", "thesis")
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("í", "i")
+        .replace("ó", "o")
+        .replace("ú", "u")
+    )
+    clean_prompt = re.sub(r"[^\w\s]", " ", prompt_norm)
+    words = clean_prompt.split()
+
+    found_contexts = []
+    seen_dirs = set()
+
+    for root in roots:
+        if not root.exists():
+            continue
+        try:
+            for item in root.iterdir():
+                if not item.is_dir() or item.name in seen_dirs:
+                    continue
+                dir_name_lower = item.name.lower()
+                dir_key = re.sub(r"[^\w]", "", dir_name_lower)
+                # Coincidencia directa o por palabras clave
+                matches = (
+                    dir_name_lower in prompt_norm
+                    or dir_key in prompt_norm.replace(" ", "")
+                    or any(w == dir_name_lower or (len(w) >= 4 and w in dir_name_lower) for w in words)
+                )
+                if matches:
+                    seen_dirs.add(item.name)
+                    readme_path = item / "README.md"
+                    if readme_path.exists():
+                        try:
+                            content = readme_path.read_text(encoding="utf-8", errors="ignore")
+                            clean_content = re.sub(r"<[^>]+>", "", content)
+                            clean_content = re.sub(r"\[!\[.*?\]\(.*?\)\]\(.*?\)", "", clean_content)
+                            clean_content = "\n".join(
+                                line for line in clean_content.splitlines() if not line.strip().startswith("[!")
+                            )
+                            clean_content = re.sub(r"\n{3,}", "\n\n", clean_content).strip()
+                            excerpt = clean_content[:1200]
+                            found_contexts.append(f"### Proyecto: {item.name}\n{excerpt}")
+                        except Exception as read_err:
+                            log.debug(f"No se pudo leer README de {item.name}: {read_err}")
+        except Exception as scan_err:
+            log.debug(f"Error escaneando proyectos en {root}: {scan_err}")
+
+    if found_contexts:
+        return "[INFORMACIÓN DE PROYECTOS LOCALES DEL USUARIO]\n" + "\n\n".join(found_contexts)
+    return ""
+
+
 def _build_system_instruction(prompt: str = "") -> str:
     """Construye directrices de personalidad de mayordomo de Darius con tiempo local, Obsidian y herramientas."""
     from src.darius_ai.core.darius_persona import DariusPersona
@@ -246,12 +313,21 @@ def _build_system_instruction(prompt: str = "") -> str:
         '- [ACTION: scrape_web(url="https://...")] -> Extrae contenido limpio de una página web.\n'
         '- [ACTION: media_action(action="play_pause")] -> Control multimedia (play, next, prev, vol, mute).\n'
         '- [ACTION: science_oracle(query="...")] -> Consulta enciclopédica o constantes físicas.\n'
-        "- [ACTION: stark_protocol()] -> Diagnóstico integral de armadura / sistemas Mark VII.\n\n"
+        "- [ACTION: darius_protocol()] -> Diagnóstico integral de sistemas y telemetría de Darius.\n\n"
         "REGLAS DE EJECUCIÓN:\n"
-        "1. Si el usuario solicita consultar información, escribir texto, mover el mouse o scrapear la web, "
-        "EMITE ÚNICAMENTE la acción correspondiente: `[ACTION: nombre_herramienta(args)]`.\n"
-        "2. No des tutoriales ni instrucciones hipotéticas; ejecuta la herramienta.\n"
-        "3. Con el resultado de la herramienta, sintetiza una respuesta concisa y ejecutiva en español."
+        "1. Para preguntas generales, dudas conceptuales, explicaciones sobre proyectos del usuario, o diálogo "
+        "ordinario,\n"
+        "   RESPONDE DIRECTAMENTE en español en lenguaje natural con tu tono característico de mayordomo de IA "
+        "leal,\n"
+        "   culto y conciso. NO uses herramientas a menos que sea una acción física explícita en el sistema.\n"
+        "2. Emite una acción `[ACTION: nombre_herramienta(args)]` ÚNICAMENTE si el usuario solicita explícitamente\n"
+        "   ejecutar una operación sobre el sistema operativo (ej: abrir/cerrar programas, volumen, multimedia,\n"
+        "   comandos de Git/GitHub, flush de DNS, o diagnosticar hardware).\n"
+        "3. NUNCA ejecutes `execute_git` en Darius-AI cuando el usuario pregunte por otros proyectos (como "
+        "ThesisForge,\n"
+        "   MacroSentinel, etc.) o haga consultas teóricas.\n"
+        "4. Si la consulta involucra proyectos del usuario o notas personales, básate en el [CONTEXTO DE MEMORIA EN\n"
+        "   OBSIDIAN] y en la [INFORMACIÓN DE PROYECTOS LOCALES DEL USUARIO]."
     )
     try:
         from src.darius_ai.core.obsidian_brain import brain
@@ -261,6 +337,14 @@ def _build_system_instruction(prompt: str = "") -> str:
             base += f"\n\n[CONTEXTO DE MEMORIA EN OBSIDIAN]\n{context}"
     except Exception as e:
         log.debug(f"No se pudo cargar contexto de Obsidian: {e}")
+
+    try:
+        proj_context = _get_local_project_context(prompt)
+        if proj_context:
+            base += f"\n\n{proj_context}"
+    except Exception as e:
+        log.debug(f"No se pudo cargar contexto de proyectos locales: {e}")
+
     return base
 
 

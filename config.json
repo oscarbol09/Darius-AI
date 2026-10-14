@@ -58,17 +58,18 @@
     "device": ""
   },
   "microphone": {
-    "energy_threshold": 3000,
-    "pause_threshold": 0.8,
-    "listen_timeout": 5,
-    "phrase_limit": 10
+    "energy_threshold": 400,
+    "pause_threshold": 1.2,
+    "listen_timeout": 7,
+    "phrase_limit": 15
   },
   "obsidian": {
-    "vault_path": "",
-    "daily_notes_folder": "Diario",
-    "memories_folder": "Darius/Memorias",
+    "vault_path": "C:\\Users\\dario\\Documents\\Cerebro(obsidian)",
+    "daily_notes_folder": "04_Bitacora",
+    "memories_folder": "01_Aprendizajes",
     "auto_inject_context": true
   },
+
   "app_cache_hours": 6,
   "speaking_tail_secs": 0.4,
   "listen_mode": "NOMBRE",

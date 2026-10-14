@@ -113,6 +113,21 @@ class TestNameModeFilter(unittest.TestCase):
         self.assertTrue(ok, "'dario' debería ser aceptado como variante de 'darius'")
         self.assertEqual(cmd, "sube el volumen")
 
+    def test_accepts_phonetic_variant_dario_with_accent(self):
+        ok, cmd = _process_recognized_text("darío qué hora es", LISTEN_MODE_NAME)
+        self.assertTrue(ok, "'darío' con tilde debe ser aceptado como variante oficial")
+        self.assertEqual(cmd, "qué hora es")
+
+    def test_accepts_mid_sentence_dario(self):
+        ok, cmd = _process_recognized_text("oye darío qué hora es", LISTEN_MODE_NAME)
+        self.assertTrue(ok, "'oye darío' debe activar el asistente")
+        self.assertEqual(cmd, "oye qué hora es")
+
+    def test_accepts_darios_plural_or_s_variant(self):
+        ok, cmd = _process_recognized_text("darios abre el explorador", LISTEN_MODE_NAME)
+        self.assertTrue(ok, "'darios' debe ser aceptado como variante de 'darius'")
+        self.assertEqual(cmd, "abre el explorador")
+
     def test_clean_text_removes_name(self):
         _, cmd = _process_recognized_text("darius reproduce rock", LISTEN_MODE_NAME)
         self.assertNotIn("darius", cmd)
@@ -121,6 +136,7 @@ class TestNameModeFilter(unittest.TestCase):
     def test_empty_string_rejected(self):
         ok, _ = _process_recognized_text("", LISTEN_MODE_NAME)
         self.assertFalse(ok)
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

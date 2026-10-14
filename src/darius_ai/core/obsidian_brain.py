@@ -19,12 +19,23 @@ import datetime
 import logging
 import re
 from collections.abc import Sequence
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
 from src.darius_ai.core.config_loader import cfg
 
 log = logging.getLogger("DARIUS.Obsidian")
+
+
+def _normalize_search_word(word: str) -> str:
+    """Normaliza tildes y fonética anglosajona/hispana común (th -> t)."""
+    w = word.lower().strip()
+    accents = {"á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u"}
+    for acc, plain in accents.items():
+        w = w.replace(acc, plain)
+    return w.replace("th", "t")
+
 
 
 _RESERVED_DOS_NAMES = {
@@ -80,7 +91,23 @@ class ObsidianBrain:
             return self._vault_dir
 
         configured = self._custom_path or cfg.obsidian_vault_path
-        path = Path(configured).expanduser().resolve() if configured else Path.home() / "Documents" / "Obsidian Vault"
+        if configured:
+            path = Path(configured).expanduser().resolve()
+        else:
+            # Auto-descubrimiento en cascada de la bóveda de Obsidian del usuario
+            home = Path.home()
+            candidates = [
+                home / "Documents" / "Cerebro(obsidian)",
+                home / "Documents" / "Cerebro",
+                home / "Documents" / "Obsidian Vault",
+                home / "Obsidian",
+                home / "Documents" / "Obsidian",
+            ]
+            path = candidates[2]  # Default de contingencia si ninguna existe aún
+            for cand in candidates:
+                if cand.exists():
+                    path = cand
+                    break
 
         try:
             path.mkdir(parents=True, exist_ok=True)
@@ -92,6 +119,7 @@ class ObsidianBrain:
             self._vault_dir = fallback
 
         return self._vault_dir
+
 
     # ── Guardado de Memorias y Notas ──────────────────────────────────────────
 
@@ -226,7 +254,7 @@ class ObsidianBrain:
     def search_vault(self, query: str, max_results: int = 3) -> list[dict]:
         """
         Realiza una búsqueda de texto en los archivos markdown de la bóveda.
-        Devuelve una lista de diccionarios con título, ruta y extracto de contenido.
+        Soporta coincidencias exactas, variaciones ortográficas y similitud difusa/fonética.
         """
         vault = self.vault_path
         if not vault.exists():
@@ -235,6 +263,8 @@ class ObsidianBrain:
         words = [w.lower() for w in re.split(r"\W+", query) if len(w) > 2]
         if not words:
             return []
+
+        norm_words = [_normalize_search_word(w) for w in words]
 
         matches: list[dict[str, Any]] = []
         for file in vault.rglob("*.md"):
@@ -245,12 +275,29 @@ class ObsidianBrain:
                 continue
 
             text_lower = text.lower()
-            score = sum(text_lower.count(w) for w in words)
-            title_score = sum(file.stem.lower().count(w) * 3 for w in words)
+            stem_lower = file.stem.lower()
+
+            norm_text = _normalize_search_word(text)
+            norm_stem = _normalize_search_word(file.stem)
+
+            # Puntuación combinada: exacta y normalizada (resuelve TesisForge <-> ThesisForge)
+            score = sum(text_lower.count(w) + norm_text.count(nw) for w, nw in zip(words, norm_words, strict=False))
+            title_score = sum(
+                stem_lower.count(w) * 5 + norm_stem.count(nw) * 6
+                for w, nw in zip(words, norm_words, strict=False)
+            )
+
+            # Puntuación difusa en el título
+            stem_tokens = [_normalize_search_word(t) for t in re.split(r"\W+|_", file.stem) if len(t) > 2]
+            for nw in norm_words:
+                for st in stem_tokens:
+                    sim = SequenceMatcher(None, nw, st).ratio()
+                    if sim >= 0.8:
+                        title_score += int(sim * 6)
+
             total_score = score + title_score
 
             if total_score > 0:
-                # Extraer cuerpo sin frontmatter
                 body = re.sub(r"^---[\s\S]*?---\n", "", text).strip()
                 preview = body[:300] + ("..." if len(body) > 300 else "")
                 matches.append(
@@ -264,6 +311,7 @@ class ObsidianBrain:
 
         matches.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
         return matches[:max_results]
+
 
     def get_memory_context(self, query: str = "") -> str:
         """

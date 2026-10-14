@@ -337,6 +337,20 @@ class GeminiLiveEngine:
         try:
             connect_task = self._loop.create_task(self.start_async())
             self._loop.run_until_complete(connect_task)
+            if self.is_active():
+                capture_thread = threading.Thread(
+                    target=self._audio_capture_loop,
+                    name="darius-live-capture",
+                    daemon=True,
+                )
+                playback_thread = threading.Thread(
+                    target=self._audio_playback_loop,
+                    name="darius-live-playback",
+                    daemon=True,
+                )
+                capture_thread.start()
+                playback_thread.start()
+
             while not (self._stop_event and self._stop_event.is_set()) and self.is_active():
                 self._loop.run_until_complete(asyncio.sleep(0.1))
         except Exception as exc:
@@ -353,6 +367,90 @@ class GeminiLiveEngine:
                 log.debug(f"[GeminiLive] Error al cerrar loop asíncrono: {exc}")
             self._loop = None
             self._set_state(LiveSessionState.DISCONNECTED)
+
+    def _audio_capture_loop(self) -> None:
+        """Captura audio del micrófono en tiempo real (PCM 16kHz) y lo transmite a Gemini Live."""
+        try:
+            import pyaudio
+        except ImportError:
+            log.warning("[GeminiLive] PyAudio no está disponible para captura en vivo.")
+            return
+
+        pa: pyaudio.PyAudio | None = None
+        stream = None
+        try:
+            pa = pyaudio.PyAudio()
+            stream = pa.open(
+                format=pyaudio.paInt16,
+                channels=self.audio_config.channels,
+                rate=self.audio_config.sample_rate_in,
+                input=True,
+                frames_per_buffer=self.audio_config.chunk_size,
+            )
+            log.info("[GeminiLive] Flujo de captura de micrófono iniciado (PCM 16kHz).")
+            while not (self._stop_event and self._stop_event.is_set()) and self.is_active():
+                try:
+                    pcm_data = stream.read(self.audio_config.chunk_size, exception_on_overflow=False)
+                    if pcm_data and self._loop and self._loop.is_running():
+                        asyncio.run_coroutine_threadsafe(self.send_audio_chunk_async(pcm_data), self._loop)
+                except Exception as read_err:
+                    log.debug(f"[GeminiLive] Error leyendo chunk de micrófono: {read_err}")
+                    time.sleep(0.02)
+        except Exception as exc:
+            log.warning(f"[GeminiLive] No se pudo inicializar captura de audio con PyAudio: {exc}")
+        finally:
+            if stream is not None:
+                with contextlib.suppress(Exception):
+                    stream.stop_stream()
+                    stream.close()
+            if pa is not None:
+                with contextlib.suppress(Exception):
+                    pa.terminate()
+            log.debug("[GeminiLive] Flujo de captura de micrófono cerrado.")
+
+    def _audio_playback_loop(self) -> None:
+        """Reproduce en tiempo real los chunks de audio entrantes (PCM 24kHz) emitidos por Gemini Live."""
+        try:
+            import pyaudio
+        except ImportError:
+            log.warning("[GeminiLive] PyAudio no está disponible para reproducción en vivo.")
+            return
+
+        pa: pyaudio.PyAudio | None = None
+        stream = None
+        try:
+            pa = pyaudio.PyAudio()
+            stream = pa.open(
+                format=pyaudio.paInt16,
+                channels=self.audio_config.channels,
+                rate=self.audio_config.sample_rate_out,
+                output=True,
+                frames_per_buffer=self.audio_config.chunk_size,
+            )
+            log.info("[GeminiLive] Flujo de reproducción de altavoz iniciado (PCM 24kHz).")
+            while not (self._stop_event and self._stop_event.is_set()) and self.is_active():
+                chunk: bytes | None = None
+                with self._lock:
+                    if self.playback_buffer:
+                        chunk = self.playback_buffer.popleft()
+                if chunk:
+                    try:
+                        stream.write(chunk)
+                    except Exception as write_err:
+                        log.debug(f"[GeminiLive] Error reproduciendo audio: {write_err}")
+                else:
+                    time.sleep(0.01)
+        except Exception as exc:
+            log.warning(f"[GeminiLive] No se pudo inicializar reproducción de audio con PyAudio: {exc}")
+        finally:
+            if stream is not None:
+                with contextlib.suppress(Exception):
+                    stream.stop_stream()
+                    stream.close()
+            if pa is not None:
+                with contextlib.suppress(Exception):
+                    pa.terminate()
+            log.debug("[GeminiLive] Flujo de reproducción cerrado.")
 
 
     def format_vocal_status(self) -> str:

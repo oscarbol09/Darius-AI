@@ -33,7 +33,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 import winreg
-from difflib import SequenceMatcher, get_close_matches
+from difflib import get_close_matches
 from pathlib import Path
 
 import customtkinter as ctk
@@ -63,6 +63,7 @@ from src.darius_ai.audio.voice_filter import (
     LISTEN_MODE_PTT,
     _strip_name,
     check_name_in_text,
+    should_process_command,
 )
 from src.darius_ai.core.obsidian_brain import brain
 from src.darius_ai.gui import gui_theme as theme
@@ -318,15 +319,20 @@ class DariusFinal(ctk.CTk):
 
     def configure_listener(self):
         self.listener.energy_threshold = MIC_ENERGY_THRESHOLD
-        self.listener.dynamic_energy_threshold = True
+        self.listener.dynamic_energy_threshold = False
         self.listener.pause_threshold = MIC_PAUSE_THRESHOLD
         self.listener.non_speaking_duration = 0.5
         try:
             self._mic_device_index = auto_select_best_mic(cfg.acoustic_trigger_device)
             mic_kwargs = {"device_index": self._mic_device_index} if self._mic_device_index is not None else {}
             with sr.Microphone(**mic_kwargs) as source:
-                self.listener.adjust_for_ambient_noise(source, duration=1)
-            log.info(f"Calibración completada en dispositivo {self._mic_device_index}.")
+                self.listener.adjust_for_ambient_noise(source, duration=0.8)
+            # Clampear umbral para asegurar que el habla humana normal (RMS ~250-600) siempre sea detectada
+            self.listener.energy_threshold = max(250, min(self.listener.energy_threshold, 600))
+            log.info(
+                f"Calibración completada en dispositivo {self._mic_device_index}. "
+                f"Umbral calibrado en: {self.listener.energy_threshold}"
+            )
         except Exception as e:
             log.warning(f"No se pudo calibrar el micrófono: {e}")
 
@@ -915,8 +921,10 @@ class DariusFinal(ctk.CTk):
 
         self.telemetry_bar = TelemetryBarWidget(self.main_studio_frame)
         self.telemetry_bar.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 4))
+        self.current_page = "dashboard"
 
     def _show_page(self, page_id: str):
+
         # Mapeo de identificadores de pestañas de CyberSidebar a páginas de contenido
         nav_map = {
             "inicio": "dashboard",
@@ -1029,15 +1037,49 @@ class DariusFinal(ctk.CTk):
     def _on_voice_capsule_mic_toggle(self, active: bool):
         """Gestiona el clic directo en el botón de micrófono de la cápsula flotante."""
         if active:
-            if self.is_muted:
+            if getattr(self, "is_muted", False):
                 self.toggle_mute()
             self.set_status("🎙 ESCUCHANDO…", "#00F0FF")
             self.is_listening = True
-            if self.listen_mode == LISTEN_MODE_PTT:
-                threading.Thread(target=self._ptt_capture_and_process, daemon=True, name="capsule-mic-capture").start()
+            threading.Thread(target=self._one_shot_mic_listen, daemon=True, name="capsule-mic-oneshot").start()
         else:
             self.is_listening = False
             self.set_status("SISTEMA LISTO", "#34D399")
+
+    def _one_shot_mic_listen(self):
+        """Captura e interpreta un único comando de voz al pulsar el botón de micrófono en la cápsula."""
+        log.info("[VoiceCapsule] Escucha directa activada por usuario.")
+        try:
+            self.set_status("🎙 ESCUCHANDO…", "#00F0FF")
+            self.is_listening = True
+            if hasattr(self, "animate_logic"):
+                self.after(0, self.animate_logic)
+            mic_idx = getattr(self, "_mic_device_index", None)
+            mic_kwargs = {"device_index": mic_idx} if isinstance(mic_idx, int) else {}
+            with sr.Microphone(**mic_kwargs) as source:
+                audio = self.listener.listen(source, timeout=6.0, phrase_time_limit=12.0)
+            self.is_listening = False
+            self.set_status("PROCESANDO…", "#FFAA00")
+            text = self.listener.recognize_google(audio, language="es-ES").lower()
+            log.info(f"[VoiceCapsule] Reconocido directo: '{text}'")
+            self.add_to_chat(USER_NAME, text)
+            self._append_chat_file(USER_NAME.upper(), text)
+            clean_text = _strip_name(text, ASSISTANT_NAME) if ASSISTANT_NAME in text else text
+            self.execute_command(clean_text or text)
+        except sr.WaitTimeoutError:
+            log.debug("[VoiceCapsule] Timeout en escucha directa.")
+        except sr.UnknownValueError:
+            log.debug("[VoiceCapsule] Audio no reconocido en escucha directa.")
+        except sr.RequestError as exc:
+            log.warning(f"[VoiceCapsule] Error de conexión STT: {exc}")
+            self.talk("Error de conexión con el servicio de reconocimiento de voz.")
+        except Exception as exc:
+            log.warning(f"[VoiceCapsule] Error en escucha directa: {exc}")
+        finally:
+            self.is_listening = False
+            self.set_status("SISTEMA LISTO", "#34D399")
+            if hasattr(self, "voice_capsule") and self.voice_capsule is not None:
+                self.after(0, self.voice_capsule.set_mic_active, False)
 
     def _llm_badge_text(self) -> str:
         prov = cfg.active_provider.upper()
@@ -1425,7 +1467,7 @@ class DariusFinal(ctk.CTk):
             if self.is_muted or self.tts_worker.is_speaking.is_set():
                 time.sleep(0.05)
                 continue
-            if self.listen_mode == LISTEN_MODE_PTT:
+            if self.listen_mode in (LISTEN_MODE_PTT, "gemini_live"):
                 time.sleep(0.1)
                 continue
             self.listen_and_process()
@@ -1585,23 +1627,12 @@ class DariusFinal(ctk.CTk):
             self.set_status("LISTO", "gray")
 
     def process_recognized_text(self, text: str):
-        words = text.split()
-        name_found = False
-        clean_text = text
-
-        if self.listen_mode == LISTEN_MODE_AUTO:
-            if ASSISTANT_NAME in text:
-                name_found = True
-                clean_text = _strip_name(text, ASSISTANT_NAME)
-            elif words and SequenceMatcher(None, ASSISTANT_NAME, words[0]).ratio() > NAME_SIMILARITY_CUTOFF:
-                name_found = True
-                clean_text = " ".join(words[1:]).strip()
-
-        elif self.listen_mode == LISTEN_MODE_NAME:
-            name_found, clean_text = self._check_name_in_text(text)
-            if not name_found:
-                log.debug(f"[NOMBRE] Descartado (sin nombre): '{text}'")
-                return
+        should_process, clean_text = should_process_command(
+            text, self.listen_mode, ASSISTANT_NAME, NAME_SIMILARITY_CUTOFF
+        )
+        if not should_process:
+            log.debug(f"[{self.listen_mode}] Descartado (sin nombre): '{text}'")
+            return
 
         self.add_to_chat(USER_NAME, text)
         self._append_chat_file(USER_NAME.upper(), text)
