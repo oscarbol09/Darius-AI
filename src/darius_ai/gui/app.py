@@ -39,18 +39,21 @@ from pathlib import Path
 import customtkinter as ctk
 import numpy as np
 import speech_recognition as sr
-import win32api
-import win32com.client
-import win32event
-import winerror
-from dotenv import load_dotenv
 
 try:
-    from PIL import Image
+    import win32api
+    import win32com.client
+    import win32event
+    import winerror
 
-    PIL_AVAILABLE = True
+    WIN32_AVAILABLE = True
 except ImportError:
-    PIL_AVAILABLE = False
+    win32api = None  # type: ignore
+    win32com = None  # type: ignore
+    win32event = None  # type: ignore
+    winerror = None  # type: ignore
+    WIN32_AVAILABLE = False
+from dotenv import load_dotenv
 
 from src.darius_ai.audio.acoustic_trigger import AcousticDoubleClapDetector, auto_select_best_mic
 from src.darius_ai.audio.tts_worker import TTSWorker
@@ -63,6 +66,9 @@ from src.darius_ai.audio.voice_filter import (
 )
 from src.darius_ai.core.obsidian_brain import brain
 from src.darius_ai.gui import gui_theme as theme
+from src.darius_ai.gui.cyber_sidebar import DEFAULT_SIDEBAR_WIDTH, CyberSidebar
+from src.darius_ai.gui.cyber_top_bar import CyberTopBar
+from src.darius_ai.gui.floating_voice_capsule import FloatingVoiceCapsule
 from src.darius_ai.system.windows_commands import (
     resolve_action as wincmd_resolve_action,
 )
@@ -74,7 +80,6 @@ from src.darius_ai.system.windows_commands import (
 )
 from src.darius_ai.system.workspace_manager import (
     focus_or_launch_cursor,
-    get_monitor_count,
     get_monitor_rects,
     run_darius_welcome_protocol,
     run_dev_mode,
@@ -90,12 +95,14 @@ from src.darius_ai.core.config_loader import cfg, get_user_data_dir  # noqa: E40
 # ─────────────────────────────────────────────────────────────────────────────
 
 _MUTEX_NAME = "Global\\DariusAI_SingleInstance"
-_mutex_handle = win32event.CreateMutex(None, False, _MUTEX_NAME)
-if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
-    import tkinter.messagebox as mb
+_mutex_handle = None
+if WIN32_AVAILABLE and win32event is not None and win32api is not None and winerror is not None:
+    _mutex_handle = win32event.CreateMutex(None, False, _MUTEX_NAME)
+    if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
+        import tkinter.messagebox as mb
 
-    mb.showerror("DARIUS AI", "Ya hay una instancia de Darius en ejecución.")
-    sys.exit(0)
+        mb.showerror("DARIUS AI", "Ya hay una instancia de Darius en ejecución.")
+        sys.exit(0)
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONFIGURACIÓN
@@ -223,11 +230,7 @@ def enable_dpi_awareness():
             ctypes.windll.user32.SetProcessDPIAware()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  VISUALIZADOR VECTORIAL DE ONDAS A 60 FPS (Senior Craftsmanship)
-# ─────────────────────────────────────────────────────────────────────────────
 
-from src.darius_ai.gui.visualizer import HighPerfWaveVisualizer  # noqa: E402
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CLASE PRINCIPAL
@@ -359,392 +362,51 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def setup_ui(self):
-        # ── GRID CONFIGURATION ──────────────────────────────────────────────
-        self.grid_rowconfigure(0, weight=1)
-        self.grid_columnconfigure(0, weight=0, minsize=theme.SIDEBAR_WIDTH)
+        # ── GRID CONFIGURATION (Cybernetic Bento Console v8.5) ─────────────
+        self.grid_rowconfigure(0, weight=0)  # Row 0: Full-width Cyber Top Bar
+        self.grid_rowconfigure(1, weight=1)  # Row 1: Sidebar (Col 0) + Studio (Col 1)
+        self.grid_columnconfigure(0, weight=0, minsize=DEFAULT_SIDEBAR_WIDTH)
         self.grid_columnconfigure(1, weight=1)
 
-        # ── 1. LEFT SIDEBAR ─────────────────────────────────────────────────
-        self.sidebar_frame = ctk.CTkFrame(
+        # ── 1. FULL-WIDTH CYBER TOP BAR ────────────────────────────────────
+        active_prov = cfg.active_provider
+        prov_model = getattr(cfg, f"llm_{active_prov}_model", getattr(cfg, f"{active_prov}_model", "Auto"))
+        self.cyber_top_bar = CyberTopBar(
             self,
-            width=theme.SIDEBAR_WIDTH,
-            fg_color=theme.BG_SIDEBAR,
-            corner_radius=0,
-            border_width=1,
-            border_color=theme.BORDER_SUBTLE,
+            on_settings=self._open_byok_settings,
+            on_mute=self.toggle_mute,
+            on_close=self.destroy,
+            provider=active_prov.title(),
+            model=prov_model,
         )
-        self.sidebar_frame.grid(row=0, column=0, sticky="nsew")
-        self.sidebar_frame.grid_propagate(False)
+        self.cyber_top_bar.grid(row=0, column=0, columnspan=2, sticky="ew", padx=10, pady=(8, 4))
 
-        # 1.1 Brand Header
-        brand_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        brand_frame.pack(fill="x", padx=14, pady=(14, 8))
+        # ── 2. LEFT CYBER SIDEBAR ──────────────────────────────────────────
+        self.sidebar = CyberSidebar(
+            self,
+            width=DEFAULT_SIDEBAR_WIDTH,
+            on_nav_change=self._show_page,
+            initial_tab="inicio",
+        )
+        self.sidebar.grid(row=1, column=0, sticky="nsew", padx=(10, 4), pady=(0, 10))
+        self.sidebar_frame = self.sidebar  # Alias de compatibilidad
 
-        brand_icon_row = ctk.CTkFrame(brand_frame, fg_color="transparent")
-        brand_icon_row.pack(fill="x")
-
-        logo_path = Path(__file__).resolve().parent / "assets" / "logo_icon.png"
-        if PIL_AVAILABLE and logo_path.exists():
-            try:
-                pil_logo = Image.open(logo_path)
-                self._sidebar_logo_img = ctk.CTkImage(light_image=pil_logo, dark_image=pil_logo, size=(24, 24))
-                ctk.CTkLabel(brand_icon_row, text="", image=self._sidebar_logo_img).pack(side="left", padx=(0, 8))
-            except Exception as e:
-                log.debug(f"Logo sidebar no disponible: {e}")
-
-        brand_text_col = ctk.CTkFrame(brand_icon_row, fg_color="transparent")
-        brand_text_col.pack(side="left", fill="x", expand=True)
-
-        ctk.CTkLabel(
-            brand_text_col,
-            text="DARIUS AI",
-            font=theme.FONT_TITLE,
-            text_color=theme.ACCENT_PRIMARY,
-            anchor="w",
-        ).pack(fill="x")
-
-        ctk.CTkLabel(
-            brand_text_col,
-            text=f"Copiloto Windows • {theme.VERSION_TAG}",
-            font=theme.FONT_CAPTION,
-            text_color=theme.TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x")
-
-        # Hairline divider
-        ctk.CTkFrame(self.sidebar_frame, height=1, fg_color=theme.BORDER_SUBTLE).pack(fill="x", padx=12, pady=6)
-
-        # 1.2 Navigation Menu
-        ctk.CTkLabel(
-            self.sidebar_frame,
-            text="VISTAS",
-            font=theme.FONT_CAPTION_BOLD,
-            text_color=theme.TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=(2, 4))
-
+        # Compatibilidad con accesos directos heredados
         self._nav_btns = {}
-        views = [
-            ("dashboard", "⚡ Centro de Mando"),
-            ("chat", "💬 Conversación"),
-            ("workspaces", "🚀 Workspaces"),
-            ("obsidian", "🧠 Obsidian Brain"),
-            ("system", "🛠 Sistema & Audio"),
-            ("settings", "⚙ Ajustes & Modelos"),
-        ]
-
-        for view_id, label in views:
-            btn = ctk.CTkButton(
-                self.sidebar_frame,
-                text=f"  {label}",
-                font=theme.FONT_NAV,
-                height=32,
-                corner_radius=theme.RADIUS_MD,
-                fg_color=theme.BG_CARD_HOVER if view_id == "dashboard" else "transparent",
-                hover_color=theme.BG_CARD_HOVER,
-                text_color=theme.ACCENT_PRIMARY if view_id == "dashboard" else theme.TEXT_SECONDARY,
-                anchor="w",
-                command=lambda v=view_id: self._show_page(v),
-            )
-            btn.pack(fill="x", padx=10, pady=2)
-            self._nav_btns[view_id] = btn
-
-        # Hairline divider
-        ctk.CTkFrame(self.sidebar_frame, height=1, fg_color=theme.BORDER_SUBTLE).pack(fill="x", padx=12, pady=8)
-
-        # 1.3 Telemetry & Mode Selector
-        ctk.CTkLabel(
-            self.sidebar_frame,
-            text="ACTIVACIÓN DE VOZ",
-            font=theme.FONT_CAPTION_BOLD,
-            text_color=theme.TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=(0, 4))
-
-        mode_row = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        mode_row.pack(fill="x", padx=10, pady=(0, 4))
-
         self._mode_btns = {}
-        modes = [
-            (LISTEN_MODE_PTT, "🎙 PTT", theme.ACCENT_PRIMARY),
-            (LISTEN_MODE_NAME, "🔤 NOM", theme.ACCENT_EMERALD),
-            (LISTEN_MODE_AUTO, "🔄 AUTO", theme.ACCENT_PURPLE),
-        ]
-        for mode_id, label, active_color in modes:
-            is_active = mode_id == self.listen_mode
-            btn = ctk.CTkButton(
-                mode_row,
-                text=label,
-                fg_color=active_color if is_active else theme.BG_PILL,
-                hover_color=active_color,
-                text_color=theme.BG_CANVAS if is_active else theme.TEXT_SECONDARY,
-                border_color=active_color if is_active else theme.BORDER_SUBTLE,
-                border_width=1,
-                font=theme.FONT_CAPTION_BOLD,
-                height=26,
-                corner_radius=theme.RADIUS_SM,
-                command=lambda m=mode_id: self._set_listen_mode(m),
-            )
-            btn.pack(side="left", fill="x", expand=True, padx=2)
-            self._mode_btns[mode_id] = (btn, active_color)
+        self.ptt_hint = None
 
-        self.ptt_hint = ctk.CTkLabel(
-            self.sidebar_frame,
-            text=f"Mantén [{LISTEN_KEY.upper()}] presionado",
-            font=theme.FONT_CAPTION,
-            text_color=theme.TEXT_MUTED,
-            anchor="w",
-        )
-        if self.listen_mode == LISTEN_MODE_PTT:
-            self.ptt_hint.pack(fill="x", padx=14, pady=(0, 4))
-
-        # Telemetry Badges
-        ctk.CTkLabel(
-            self.sidebar_frame,
-            text="ESTADO DE SISTEMAS",
-            font=theme.FONT_CAPTION_BOLD,
-            text_color=theme.TEXT_MUTED,
-            anchor="w",
-        ).pack(fill="x", padx=14, pady=(6, 4))
-
-        telemetry_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        telemetry_frame.pack(fill="x", padx=10, pady=0)
-
-        # Clap trigger button
-        clap_active = hasattr(self, "_clap_detector") and self._clap_detector.is_running()
-        self.clap_btn = ctk.CTkButton(
-            telemetry_frame,
-            text=self._clap_badge_text(),
-            font=theme.FONT_BADGE,
-            text_color=theme.ACCENT_EMERALD if clap_active else theme.TEXT_SECONDARY,
-            fg_color=theme.BG_PILL,
-            hover_color=theme.BG_CARD_HOVER,
-            border_color=theme.BORDER_SUBTLE,
-            border_width=1,
-            corner_radius=theme.RADIUS_SM,
-            height=24,
-            anchor="w",
-            command=self.toggle_clap_detector,
-        )
-        self.clap_btn.pack(fill="x", pady=2)
-
-        # LLM Pill
-        self.llm_pill = ctk.CTkLabel(
-            telemetry_frame,
-            text=self._llm_badge_text(),
-            font=theme.FONT_BADGE,
-            text_color=theme.ACCENT_PRIMARY,
-            fg_color=theme.BG_PILL,
-            corner_radius=theme.RADIUS_SM,
-            padx=8,
-            pady=3,
-            anchor="w",
-        )
-        self.llm_pill.pack(fill="x", pady=2)
-
-        # Obsidian Pill
-        obsidian_connected = bool(brain.vault_path and Path(brain.vault_path).exists())
-        obsidian_text = "CONECTADO" if obsidian_connected else "LOCAL"
-        obsidian_color = theme.ACCENT_EMERALD if obsidian_connected else theme.TEXT_MUTED
-        self.brain_pill = ctk.CTkLabel(
-            telemetry_frame,
-            text=f"🧠 OBSIDIAN: {obsidian_text}",
-            font=theme.FONT_BADGE,
-            text_color=obsidian_color,
-            fg_color=theme.BG_PILL,
-            corner_radius=theme.RADIUS_SM,
-            padx=8,
-            pady=3,
-            anchor="w",
-        )
-        self.brain_pill.pack(fill="x", pady=2)
-
-        # TTS Pill
-        self.tts_pill = ctk.CTkLabel(
-            telemetry_frame,
-            text=self._tts_badge_text(),
-            font=theme.FONT_BADGE,
-            text_color=theme.ACCENT_AMBER,
-            fg_color=theme.BG_PILL,
-            corner_radius=theme.RADIUS_SM,
-            padx=8,
-            pady=3,
-            anchor="w",
-        )
-        self.tts_pill.pack(fill="x", pady=2)
-
-        # Apps Pill
-        self.apps_pill = ctk.CTkLabel(
-            telemetry_frame,
-            text=f"📦 {len(self.installed_apps)} APPS",
-            font=theme.FONT_BADGE,
-            text_color=theme.TEXT_SECONDARY,
-            fg_color=theme.BG_PILL,
-            corner_radius=theme.RADIUS_SM,
-            padx=8,
-            pady=3,
-            anchor="w",
-        )
-        self.apps_pill.pack(fill="x", pady=2)
-
-        # Monitors Pill
-        self.monitors_pill = ctk.CTkLabel(
-            telemetry_frame,
-            text=f"🖥 {get_monitor_count()} PANTALLA{'S' if get_monitor_count() > 1 else ''}",
-            font=theme.FONT_BADGE,
-            text_color=theme.ACCENT_PURPLE,
-            fg_color=theme.BG_PILL,
-            corner_radius=theme.RADIUS_SM,
-            padx=8,
-            pady=3,
-            anchor="w",
-        )
-        self.monitors_pill.pack(fill="x", pady=2)
-
-        # 1.4 Sidebar Footer (Settings & Author Attribution)
-        footer_spacer = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        footer_spacer.pack(fill="both", expand=True)
-
-        footer_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
-        footer_frame.pack(fill="x", padx=10, pady=(0, 10))
-
-        # BYOK Settings button
-        ctk.CTkButton(
-            footer_frame,
-            text="⚙ AJUSTES IA / MODELOS",
-            height=28,
-            fg_color=theme.BG_CARD_INNER,
-            hover_color=theme.BG_CARD_HOVER,
-            border_color=theme.BORDER_SUBTLE,
-            border_width=1,
-            text_color=theme.ACCENT_PRIMARY,
-            font=theme.FONT_CAPTION_BOLD,
-            corner_radius=theme.RADIUS_SM,
-            command=self._open_byok_settings,
-        ).pack(fill="x", pady=(0, 6))
-
-        # Author Attribution (Discreet link to Github)
-        ctk.CTkButton(
-            footer_frame,
-            text=f"{theme.AUTHOR_TAG} • GPLv3",
-            height=22,
-            fg_color="transparent",
-            hover_color=theme.BG_CARD_HOVER,
-            text_color=theme.TEXT_MUTED,
-            font=theme.FONT_CAPTION,
-            corner_radius=theme.RADIUS_SM,
-            command=self._open_author_github,
-        ).pack(fill="x")
-
-        # ── 2. RIGHT MAIN STUDIO PANE ───────────────────────────────────────
+        # ── 3. RIGHT MAIN STUDIO PANE ───────────────────────────────────────
         self.main_studio_frame = ctk.CTkFrame(self, fg_color=theme.BG_CANVAS, corner_radius=0)
-        self.main_studio_frame.grid(row=0, column=1, sticky="nsew")
-        self.main_studio_frame.grid_rowconfigure(1, weight=1)
+        self.main_studio_frame.grid(row=1, column=1, sticky="nsew", padx=(4, 10), pady=(0, 10))
+        self.main_studio_frame.grid_rowconfigure(0, weight=1)  # Stacked pages
+        self.main_studio_frame.grid_rowconfigure(1, weight=0)  # Floating voice capsule
+        self.main_studio_frame.grid_rowconfigure(2, weight=0)  # Telemetry bar
         self.main_studio_frame.grid_columnconfigure(0, weight=1)
-
-        # 2.1 Top Studio Header
-        header_card = ctk.CTkFrame(
-            self.main_studio_frame,
-            fg_color=theme.BG_HEADER,
-            corner_radius=theme.RADIUS_LG,
-            border_width=1,
-            border_color=theme.BORDER_CARD,
-            height=52,
-        )
-        header_card.grid(row=0, column=0, sticky="ew", padx=12, pady=(12, 6))
-
-        # Left: Status Indicator
-        status_box = ctk.CTkFrame(header_card, fg_color="transparent")
-        status_box.pack(side="left", padx=(12, 8), pady=8)
-
-        self.status_dot = ctk.CTkLabel(
-            status_box,
-            text="●",
-            font=("Segoe UI", 13),
-            text_color=theme.ACCENT_EMERALD,
-        )
-        self.status_dot.pack(side="left", padx=(0, 5))
-
-        self.status_label = ctk.CTkLabel(
-            status_box,
-            text="SISTEMA LISTO",
-            font=theme.FONT_SUBTITLE,
-            text_color=theme.TEXT_PRIMARY,
-        )
-        self.status_label.pack(side="left")
-
-        # Center: Waveform Visualizer
-        self.visualizer = HighPerfWaveVisualizer(header_card, width=170, height=36)
-        self.visualizer.pack(side="left", padx=12, pady=6, fill="y")
-
-        # Right: Quick Action Buttons
-        actions_box = ctk.CTkFrame(header_card, fg_color="transparent")
-        actions_box.pack(side="right", padx=(8, 12), pady=8)
-
-        self.settings_top_btn = ctk.CTkButton(
-            actions_box,
-            text="⚙ AJUSTES",
-            width=84,
-            height=30,
-            fg_color=theme.BG_CARD_INNER,
-            hover_color=theme.BG_CARD_HOVER,
-            text_color=theme.ACCENT_PRIMARY,
-            border_color=theme.BORDER_SUBTLE,
-            border_width=1,
-            font=theme.FONT_CAPTION_BOLD,
-            corner_radius=theme.RADIUS_SM,
-            command=self._open_byok_settings,
-        )
-        self.settings_top_btn.pack(side="right", padx=(4, 0))
-
-        self.clear_btn = ctk.CTkButton(
-            actions_box,
-            text="🗑 LIMPIAR",
-            width=78,
-            height=30,
-            fg_color=theme.BG_CARD_INNER,
-            hover_color=theme.BG_CARD_HOVER,
-            text_color=theme.TEXT_PRIMARY,
-            font=theme.FONT_CAPTION_BOLD,
-            border_color=theme.BORDER_SUBTLE,
-            border_width=1,
-            corner_radius=theme.RADIUS_SM,
-            command=self.reset_conversation,
-        )
-        self.clear_btn.pack(side="right", padx=4)
-
-        self.mute_btn = ctk.CTkButton(
-            actions_box,
-            text="🔇 SILENCIO",
-            width=82,
-            height=30,
-            fg_color=theme.ACCENT_ROSE,
-            hover_color="#E11D48",
-            text_color=theme.TEXT_PRIMARY,
-            state="disabled",
-            font=theme.FONT_CAPTION_BOLD,
-            corner_radius=theme.RADIUS_SM,
-            command=self.toggle_mute,
-        )
-        self.mute_btn.pack(side="right", padx=4)
-
-        self.start_btn = ctk.CTkButton(
-            actions_box,
-            text="⚡ INICIAR",
-            width=82,
-            height=30,
-            fg_color=theme.ACCENT_PRIMARY,
-            hover_color=theme.ACCENT_PRIMARY_HOVER,
-            text_color=theme.BG_CANVAS,
-            font=theme.FONT_CAPTION_BOLD,
-            corner_radius=theme.RADIUS_SM,
-            command=self.start_system,
-        )
-        self.start_btn.pack(side="right", padx=(0, 4))
 
         # 2.2 View Container (Stacked Views)
         self.view_container = ctk.CTkFrame(self.main_studio_frame, fg_color="transparent")
-        self.view_container.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 6))
+        self.view_container.grid(row=0, column=0, sticky="nsew", padx=4, pady=(0, 6))
         self.view_container.grid_rowconfigure(0, weight=1)
         self.view_container.grid_columnconfigure(0, weight=1)
 
@@ -1210,63 +872,69 @@ class DariusFinal(ctk.CTk):
             command=self._open_byok_settings,
         ).pack(fill="x", padx=12, pady=(0, 10))
 
-        # 2.3 Bottom Command Dock
-        dock_frame = ctk.CTkFrame(
+        # ── 4. FLOATING VOICE CAPSULE (Dock Flotante v8.5) ──────────────────
+        initial_capsule_mode = "NOM"
+        if self.listen_mode == LISTEN_MODE_PTT:
+            initial_capsule_mode = "PTT"
+        elif self.listen_mode == LISTEN_MODE_AUTO:
+            initial_capsule_mode = "AUTO"
+        elif self.listen_mode == "gemini_live":
+            initial_capsule_mode = "GEMINI LIVE"
+
+        self.voice_capsule = FloatingVoiceCapsule(
             self.main_studio_frame,
-            fg_color=theme.BG_CARD,
-            corner_radius=theme.RADIUS_LG,
-            border_width=1,
-            border_color=theme.BORDER_CARD,
+            on_submit_callback=self._on_text_submit,
+            on_mode_change=self._set_listen_mode,
+            on_mic_toggle=self._on_voice_capsule_mic_toggle,
+            default_mode=initial_capsule_mode,
         )
-        dock_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(0, 12))
+        self.voice_capsule.grid(row=1, column=0, sticky="ew", padx=8, pady=(4, 6))
 
-        self.text_input = ctk.CTkEntry(
-            dock_frame,
-            placeholder_text="Escribe un comando o consulta para Darius…",
-            font=theme.FONT_BODY,
-            fg_color=theme.BG_INPUT,
-            border_color=theme.BORDER_SUBTLE,
-            border_width=1,
-            text_color=theme.TEXT_PRIMARY,
-            placeholder_text_color=theme.TEXT_MUTED,
-            height=38,
-            corner_radius=theme.RADIUS_MD,
-        )
-        self.text_input.pack(side="left", fill="x", expand=True, padx=(10, 8), pady=8)
-        self.text_input.bind("<Return>", self._on_text_submit)
-
-        ctk.CTkButton(
-            dock_frame,
-            text="ENVIAR ▶",
-            width=86,
-            height=38,
-            fg_color=theme.ACCENT_PRIMARY,
-            hover_color=theme.ACCENT_PRIMARY_HOVER,
-            text_color=theme.BG_CANVAS,
-            font=theme.FONT_SUBTITLE,
-            corner_radius=theme.RADIUS_MD,
-            command=self._on_text_submit,
-        ).pack(side="right", padx=(0, 10), pady=8)
+        # Backward compatibility aliases
+        self.text_input = self.voice_capsule.entry
+        self.status_label = self.cyber_top_bar.lbl_system_badge
+        self.status_dot = getattr(self.cyber_top_bar, "lbl_brand_icon", None)
+        self.mute_btn = self.cyber_top_bar.btn_mute
+        self.start_btn = self.cyber_top_bar.btn_mute
+        self.settings_top_btn = self.cyber_top_bar.btn_settings
 
         # 2.4 Bottom Telemetry HUD Bar (Motor de Telemetría Darius)
         from src.darius_ai.gui.telemetry_bar import TelemetryBarWidget
 
         self.telemetry_bar = TelemetryBarWidget(self.main_studio_frame)
-        self.telemetry_bar.grid(row=3, column=0, sticky="ew", padx=12, pady=(0, 8))
+        self.telemetry_bar.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 4))
 
     def _show_page(self, page_id: str):
-        if page_id == "settings":
+        # Mapeo de identificadores de pestañas de CyberSidebar a páginas de contenido
+        nav_map = {
+            "inicio": "dashboard",
+            "asistente": "chat",
+            "automatizacion": "workspaces",
+            "memoria": "obsidian",
+            "configuracion": "settings",
+            "logs": "system",
+        }
+        target_page = nav_map.get(page_id, page_id)
+        if target_page == "settings":
             self._open_byok_settings()
             return
-        self.current_page = page_id
+
+        self.current_page = target_page
         for pid, frame in self._pages.items():
-            if pid == page_id:
+            if pid == target_page:
                 frame.grid(row=0, column=0, sticky="nsew")
             else:
                 frame.grid_forget()
 
+        # Sincronizar estado visual del sidebar si difiere
+        if hasattr(self, "sidebar") and self.sidebar is not None:
+            rev_map = {v: k for k, v in nav_map.items()}
+            expected_tab = rev_map.get(target_page, target_page)
+            if self.sidebar.current_tab != expected_tab:
+                self.sidebar.select_tab(expected_tab, dispatch_callback=False)
+
         for pid, btn in self._nav_btns.items():
-            is_active = pid == page_id
+            is_active = pid == target_page
             btn.configure(
                 fg_color=theme.BG_CARD_HOVER if is_active else "transparent",
                 text_color=theme.ACCENT_PRIMARY if is_active else theme.TEXT_SECONDARY,
@@ -1285,25 +953,74 @@ class DariusFinal(ctk.CTk):
         return icons.get(self.listen_mode, "")
 
     def _set_listen_mode(self, mode: str):
-        self.listen_mode = mode
+        mode_alias = {
+            "PTT": LISTEN_MODE_PTT,
+            "NOM": LISTEN_MODE_NAME,
+            "AUTO": LISTEN_MODE_AUTO,
+            "GEMINI LIVE": "gemini_live",
+        }
+        resolved_mode = mode_alias.get(mode.upper(), mode)
+        self.listen_mode = resolved_mode
+
+        # Si el modo seleccionado es GEMINI LIVE, manejar la sesión de audio bidireccional
+        if resolved_mode == "gemini_live":
+            try:
+                from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
+
+                engine = get_gemini_live_engine()
+                if not engine.is_running:
+                    ok, msg = engine.start_live_session()
+                    self.set_status("GEMINI LIVE CONECTADO", "#00F0FF")
+                    self.talk("Sesión de audio bidireccional Gemini Live iniciada.")
+            except Exception as e:
+                log.warning(f"Error al iniciar Gemini Live: {e}")
+        else:
+            with contextlib.suppress(Exception):
+                from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
+
+                engine = get_gemini_live_engine()
+                if engine.is_running:
+                    engine.stop_live_session()
+
+        if hasattr(self, "voice_capsule") and self.voice_capsule is not None:
+            reverse_mode = {v: k for k, v in mode_alias.items()}
+            capsule_tag = reverse_mode.get(resolved_mode, resolved_mode.upper())
+            if self.voice_capsule.current_mode != capsule_tag:
+                self.voice_capsule.set_mode(capsule_tag)
+
         for mode_id, (btn, active_color) in self._mode_btns.items():
-            is_active = mode_id == mode
+            is_active = mode_id == resolved_mode
             btn.configure(
                 fg_color=active_color if is_active else theme.BG_PILL,
                 text_color=theme.BG_CANVAS if is_active else theme.TEXT_SECONDARY,
                 border_color=active_color if is_active else theme.BORDER_SUBTLE,
             )
-        if hasattr(self, "mode_pill"):
+        if getattr(self, "mode_pill", None) is not None:
             self.mode_pill.configure(text=self._mode_label_text())
-        if mode == LISTEN_MODE_PTT:
-            self.ptt_hint.pack(fill="x", padx=14, pady=(0, 4))
+        if resolved_mode == LISTEN_MODE_PTT:
+            if self.ptt_hint:
+                self.ptt_hint.pack(fill="x", padx=14, pady=(0, 4))
             if not KEYBOARD_AVAILABLE:
                 self.talk("Advertencia: librería keyboard no instalada. Ejecuta pip install keyboard")
         else:
             with contextlib.suppress(Exception):
-                self.ptt_hint.pack_forget()
-        log.info(f"Modo cambiado a: {mode}")
-        self.set_status(f"MODO: {mode.upper()}", theme.ACCENT_PRIMARY)
+                if self.ptt_hint:
+                    self.ptt_hint.pack_forget()
+        log.info(f"Modo cambiado a: {resolved_mode}")
+        self.set_status(f"MODO: {resolved_mode.upper()}", theme.ACCENT_PRIMARY)
+
+    def _on_voice_capsule_mic_toggle(self, active: bool):
+        """Gestiona el clic directo en el botón de micrófono de la cápsula flotante."""
+        if active:
+            if self.is_muted:
+                self.toggle_mute()
+            self.set_status("🎙 ESCUCHANDO…", "#00F0FF")
+            self.is_listening = True
+            if self.listen_mode == LISTEN_MODE_PTT:
+                threading.Thread(target=self._ptt_capture_and_process, daemon=True, name="capsule-mic-capture").start()
+        else:
+            self.is_listening = False
+            self.set_status("SISTEMA LISTO", "#34D399")
 
     def _llm_badge_text(self) -> str:
         prov = cfg.active_provider.upper()
@@ -1369,11 +1086,21 @@ class DariusFinal(ctk.CTk):
         self.set_status(f"IA: {prov_name} • TTS: {tts_name}", "#38BDF8")
         self.talk(f"Configuración actualizada. Proveedor: {prov_name}, Motor de voz: {tts_name}.")
 
-    def _on_text_submit(self, event=None):
-        text = self.text_input.get().strip()
+    def _on_text_submit(self, text: str | None = None, event=None):
+        if text is None or not isinstance(text, str):
+            if hasattr(self, "text_input") and self.text_input is not None:
+                text = self.text_input.get().strip()
+                self.text_input.delete(0, "end")
+            else:
+                return
+        else:
+            text = text.strip()
+            if hasattr(self, "text_input") and self.text_input is not None:
+                with contextlib.suppress(Exception):
+                    self.text_input.delete(0, "end")
+
         if not text:
             return
-        self.text_input.delete(0, "end")
 
         from src.darius_ai.audio.sound_effects import get_sfx_engine
         from src.darius_ai.core.telemetry_tracker import get_telemetry_tracker
@@ -1431,8 +1158,15 @@ class DariusFinal(ctk.CTk):
         def _update():
             if hasattr(self, "status_label"):
                 self.status_label.configure(text=text)
-            if hasattr(self, "status_dot"):
+            if hasattr(self, "status_dot") and self.status_dot is not None:
                 self.status_dot.configure(text_color=resolved_color)
+            if hasattr(self, "cyber_top_bar") and self.cyber_top_bar is not None:
+                self.cyber_top_bar.set_system_status(
+                    system_status=text[:30],
+                    is_online=not self.is_muted,
+                    provider=cfg.active_provider.title(),
+                    model=getattr(cfg, f"llm_{cfg.active_provider}_model", "Auto"),
+                )
 
         self.after(0, _update)
 
@@ -1468,6 +1202,10 @@ class DariusFinal(ctk.CTk):
 
         if hasattr(self, "bento_dashboard") and self.bento_dashboard is not None:
             self.bento_dashboard.set_core_state(state, self._smoothed_energy)
+
+        if hasattr(self, "voice_capsule") and self.voice_capsule is not None:
+            self.voice_capsule.set_rms_energy(self._smoothed_energy)
+            self.voice_capsule.set_mic_active(self.is_listening)
 
         self.after(16, self._render_loop)  # ~60 FPS
 
@@ -1508,11 +1246,13 @@ class DariusFinal(ctk.CTk):
     def toggle_mute(self):
         self.is_muted = not self.is_muted
         if self.is_muted:
-            self.mute_btn.configure(text="🔊 ESCUCHAR", fg_color="#34D399", hover_color="#10B981")
+            if hasattr(self, "mute_btn") and self.mute_btn is not None:
+                self.mute_btn.configure(text="🔇", fg_color="#F87171", hover_color="#EF4444")
             self.add_to_chat("Darius", "Modo discreto activado.")
             self.set_status("SILENCIADO", "#F87171")
         else:
-            self.mute_btn.configure(text="🔇 SILENCIO", fg_color="#F87171", hover_color="#EF4444")
+            if hasattr(self, "mute_btn") and self.mute_btn is not None:
+                self.mute_btn.configure(text="🔊", fg_color=theme.BG_CARD_INNER, hover_color=theme.BG_CARD_HOVER)
             self.talk("Sistemas de escucha reactivados.")
             self.set_status("SISTEMA LISTO", "#34D399")
 

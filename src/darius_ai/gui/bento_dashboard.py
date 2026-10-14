@@ -350,6 +350,211 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             command=self._on_request_situational_briefing,
         ).pack(fill="x", pady=(10, 0))
 
+        # ── 5. MÓDULOS PRINCIPALES (Fila 2, Columnas 0-1) ────────────────────
+        self.modules_card = BentoCard(
+            self,
+            title="Módulos Principales",
+            icon="🗂",
+            accent_color=CORE_CYAN,
+        )
+        self.modules_card.grid(row=2, column=0, columnspan=2, padx=8, pady=8, sticky="nsew")
+        mod_body = self.modules_card.body_frame
+        mod_body.grid_columnconfigure((0, 1, 2, 3), weight=1)
+
+        self._create_main_module_card(
+            mod_body, 0, "🎙 Asistente de Voz", "Habla con Darius", "● Activo", CORE_EMERALD, self._on_nav_asistente
+        )
+        self._create_main_module_card(
+            mod_body, 1, "🗂 Automatización GUI", "Controla tu sistema", "● Listo", CORE_CYAN, self._on_nav_workspaces
+        )
+        self._create_main_module_card(
+            mod_body, 2, "📖 Memoria (Obsidian)", "Tu segundo cerebro", "● Conectado", "#A855F7", self._on_nav_obsidian
+        )
+        self._create_main_module_card(
+            mod_body,
+            3,
+            "🧠 IA y Modelos",
+            "Elige tu proveedor",
+            "Gemini 2.5 Flash ›",
+            CORE_AMBER,
+            self._on_nav_settings,
+        )
+
+        # ── 6. VISUALIZADOR DE CONTEXTO & ACCESOS RÁPIDOS (Fila 3) ──────────
+        from src.darius_ai.gui.context_mesh_visualizer import ContextMeshVisualizer
+
+        self.context_mesh_card = BentoCard(
+            self,
+            title="Visualizador de Contexto (60 FPS)",
+            icon="🌐",
+            accent_color=CORE_CYAN,
+        )
+        self.context_mesh_card.grid(row=3, column=0, padx=8, pady=8, sticky="nsew")
+        self.context_mesh = ContextMeshVisualizer(
+            self.context_mesh_card.body_frame,
+            width=360,
+            height=120,
+            bg_color=theme.BG_CARD,
+        )
+        self.context_mesh.pack(fill="both", expand=True, pady=4)
+
+        self.quick_access_card = BentoCard(
+            self,
+            title="Accesos Rápidos",
+            icon="⚡",
+            accent_color=CORE_AMBER,
+        )
+        self.quick_access_card.grid(row=3, column=1, padx=8, pady=8, sticky="nsew")
+        qa_body = self.quick_access_card.body_frame
+        qa_body.grid_columnconfigure((0, 1, 2), weight=1)
+
+        quick_apps = [
+            ("🔷 VS Code", "code", 0, 0),
+            ("🎯 Cursor", "cursor", 0, 1),
+            ("🌐 Chrome", "chrome", 0, 2),
+            ("▶ YouTube", "https://youtube.com", 1, 0),
+            ("🧠 Obsidian", "obsidian", 1, 1),
+            ("💬 Discord", "discord", 1, 2),
+        ]
+        for label, cmd_target, r, c in quick_apps:
+            ctk.CTkButton(
+                qa_body,
+                text=label,
+                font=theme.FONT_CAPTION_BOLD,
+                height=32,
+                fg_color=theme.BG_CARD_INNER,
+                hover_color=theme.BG_CARD_HOVER,
+                border_width=1,
+                border_color=theme.BORDER_SUBTLE,
+                corner_radius=theme.RADIUS_SM,
+                command=lambda t=cmd_target: self._launch_quick_app(t),
+            ).grid(row=r, column=c, padx=3, pady=4, sticky="nsew")
+
+        # ── 7. ACTIVIDAD RECIENTE & MONITORES (Fila 4) ───────────────────────
+        self.activity_card = BentoCard(
+            self,
+            title="Actividad Reciente",
+            icon="📄",
+            accent_color="#A855F7",
+        )
+        self.activity_card.grid(row=4, column=0, padx=8, pady=8, sticky="nsew")
+        act_body = self.activity_card.body_frame
+
+        recent_items = [
+            ("🟣", "Nota guardada en Obsidian", "Ideas para el proyecto Darius", "14:28"),
+            ("🔷", "Aplicación abierta", "Visual Studio Code / Cursor", "14:21"),
+            ("🔴", "Búsqueda en YouTube", "Arquitectura Clean Code en Python", "14:14"),
+            ("🌐", "Diagnosticar red", "Conexión nominal establecida (12 ms)", "14:10"),
+            ("💬", "Consulta a la IA", "Evaluación de modelos y copiloto", "14:03"),
+        ]
+        for icon_c, title_c, desc_c, time_c in recent_items:
+            row_f = ctk.CTkFrame(act_body, fg_color="transparent")
+            row_f.pack(fill="x", pady=2)
+            ctk.CTkLabel(row_f, text=icon_c, font=("Segoe UI", 12)).pack(side="left", padx=(0, 6))
+            txt_f = ctk.CTkFrame(row_f, fg_color="transparent")
+            txt_f.pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(
+                txt_f, text=title_c, font=theme.FONT_CAPTION_BOLD, text_color=theme.TEXT_PRIMARY, anchor="w"
+            ).pack(fill="x")
+            ctk.CTkLabel(txt_f, text=desc_c, font=theme.FONT_BADGE, text_color=theme.TEXT_MUTED, anchor="w").pack(
+                fill="x"
+            )
+            ctk.CTkLabel(row_f, text=time_c, font=theme.FONT_BADGE, text_color=theme.TEXT_MUTED).pack(
+                side="right", padx=4
+            )
+
+        self.monitors_card = BentoCard(
+            self,
+            title="Monitores & Topología",
+            icon="🖥",
+            accent_color=CORE_EMERALD,
+        )
+        self.monitors_card.grid(row=4, column=1, padx=8, pady=8, sticky="nsew")
+        mon_body = self.monitors_card.body_frame
+
+        from src.darius_ai.system.workspace_manager import get_monitor_count
+
+        n_mon = get_monitor_count()
+        self._create_situational_item(mon_body, "🖥 Monitor 1 (Principal):", "1920x1080 • Activo")
+        if n_mon > 1:
+            self._create_situational_item(mon_body, "🖥 Monitor 2 (Secundario):", "1920x1080 • Activo")
+        else:
+            self._create_situational_item(mon_body, "🖥 Monitor Secundario:", "No detectado (Mono-pantalla)")
+
+    def _create_main_module_card(
+        self,
+        parent: Any,
+        col: int,
+        title: str,
+        subtitle: str,
+        status_txt: str,
+        status_color: str,
+        cmd_fn: Callable[[], None],
+    ) -> None:
+        """Crea una tarjeta individual para los módulos principales del Hero."""
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=theme.BG_CARD_INNER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
+        )
+        card.grid(row=0, column=col, padx=4, pady=4, sticky="nsew")
+
+        btn = ctk.CTkButton(
+            card,
+            text=title,
+            font=theme.FONT_CAPTION_BOLD,
+            text_color=theme.TEXT_PRIMARY,
+            fg_color="transparent",
+            hover_color=theme.BG_CARD_HOVER,
+            anchor="w",
+            command=cmd_fn,
+        )
+        btn.pack(fill="x", padx=6, pady=(6, 1))
+
+        ctk.CTkLabel(card, text=subtitle, font=theme.FONT_BADGE, text_color=theme.TEXT_MUTED, anchor="w").pack(
+            fill="x", padx=10, pady=(0, 4)
+        )
+        ctk.CTkLabel(card, text=status_txt, font=theme.FONT_BADGE, text_color=status_color, anchor="w").pack(
+            fill="x", padx=10, pady=(0, 6)
+        )
+
+    def _launch_quick_app(self, target: str) -> None:
+        """Lanza una aplicación o URL desde la tarjeta de accesos rápidos."""
+        if self.app_ref and hasattr(self.app_ref, "talk"):
+            if target.startswith("http"):
+                import webbrowser
+
+                webbrowser.open_new_tab(target)
+                self.app_ref.talk(f"Abriendo enlace rápido: {target}")
+            else:
+                import shutil
+                import subprocess
+
+                try:
+                    exe = shutil.which(target) or target
+                    subprocess.Popen([exe], shell=False)  # noqa: S603
+                    self.app_ref.talk(f"Iniciando aplicación: {target}")
+                except Exception as e:
+                    self.app_ref.talk(f"No se pudo iniciar {target}: {e}")
+
+    def _on_nav_asistente(self) -> None:
+        if self.app_ref and hasattr(self.app_ref, "_show_page"):
+            self.app_ref._show_page("chat")
+
+    def _on_nav_workspaces(self) -> None:
+        if self.app_ref and hasattr(self.app_ref, "_show_page"):
+            self.app_ref._show_page("workspaces")
+
+    def _on_nav_obsidian(self) -> None:
+        if self.app_ref and hasattr(self.app_ref, "_show_page"):
+            self.app_ref._show_page("obsidian")
+
+    def _on_nav_settings(self) -> None:
+        if self.app_ref and hasattr(self.app_ref, "_open_byok_settings"):
+            self.app_ref._open_byok_settings()
+
     def _create_metric_row(
         self,
         parent: Any,
@@ -588,12 +793,14 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             self.after(60000, self._tick_situational)
 
     def _tick_animation(self) -> None:
-        """Anima el Cyber Core a 60 FPS."""
+        """Anima el Cyber Core y la Malla de Contexto a 60 FPS."""
         if not self._is_active:
             return
         self._anim_phase += 0.03
         with contextlib.suppress(Exception):
             self.core_visualizer.update_frame(phase=self._anim_phase, energy=0.0)
+            if hasattr(self, "context_mesh") and self.context_mesh is not None:
+                self.context_mesh.update_frame(phase=self._anim_phase, energy=0.0)
             self.after(33, self._tick_animation)
 
     def destroy(self) -> None:
