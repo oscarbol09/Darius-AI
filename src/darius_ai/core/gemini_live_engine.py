@@ -16,6 +16,7 @@ import enum
 import logging
 import os
 import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -50,7 +51,7 @@ class LiveAudioConfig:
 class GeminiLiveEngine:
     """Motor de comunicación de voz en vivo y bidireccional con Gemini Live."""
 
-    api_key: str = ""
+    api_key: str | None = None
     model: str = DEFAULT_LIVE_MODEL
     voice_name: str = DEFAULT_LIVE_VOICE
     audio_config: LiveAudioConfig = field(default_factory=LiveAudioConfig)
@@ -67,18 +68,27 @@ class GeminiLiveEngine:
     _receive_task: asyncio.Task | None = None
     _loop: asyncio.AbstractEventLoop | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
+    _worker_thread: threading.Thread | None = None
+    _stop_event: threading.Event | None = None
 
     def __post_init__(self):
-        if not self.api_key:
+        if self.api_key is None:
             self.api_key = (
                 cfg.llm_gemini_api_key
                 or cfg.get("gemini", "api_key", default="")
                 or os.getenv("GEMINI_API_KEY", "")
             )
+        elif not isinstance(self.api_key, str):
+            self.api_key = str(self.api_key)
+
+    @property
+    def is_running(self) -> bool:
+        return self.is_active()
 
     @property
     def state(self) -> LiveSessionState:
         return self._state
+
 
     def is_active(self) -> bool:
         return self._state in (
@@ -272,6 +282,78 @@ class GeminiLiveEngine:
             self.playback_buffer.clear()
         self._set_state(LiveSessionState.DISCONNECTED)
         log.info("[GeminiLive] Sesión en vivo desconectada.")
+
+    def start_live_session(self) -> tuple[bool, str]:
+
+        """Inicia sincrónicamente la sesión de Gemini Live gestionando su bucle en un hilo dedicado."""
+        if self.is_running:
+            return True, "Sesión en vivo de Gemini Live ya activa."
+
+        if not self.api_key:
+            return False, "API key de Gemini no configurada."
+
+        with self._lock:
+            if self._worker_thread is None or not self._worker_thread.is_alive():
+                self._stop_event = threading.Event()
+                self._worker_thread = threading.Thread(
+                    target=self._run_async_worker,
+                    name="darius-gemini-live-worker",
+                    daemon=True,
+                )
+                self._worker_thread.start()
+
+        # Esperar hasta 2.5s para confirmar el establecimiento de la conexión
+        t0 = time.time()
+        while time.time() - t0 < 2.5:
+            if self.is_running:
+                return True, "Conexión en vivo con Gemini Live iniciada exitosamente."
+            if self._state == LiveSessionState.ERROR:
+                return False, "Fallo al conectar con Gemini Live."
+            time.sleep(0.05)
+
+        if self.is_running:
+            return True, "Conexión en vivo con Gemini Live iniciada."
+        return False, "Tiempo de espera agotado al conectar con Gemini Live."
+
+    def stop_live_session(self) -> tuple[bool, str]:
+        """Detiene sincrónicamente la sesión de Gemini Live y limpia recursos."""
+        if self._stop_event is not None:
+            self._stop_event.set()
+
+        if self._loop and self._loop.is_running():
+            future = asyncio.run_coroutine_threadsafe(self.stop_async(), self._loop)
+            try:
+                future.result(timeout=1.5)
+            except Exception as exc:
+                log.debug(f"[GeminiLive] Timeout o error al detener stop_async: {exc}")
+
+        self._set_state(LiveSessionState.DISCONNECTED)
+        return True, "Sesión Gemini Live finalizada."
+
+    def _run_async_worker(self) -> None:
+        """Bucle de trabajo asíncrono ejecutado en hilo de fondo dedicado."""
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
+        try:
+            connect_task = self._loop.create_task(self.start_async())
+            self._loop.run_until_complete(connect_task)
+            while not (self._stop_event and self._stop_event.is_set()) and self.is_active():
+                self._loop.run_until_complete(asyncio.sleep(0.1))
+        except Exception as exc:
+            log.error(f"[GeminiLive] Error en bucle asíncrono de Gemini Live: {exc}")
+        finally:
+            try:
+                pending = [t for t in asyncio.all_tasks(self._loop) if not t.done()]
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    self._loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+                self._loop.close()
+            except Exception as exc:
+                log.debug(f"[GeminiLive] Error al cerrar loop asíncrono: {exc}")
+            self._loop = None
+            self._set_state(LiveSessionState.DISCONNECTED)
+
 
     def format_vocal_status(self) -> str:
         """Genera un reporte conciso del estado de Gemini Live para el usuario."""

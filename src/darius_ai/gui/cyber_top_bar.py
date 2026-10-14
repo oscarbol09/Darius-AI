@@ -276,10 +276,23 @@ class CyberTopBar(ctk.CTkFrame):
         self._model = model_name
         self._refresh_status_pill()
 
-    def set_system_status(self, status_text: str, is_online: bool = True) -> None:
+    def set_system_status(
+        self,
+        status_text: str | None = None,
+        is_online: bool = True,
+        system_status: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Actualiza el indicador de estado del sistema y conectividad de red."""
-        self._system_status = status_text
+        eff_status = status_text if status_text is not None else (system_status or "Operativo")
+        self._system_status = str(eff_status)
         self._is_online = is_online
+        if provider is not None:
+            self._provider = str(provider)
+        if model is not None:
+            self._model = str(model)
 
         # Actualizar color del indicador de usuario según la red
         if is_online:
@@ -294,6 +307,7 @@ class CyberTopBar(ctk.CTkFrame):
             )
 
         self._refresh_status_pill()
+
 
     def _refresh_status_pill(self) -> None:
         """Regenera el texto del pill central con el estado consolidado."""

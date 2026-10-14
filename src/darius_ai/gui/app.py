@@ -980,10 +980,14 @@ class DariusFinal(ctk.CTk):
                 from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
 
                 engine = get_gemini_live_engine()
-                if not engine.is_running:
+                if not getattr(engine, "is_running", False):
                     ok, msg = engine.start_live_session()
-                    self.set_status("GEMINI LIVE CONECTADO", "#00F0FF")
-                    self.talk("Sesión de audio bidireccional Gemini Live iniciada.")
+                    if ok:
+                        self.set_status("GEMINI LIVE CONECTADO", "#00F0FF")
+                        self.talk("Sesión de audio bidireccional Gemini Live iniciada.")
+                    else:
+                        self.set_status("GEMINI LIVE ERROR", "#F87171")
+                        log.warning(f"[GeminiLive] {msg}")
             except Exception as e:
                 log.warning(f"Error al iniciar Gemini Live: {e}")
         else:
@@ -991,10 +995,11 @@ class DariusFinal(ctk.CTk):
                 from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
 
                 engine = get_gemini_live_engine()
-                if engine.is_running:
+                if getattr(engine, "is_running", False):
                     engine.stop_live_session()
 
         if hasattr(self, "voice_capsule") and self.voice_capsule is not None:
+
             reverse_mode = {v: k for k, v in mode_alias.items()}
             capsule_tag = reverse_mode.get(resolved_mode, resolved_mode.upper())
             if self.voice_capsule.current_mode != capsule_tag:

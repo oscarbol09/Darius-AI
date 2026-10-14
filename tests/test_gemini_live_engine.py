@@ -148,3 +148,29 @@ class TestGeminiLiveEngineUnit:
             mock_session.close.assert_called_once()
 
         asyncio.run(_run())
+
+    def test_is_running_property(self):
+        engine = GeminiLiveEngine(api_key="mock_key")
+        assert hasattr(engine, "is_running")
+        assert engine.is_running is False
+
+        engine._state = LiveSessionState.CONNECTED
+        assert engine.is_running is True
+
+        engine._state = LiveSessionState.DISCONNECTED
+        assert engine.is_running is False
+
+    def test_synchronous_live_session_lifecycle(self):
+        engine = GeminiLiveEngine(api_key="")
+        assert callable(getattr(engine, "start_live_session", None))
+        assert callable(getattr(engine, "stop_live_session", None))
+
+        # Sin API key configurada debe fallar con mensaje claro
+        ok, msg = engine.start_live_session()
+        assert ok is False
+        assert "api key" in msg.lower() or "configurada" in msg.lower()
+
+        # Detener la sesión no debe arrojar excepciones
+        ok_stop, msg_stop = engine.stop_live_session()
+        assert ok_stop is True
+

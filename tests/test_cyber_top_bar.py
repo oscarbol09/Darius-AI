@@ -142,3 +142,17 @@ class TestCyberTopBarWidget:
         assert hasattr(widget, "lbl_status_badge")
         assert widget.lbl_status_badge is widget.lbl_status_pill
 
+    def test_set_system_status_kwargs_polymorphism(self, widget):
+        widget.set_system_status(
+            system_status="Escaneo Activo",
+            is_online=True,
+            provider="OpenAI",
+            model="gpt-4o",
+            arbitrary_forward_kwarg=123,
+        )
+        pill_text = widget.lbl_status_pill.cget("text")
+        assert "Sistema: Escaneo Activo" in pill_text
+        assert "Red: Conectado" in pill_text
+        assert "IA: gpt-4o" in pill_text
+
+
