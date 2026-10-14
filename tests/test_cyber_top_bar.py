@@ -135,3 +135,10 @@ class TestCyberTopBarWidget:
 
         widget._handle_close()
         mock_close.assert_called_once()
+
+    def test_backward_compatibility_badge_aliases(self, widget):
+        assert hasattr(widget, "lbl_system_badge")
+        assert widget.lbl_system_badge is widget.lbl_status_pill
+        assert hasattr(widget, "lbl_status_badge")
+        assert widget.lbl_status_badge is widget.lbl_status_pill
+

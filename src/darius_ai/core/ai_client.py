@@ -396,7 +396,15 @@ def ask_gemini(
     system_instruction = _build_system_instruction(prompt)
     primary_model = cfg.llm_gemini_model or cfg.gemini_model or "gemini-3.5-flash-lite"
     candidate_models = [primary_model]
-    for fb in ("gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"):
+    for fb in (
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-flash-latest",
+        "gemini-flash-lite-latest",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ):
         if fb not in candidate_models:
             candidate_models.append(fb)
 
@@ -423,13 +431,31 @@ def ask_gemini(
         except Exception as exc:
             log.warning(f"[Gemini] Modelo '{cand_model}' falló: {exc}")
             last_exc = exc
-            err_str = str(exc)
-            # Solo rotar modelo si es error del modelo (404 no encontrado, 503 alta demanda, o no disponible)
-            if not any(code in err_str for code in ("404", "503", "400", "not available", "demand", "timed out")):
+            err_str = str(exc).lower()
+            # Rotar si hay sobrecarga temporal o error de disponibilidad (503, 500, 429, spikes, high demand)
+            if not any(
+
+                code in err_str
+                for code in (
+                    "404",
+                    "503",
+                    "500",
+                    "429",
+                    "400",
+                    "not available",
+                    "demand",
+                    "spikes",
+                    "temporar",
+                    "resource_exhausted",
+                    "unavailable",
+                    "timed out",
+                )
+            ):
                 break
 
     error_msg = _classify_error_message(last_exc or RuntimeError("Error desconocido en Gemini"), "Gemini")
     raise RuntimeError(error_msg) from last_exc
+
 
 
 def ask_openai(
@@ -726,33 +752,33 @@ def get_ai_response(
         if not cfg.llm_fallback_enabled:
             return _classify_error_message(primary_exc, active.upper()), "error"
 
-        # Cadena de Fallback: intenta OpenRouter si hay clave configurada
-        openrouter_key = resolve_provider_key("openrouter")
-        if active != "openrouter" and openrouter_key:
+        # Cadena de Fallback multinivel con todos los proveedores configurados
+        fallback_candidates = [
+            ("gemini", ask_gemini),
+            ("groq", ask_groq),
+            ("openrouter", ask_openrouter),
+            ("openai", ask_openai),
+            ("nvidia", ask_nvidia),
+            ("antigravity", ask_antigravity),
+        ]
+        for p_name, p_fn in fallback_candidates:
+            if p_name == active:
+                continue
+            p_key = resolve_provider_key(p_name)
+            if not p_key and p_name != "antigravity":
+                continue
             try:
-                log.info("Intentando fallback con OpenRouter...")
-                raw_text, provider = ask_openrouter(prompt, history, image_b64=image_b64)
+                log.info(f"Intentando fallback con {p_name.capitalize()}...")
+                raw_text, provider = p_fn(prompt, history, image_b64=image_b64)
                 synth_text, final_prov = _resolve_agentic_tool_loop(
-                    raw_text, provider, ask_openrouter, prompt, history, image_b64=image_b64
+                    raw_text, provider, p_fn, prompt, history, image_b64=image_b64
                 )
                 return DariusPersona.format_butler_response(synth_text, user_name=cfg.user_name), final_prov
             except Exception as fb_exc:
-                log.warning(f"Fallback OpenRouter falló: {fb_exc}")
-
-        # Si aún falla, intenta Gemini si no era el activo
-        gemini_key = resolve_provider_key("gemini")
-        if active != "gemini" and gemini_key:
-            try:
-                log.info("Intentando fallback con Gemini...")
-                raw_text, provider = ask_gemini(prompt, history, image_b64=image_b64)
-                synth_text, final_prov = _resolve_agentic_tool_loop(
-                    raw_text, provider, ask_gemini, prompt, history, image_b64=image_b64
-                )
-                return DariusPersona.format_butler_response(synth_text, user_name=cfg.user_name), final_prov
-            except Exception as gemini_exc:
-                log.warning(f"Fallback Gemini falló: {gemini_exc}")
+                log.warning(f"Fallback {p_name} falló: {fb_exc}")
 
         return _classify_error_message(primary_exc, active.upper()), "error"
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

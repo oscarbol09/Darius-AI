@@ -256,6 +256,10 @@ class CyberTopBar(ctk.CTkFrame):
             pady=4,
         )
         self.lbl_status_pill.pack()
+        # Aliases de compatibilidad hacia atrás
+        self.lbl_system_badge = self.lbl_status_pill
+        self.lbl_status_badge = self.lbl_status_pill
+
 
     # =========================================================================
     #  MÉTODOS PÚBLICOS DE ACTUALIZACIÓN

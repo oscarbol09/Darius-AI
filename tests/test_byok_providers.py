@@ -206,6 +206,55 @@ class TestDispatcherAndFallback:
         finally:
             cfg.set(orig_prov, "llm", "active_provider")
 
+    def test_gemini_503_high_demand_fallback(self):
+        """Verifica que si un modelo devuelve 503 alta demanda, rote y tenga éxito con el siguiente."""
+        from src.darius_ai.core.ai_client import ask_gemini
+
+        def fake_call_gemini_rest(api_key, model, *args, **kwargs):
+            if "3.5" in model:
+                raise RuntimeError(
+                    "HTTP 503: Model is experiencing high demand. Spikes in demand are temporary."
+                )
+            return "Respuesta recuperada tras rotación de modelo Gemini."
+
+        with (
+            patch("src.darius_ai.core.ai_client.resolve_provider_key", return_value="gemini-fake-key"),
+            patch("src.darius_ai.core.ai_client._call_gemini_rest", side_effect=fake_call_gemini_rest),
+        ):
+            text, prov = ask_gemini("Hola Darius")
+            assert text == "Respuesta recuperada tras rotación de modelo Gemini."
+            assert "Gemini" in prov
+
+    def test_multi_provider_cascade_to_groq_when_gemini_fails(self):
+        """Verifica que si Gemini falla, el despachador haga cascada hacia Groq u otro configurado."""
+
+        orig_prov = cfg.active_provider
+        try:
+            cfg.set("gemini", "llm", "active_provider")
+            cfg.set(True, "llm", "fallback_enabled")
+
+            def resolve_key_mock(prov):
+                if prov == "gemini":
+                    return "gemini-key"
+                if prov == "groq":
+                    return "groq-key"
+                return ""
+
+            with (
+                patch("src.darius_ai.core.ai_client.ask_gemini", side_effect=RuntimeError("Gemini 503 Dead")),
+                patch("src.darius_ai.core.ai_client.resolve_provider_key", side_effect=resolve_key_mock),
+                patch(
+                    "src.darius_ai.core.ai_client.ask_groq",
+                    return_value=("Respuesta desde Groq en cascada", "Groq (llama-3.3-70b-versatile)"),
+                ),
+            ):
+                text, prov = get_ai_response("Pregunta")
+                assert "Groq" in prov
+                assert "Respuesta desde Groq" in text
+        finally:
+            cfg.set(orig_prov, "llm", "active_provider")
+
+
 
 class TestObsidianSystemInstructionIntegration:
     """Verifica que la memoria contextual de Obsidian y las herramientas se integren en todos los prompts."""

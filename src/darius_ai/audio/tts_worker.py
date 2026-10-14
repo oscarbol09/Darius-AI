@@ -36,16 +36,23 @@ class TTSWorker:
         self._thread.start()
 
     def _run(self):
-        import pythoncom
+        co_initialized = False
+        sapi_speaker = None
+        try:
+            import pythoncom
 
-        pythoncom.CoInitialize()
-        import win32com.client
+            pythoncom.CoInitialize()
+            co_initialized = True
+            import win32com.client
 
-        sapi_speaker = win32com.client.Dispatch("SAPI.SpVoice")
-        if self._voice_token:
-            sapi_speaker.Voice = self._voice_token
-        sapi_speaker.Rate = cfg.tts_rate
-        sapi_speaker.Volume = cfg.tts_volume
+            sapi_speaker = win32com.client.Dispatch("SAPI.SpVoice")
+            if self._voice_token:
+                sapi_speaker.Voice = self._voice_token
+            sapi_speaker.Rate = cfg.tts_rate
+            sapi_speaker.Volume = cfg.tts_volume
+        except Exception as e:
+            log.warning(f"SAPI5 no disponible para TTS: {e}")
+            sapi_speaker = None
 
         while True:
             text = self._queue.get()
@@ -58,31 +65,37 @@ class TTSWorker:
                 # 1. ElevenLabs con caché local
                 if engine == "elevenlabs":
                     played = self._speak_elevenlabs(text)
-                    if not played:
+                    if not played and sapi_speaker is not None:
                         log.info("[TTS] Fallback a SAPI nativo tras fallo de ElevenLabs.")
                         sapi_speaker.Speak(text)
 
                 # 2. Edge-TTS
                 elif engine in ("edge", "edge_tts", "edgetts"):
                     played = self._speak_edge_tts(text)
-                    if not played:
+                    if not played and sapi_speaker is not None:
                         log.info("[TTS] Fallback a SAPI nativo tras fallo de Edge-TTS.")
                         sapi_speaker.Speak(text)
 
                 # 3. SAPI5 por defecto
-                else:
+                elif sapi_speaker is not None:
                     sapi_speaker.Speak(text)
 
             except Exception as e:
                 log.error(f"Error en síntesis TTS: {e}")
-                with contextlib.suppress(Exception):
-                    sapi_speaker.Speak(text)
+                if sapi_speaker is not None:
+                    with contextlib.suppress(Exception):
+                        sapi_speaker.Speak(text)
             finally:
                 self.is_speaking.clear()
                 time.sleep(cfg.speaking_tail_secs)
                 self._queue.task_done()
 
-        pythoncom.CoUninitialize()
+        if co_initialized:
+            with contextlib.suppress(Exception):
+                import pythoncom
+
+                pythoncom.CoUninitialize()
+
 
     def _speak_elevenlabs(self, text: str) -> bool:
         """Intenta sintetizar con ElevenLabs y caché en disco."""

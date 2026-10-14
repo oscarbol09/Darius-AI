@@ -296,18 +296,25 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def setup_tts_config(self):
-        temp = win32com.client.Dispatch("SAPI.SpVoice")
-        voices = temp.GetVoices()
         self.tts_voice_token = None
-        for i in range(voices.Count):
-            v = voices.Item(i)
-            desc = v.GetDescription()
-            log.info(f"  Voz [{i}] {desc}")
-            if any(k in desc.lower() for k in ["spanish", "helena", "sabina", "es-es", "español"]):
-                self.tts_voice_token = v
-                log.info(f"Voz seleccionada: {desc}")
-        if not self.tts_voice_token and voices.Count > 0:
-            self.tts_voice_token = voices.Item(0)
+        if not WIN32_AVAILABLE or win32com is None:
+            return
+        try:
+            temp = win32com.client.Dispatch("SAPI.SpVoice")
+            voices = temp.GetVoices()
+            for i in range(voices.Count):
+                v = voices.Item(i)
+                desc = v.GetDescription()
+                log.info(f"  Voz [{i}] {desc}")
+                if any(k in desc.lower() for k in ["spanish", "helena", "sabina", "es-es", "español"]):
+                    self.tts_voice_token = v
+                    log.info(f"Voz seleccionada: {desc}")
+            if not self.tts_voice_token and voices.Count > 0:
+                self.tts_voice_token = voices.Item(0)
+        except Exception as e:
+            log.warning(f"No se pudo inicializar SAPI.SpVoice: {e}")
+            self.tts_voice_token = None
+
 
     def configure_listener(self):
         self.listener.energy_threshold = MIC_ENERGY_THRESHOLD
@@ -891,12 +898,17 @@ class DariusFinal(ctk.CTk):
         self.voice_capsule.grid(row=1, column=0, sticky="ew", padx=8, pady=(4, 6))
 
         # Backward compatibility aliases
-        self.text_input = self.voice_capsule.entry
-        self.status_label = self.cyber_top_bar.lbl_system_badge
+        self.text_input = getattr(self.voice_capsule, "entry", None)
+        self.status_label = getattr(
+            self.cyber_top_bar,
+            "lbl_status_pill",
+            getattr(self.cyber_top_bar, "lbl_system_badge", None),
+        )
         self.status_dot = getattr(self.cyber_top_bar, "lbl_brand_icon", None)
-        self.mute_btn = self.cyber_top_bar.btn_mute
-        self.start_btn = self.cyber_top_bar.btn_mute
-        self.settings_top_btn = self.cyber_top_bar.btn_settings
+        self.mute_btn = getattr(self.cyber_top_bar, "btn_mute", None)
+        self.start_btn = getattr(self.cyber_top_bar, "btn_mute", None)
+        self.settings_top_btn = getattr(self.cyber_top_bar, "btn_settings", None)
+
 
         # 2.4 Bottom Telemetry HUD Bar (Motor de Telemetría Darius)
         from src.darius_ai.gui.telemetry_bar import TelemetryBarWidget

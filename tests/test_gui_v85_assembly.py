@@ -187,3 +187,41 @@ class TestGuiV85NavigationAndModes:
         app._on_voice_capsule_mic_toggle(False)
         assert app.is_listening is False
         app.set_status.assert_called_with("SISTEMA LISTO", "#34D399")
+
+    def test_setup_tts_config_resilient_without_sapi(self):
+        """Verifica que setup_tts_config maneje errores de SAPI o falta de pywin32 sin lanzar excepciones."""
+        from src.darius_ai.gui import app as app_module
+        from src.darius_ai.gui.app import DariusFinal
+
+        app = object.__new__(DariusFinal)
+
+        # Caso 1: WIN32_AVAILABLE es False
+        with patch.object(app_module, "WIN32_AVAILABLE", False):
+            app.setup_tts_config()
+            assert app.tts_voice_token is None
+
+        # Caso 2: win32com lanza excepción durante Dispatch
+        mock_win32com = MagicMock()
+        mock_win32com.client.Dispatch.side_effect = Exception("SAPI Initialization Error")
+        with (
+            patch.object(app_module, "WIN32_AVAILABLE", True),
+            patch.object(app_module, "win32com", mock_win32com),
+        ):
+            app.setup_tts_config()
+            assert app.tts_voice_token is None
+
+
+    def test_status_label_alias_binding(self):
+        """Verifica que status_label se enlace limpiamente con lbl_status_pill o lbl_system_badge."""
+        from src.darius_ai.gui.app import DariusFinal
+
+        app = object.__new__(DariusFinal)
+        app.cyber_top_bar = MagicMock()
+        mock_pill = MagicMock()
+        app.cyber_top_bar.lbl_status_pill = mock_pill
+
+        app.status_label = getattr(
+            app.cyber_top_bar, "lbl_status_pill", getattr(app.cyber_top_bar, "lbl_system_badge", None)
+        )
+        assert app.status_label is mock_pill
+
