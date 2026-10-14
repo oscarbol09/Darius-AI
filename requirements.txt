@@ -5,6 +5,7 @@
 
 # -- IA y LLMs (Llamadas nativas HTTP/REST de ultra-baja latencia) -------------
 requests>=2.31.0
+httpx>=0.27.0
 
 # -- Variables de entorno ------------------------------------------------------
 python-dotenv>=1.0.0
@@ -24,8 +25,10 @@ pywin32>=306
 comtypes>=1.2.0
 pycaw>=20181226
 keyboard>=0.13.5
+psutil>=5.9.0
 
 # -- Utilidades y Procesamiento Numérico / Visión ------------------------------
 numpy>=1.24.0
 mss>=9.0.0
 beautifulsoup4>=4.12.0
+defusedxml>=0.7.1
