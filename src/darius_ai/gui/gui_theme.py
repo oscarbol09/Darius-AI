@@ -11,11 +11,11 @@ from typing import Final
 # =============================================================================
 #  GEOMETRÍA Y PROPORCIONES
 # =============================================================================
-WINDOW_TITLE: Final[str] = "DARIUS AI — Tu Copiloto en Windows"
-WINDOW_WIDTH: Final[int] = 880
-WINDOW_HEIGHT: Final[int] = 620
-WINDOW_MIN_WIDTH: Final[int] = 800
-WINDOW_MIN_HEIGHT: Final[int] = 560
+WINDOW_TITLE: Final[str] = "DARIUS AI v8.5 — Estación de Mando Cybernetic Bento"
+WINDOW_WIDTH: Final[int] = 1000
+WINDOW_HEIGHT: Final[int] = 680
+WINDOW_MIN_WIDTH: Final[int] = 880
+WINDOW_MIN_HEIGHT: Final[int] = 600
 SIDEBAR_WIDTH: Final[int] = 230
 
 RADIUS_LG: Final[int] = 10
@@ -84,4 +84,4 @@ FONT_MONO = (FONT_MONO_FAMILY, 10)
 AUTHOR_NAME: Final[str] = "Oscarbol09"
 AUTHOR_GITHUB_URL: Final[str] = "https://github.com/oscarbol09/Darius-AI"
 AUTHOR_TAG: Final[str] = "🛠 Desarrollado por @Oscarbol09"
-VERSION_TAG: Final[str] = "v7.0.0"
+VERSION_TAG: Final[str] = "v8.5.0"

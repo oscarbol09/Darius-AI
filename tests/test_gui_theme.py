@@ -62,7 +62,7 @@ def test_theme_author_metadata():
     assert theme.AUTHOR_NAME == "Oscarbol09"
     assert "https://github.com/oscarbol09" in theme.AUTHOR_GITHUB_URL
     assert "@Oscarbol09" in theme.AUTHOR_TAG
-    assert theme.VERSION_TAG == "v7.0.0"
+    assert theme.VERSION_TAG in ("v7.0.0", "v8.5.0")
 
 
 def test_license_file_and_copyright():

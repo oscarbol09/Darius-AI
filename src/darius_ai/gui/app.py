@@ -425,8 +425,9 @@ class DariusFinal(ctk.CTk):
 
         self._nav_btns = {}
         views = [
+            ("dashboard", "⚡ Centro de Mando"),
             ("chat", "💬 Conversación"),
-            ("workspaces", "⚡ Workspaces"),
+            ("workspaces", "🚀 Workspaces"),
             ("obsidian", "🧠 Obsidian Brain"),
             ("system", "🛠 Sistema & Audio"),
             ("settings", "⚙ Ajustes & Modelos"),
@@ -439,9 +440,9 @@ class DariusFinal(ctk.CTk):
                 font=theme.FONT_NAV,
                 height=32,
                 corner_radius=theme.RADIUS_MD,
-                fg_color=theme.BG_CARD_HOVER if view_id == "chat" else "transparent",
+                fg_color=theme.BG_CARD_HOVER if view_id == "dashboard" else "transparent",
                 hover_color=theme.BG_CARD_HOVER,
-                text_color=theme.ACCENT_PRIMARY if view_id == "chat" else theme.TEXT_SECONDARY,
+                text_color=theme.ACCENT_PRIMARY if view_id == "dashboard" else theme.TEXT_SECONDARY,
                 anchor="w",
                 command=lambda v=view_id: self._show_page(v),
             )
@@ -749,6 +750,13 @@ class DariusFinal(ctk.CTk):
 
         self._pages = {}
 
+        # ── Page: Cybernetic Bento Dashboard (Vista Principal v8.5) ──
+        from src.darius_ai.gui.bento_dashboard import BentoDashboardView
+
+        self.bento_dashboard = BentoDashboardView(self.view_container, app_ref=self)
+        self.bento_dashboard.grid(row=0, column=0, sticky="nsew")
+        self._pages["dashboard"] = self.bento_dashboard
+
         # ── Page: Chat ──
         page_chat = ctk.CTkFrame(
             self.view_container,
@@ -757,7 +765,6 @@ class DariusFinal(ctk.CTk):
             border_width=1,
             border_color=theme.BORDER_CARD,
         )
-        page_chat.grid(row=0, column=0, sticky="nsew")
         self._pages["chat"] = page_chat
 
         chat_hdr = ctk.CTkFrame(page_chat, fg_color="transparent")
@@ -1458,6 +1465,9 @@ class DariusFinal(ctk.CTk):
 
         if hasattr(self, "visualizer"):
             self.visualizer.update_frame(state, self._smoothed_energy)
+
+        if hasattr(self, "bento_dashboard") and self.bento_dashboard is not None:
+            self.bento_dashboard.set_core_state(state, self._smoothed_energy)
 
         self.after(16, self._render_loop)  # ~60 FPS
 
