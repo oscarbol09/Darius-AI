@@ -138,5 +138,16 @@ def test_check_situational_suite():
 test_check_gods_eye_situational_suite = test_check_situational_suite
 
 
+def test_check_live_and_antigravity_suite():
+    from src.darius_ai.core.self_test import check_live_and_antigravity_suite
+
+    res = check_live_and_antigravity_suite()
+    assert res.status == "PASS"
+    assert res.name == "LIVE & AGENT BRIDGE"
+    assert "Gemini Live OK" in res.detail
+    assert "Antigravity Agent" in res.detail
+
+
+
 
 

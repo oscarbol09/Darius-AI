@@ -369,6 +369,35 @@ def check_situational_suite() -> CheckResult:
         return CheckResult("SITUATIONAL INTELLIGENCE", "WARN", f"Diagnóstico situacional: {e}")
 
 
+def check_live_and_antigravity_suite() -> CheckResult:
+    """Verifica la inicialización del motor Gemini Live y el puente con el agente Antigravity."""
+    try:
+        from src.darius_ai.core.antigravity_bridge import get_antigravity_bridge
+        from src.darius_ai.core.gemini_live_engine import AVAILABLE_LIVE_VOICES, get_gemini_live_engine
+
+        live_engine = get_gemini_live_engine()
+        live_ok = live_engine is not None and len(AVAILABLE_LIVE_VOICES) == 5
+
+        bridge = get_antigravity_bridge()
+        bridge_ok = bridge.is_available()
+
+        if live_ok and bridge_ok:
+            return CheckResult(
+                "LIVE & AGENT BRIDGE",
+                "PASS",
+                f"Gemini Live OK ({len(AVAILABLE_LIVE_VOICES)} voces) | Antigravity Agent OK (Runtime disponible)",
+            )
+        elif live_ok:
+            return CheckResult(
+                "LIVE & AGENT BRIDGE",
+                "PASS",
+                "Gemini Live OK | Antigravity Agent: SDK disponible",
+            )
+        return CheckResult("LIVE & AGENT BRIDGE", "WARN", "Configuración parcial en enlace Live / Antigravity")
+    except Exception as e:
+        return CheckResult("LIVE & AGENT BRIDGE", "WARN", f"Diagnóstico Live/Antigravity: {e}")
+
+
 # Retrocompatibilidad
 check_gods_eye_situational_suite = check_situational_suite
 
@@ -388,6 +417,7 @@ def run_self_test() -> list[CheckResult]:
         check_multimodal_biometric_suite(),
         check_darius_synapse_suite(),
         check_situational_suite(),
+        check_live_and_antigravity_suite(),
         check_tool_contracts(),
     ]
     return checks

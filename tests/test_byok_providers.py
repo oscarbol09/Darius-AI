@@ -54,7 +54,16 @@ class TestProviderKeyResolution:
         assert resolved == ""
 
     def test_all_known_providers_have_display_names(self):
-        expected_providers = {"gemini", "openai", "openrouter", "nvidia", "groq", "ollama", "custom"}
+        expected_providers = {
+            "gemini",
+            "antigravity",
+            "openai",
+            "openrouter",
+            "nvidia",
+            "groq",
+            "ollama",
+            "custom",
+        }
         assert set(PROVIDER_NAMES.keys()) == expected_providers
 
 

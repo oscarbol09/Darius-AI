@@ -245,6 +245,7 @@ Puedes personalizar rutas y pantallas en `config.json`:
 | Proveedor | Identificador | Modelo Predeterminado | Endpoint Base | Variable de Entorno |
 | :--- | :--- | :--- | :--- | :--- |
 | **Google Gemini** | `gemini` | `gemini-3.5-flash-lite` | Google GenAI SDK nativo | `GEMINI_API_KEY` |
+| **Antigravity Agent** | `antigravity` | `antigravity-core` | SDK `google-antigravity` nativo | `GEMINI_API_KEY` / `ANTIGRAVITY_API_KEY` |
 | **OpenAI / ChatGPT** | `openai` | `gpt-4o-mini` | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 | **Groq Cloud** | `groq` | `llama-3.3-70b-versatile` | `https://api.groq.com/openai/v1` | `GROQ_API_KEY` |
 | **NVIDIA NIM** | `nvidia_nim` | `nvidia/llama-3.1-nemotron-70b-instruct` | `https://integrate.api.nvidia.com/v1` | `NVIDIA_API_KEY` |
@@ -258,6 +259,8 @@ Puedes personalizar rutas y pantallas en `config.json`:
 
 | Comando de Voz | Acción Ejecutada | Módulo |
 | :--- | :--- | :--- |
+| **"Activar Gemini Live"** / **"Modo Live"** | Inicia stream bidireccional full-duplex de voz con ultra-baja latencia y barge-in nativo | `src/darius_ai/core/gemini_live_engine.py` |
+| **"Agente Antigravity"** / **"Cerebro Antigravity"** | Consulta o delega tareas de ingeniería y ejecución al agente autónomo Antigravity | `src/darius_ai/core/antigravity_bridge.py` |
 | **"Protocolo Darius"** / **"Modo Bienvenida"** | Maximiza IDE Cursor/Code en monitor 1, abre herramientas en monitor 2, ajusta audio y reproduce bienvenida | `src/darius_ai/system/workspace_manager.py` |
 | **"Modo desarrollo"** / **"Modo programar"** | Enfoca Cursor/Code en monitor principal y abre documentación técnica en monitor secundario | `src/darius_ai/system/workspace_manager.py` |
 | **"Modo trading"** / **"Modo finanzas"** | Abre TradingView y Finviz en monitores 1 y 2 para análisis de mercado | `src/darius_ai/system/workspace_manager.py` |

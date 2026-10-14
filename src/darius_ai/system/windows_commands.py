@@ -1306,6 +1306,41 @@ $ip     = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlia
         "desc": "Ejecutar barrido situacional integral de satélites, tráfico aéreo, sismos y clima espacial",
         "return_output": True,
     },
+    "activar gemini live": {
+        "action": {"type": "python", "run": "gemini_live_start"},
+        "aliases": [
+            "iniciar gemini live",
+            "conectar gemini live",
+            "modo live",
+            "enlace en vivo",
+            "activar modo live",
+        ],
+        "desc": "Iniciar canal bidireccional de voz Gemini Live en ultra-baja latencia",
+        "return_output": True,
+    },
+    "desactivar gemini live": {
+        "action": {"type": "python", "run": "gemini_live_stop"},
+        "aliases": [
+            "detener gemini live",
+            "desconectar gemini live",
+            "apagar modo live",
+            "desactivar modo live",
+            "terminar gemini live",
+        ],
+        "desc": "Detener canal bidireccional Gemini Live",
+        "return_output": True,
+    },
+    "agente antigravity": {
+        "action": {"type": "python", "run": "antigravity_agent_status"},
+        "aliases": [
+            "consultar antigravity",
+            "estado de antigravity",
+            "cerebro antigravity",
+            "modo antigravity",
+        ],
+        "desc": "Verificar y consultar estado del agente autónomo Antigravity",
+        "return_output": True,
+    },
 }
 
 
@@ -1657,6 +1692,31 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                     sections.append(f"4. Clima espacial: Índice Kp {sw.kp_index:.1f} ({sw.storm_level}).")
 
                 return True, "\n".join(sections)
+            elif workspace_cmd == "gemini_live_start":
+                from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
+
+                engine = get_gemini_live_engine()
+                import asyncio
+                import threading
+
+                threading.Thread(target=lambda: asyncio.run(engine.start_async()), daemon=True).start()
+                return True, "Iniciando enlace neuronal bidireccional con Gemini Live, señor. Canal full-duplex en línea."
+            elif workspace_cmd == "gemini_live_stop":
+                from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
+
+                engine = get_gemini_live_engine()
+                import asyncio
+                import threading
+
+                threading.Thread(target=lambda: asyncio.run(engine.stop_async()), daemon=True).start()
+                return True, "Enlace Gemini Live desconectado, señor. Retornando a canal de síntesis estándar."
+            elif workspace_cmd == "antigravity_agent_status":
+                from src.darius_ai.core.antigravity_bridge import get_antigravity_bridge
+
+                bridge = get_antigravity_bridge()
+                if bridge.is_available():
+                    return True, "El Agente Antigravity está en línea y vinculado para resolver tareas autónomas, señor."
+                return False, "El runtime de Antigravity no está disponible en este entorno, señor."
             fn = action.get("fn")
             if callable(fn):
                 res = fn()

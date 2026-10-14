@@ -71,6 +71,7 @@ _DEFAULTS: dict = {
         "active_provider": "gemini",
         "gemini_api_key": "",
         "gemini_model": "gemini-3.5-flash-lite",
+        "antigravity_model": "antigravity-core",
         "openai_api_key": "",
         "openai_model": "gpt-4o-mini",
         "openrouter_api_key": "",
@@ -303,6 +304,10 @@ class _Config:
         return str(self.get("llm", "gemini_model", default="gemini-3.5-flash-lite"))
 
     @property
+    def llm_antigravity_model(self) -> str:
+        return str(self.get("llm", "antigravity_model", default="antigravity-core"))
+
+    @property
     def llm_openai_api_key(self) -> str:
         return str(self.get("llm", "openai_api_key", default=""))
 
@@ -459,6 +464,7 @@ _SCHEMA: dict = {
         "active_provider": str,
         "gemini_api_key": str,
         "gemini_model": str,
+        "antigravity_model": str,
         "openai_api_key": str,
         "openai_model": str,
         "openrouter_api_key": str,

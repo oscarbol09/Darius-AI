@@ -45,6 +45,11 @@ PROVIDER_DEFAULT_MODELS: dict[str, list[str]] = {
         "gemini-4-argon",
         "gemini-pro-latest",
     ],
+    "antigravity": [
+        "antigravity-core",
+        "antigravity-deep-reasoning",
+        "antigravity-fast-agent",
+    ],
     "openai": [
         "gpt-4o-mini",
         "gpt-4o",
@@ -155,6 +160,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             "gemini": {
                 "key": cfg.llm_gemini_api_key or resolve_provider_key("gemini"),
                 "model": cfg.llm_gemini_model or "gemini-3.5-flash-lite",
+                "base_url": "",
+            },
+            "antigravity": {
+                "key": cfg.llm_gemini_api_key or resolve_provider_key("gemini"),
+                "model": cfg.llm_antigravity_model or "antigravity-core",
                 "base_url": "",
             },
             "openai": {

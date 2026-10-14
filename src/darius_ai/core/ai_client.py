@@ -50,6 +50,7 @@ OPENROUTER_FREE_MODELS = [
 
 PROVIDER_NAMES = {
     "gemini": "Google Gemini",
+    "antigravity": "Antigravity Agent (Google)",
     "openai": "OpenAI (ChatGPT)",
     "openrouter": "OpenRouter",
     "nvidia": "NVIDIA NIM",
@@ -67,8 +68,8 @@ PROVIDER_NAMES = {
 def resolve_provider_key(provider: str) -> str:
     """Resuelve la API Key para un proveedor: primero desde config.json, luego variables de entorno."""
     p = provider.lower().strip()
-    if p == "gemini":
-        return cfg.llm_gemini_api_key or os.getenv("GEMINI_API_KEY", "")
+    if p in ("gemini", "antigravity"):
+        return cfg.llm_gemini_api_key or os.getenv("GEMINI_API_KEY", "") or os.getenv("ANTIGRAVITY_API_KEY", "")
     if p == "openai":
         return cfg.llm_openai_api_key or os.getenv("OPENAI_API_KEY", "")
     if p == "openrouter":
@@ -665,6 +666,21 @@ def _resolve_agentic_tool_loop(
         return raw_text, provider_name
 
 
+def ask_antigravity(
+    prompt: str,
+    history: list[dict] | None = None,
+    image_b64: str | None = None,
+) -> tuple[str, str]:
+    """Llama al Agente Antigravity oficial para razonamiento de ingeniería y herramientas."""
+    from src.darius_ai.core.antigravity_bridge import get_antigravity_bridge
+
+    bridge = get_antigravity_bridge()
+    res = bridge.ask_agent(prompt)
+    if res.success:
+        return res.response_text, "Antigravity Agent"
+    raise RuntimeError(res.response_text)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  DISPATCHER PRINCIPAL CON FALLBACK DEFENSIVO
 # ─────────────────────────────────────────────────────────────────────────────
@@ -688,6 +704,7 @@ def get_ai_response(
     active = cfg.active_provider or "gemini"
     provider_callers = {
         "gemini": ask_gemini,
+        "antigravity": ask_antigravity,
         "openai": ask_openai,
         "openrouter": ask_openrouter,
         "nvidia": ask_nvidia,
@@ -771,6 +788,17 @@ def test_provider_connection(
                 temperature=0.0,
                 timeout=10,
             )
+        elif p == "antigravity":
+            from src.darius_ai.core.antigravity_bridge import get_antigravity_bridge
+
+            bridge = get_antigravity_bridge()
+            if not bridge.is_available():
+                return False, "SDK google-antigravity no instalado", 0.0
+            res = bridge.ask_agent(test_prompt, timeout=15.0)
+            latency = (time.perf_counter() - start_t) * 1000.0
+            if res.success:
+                return True, f"Agente Antigravity en línea ({latency:.0f} ms)", latency
+            return False, res.response_text, latency
         elif p == "openai":
             if not effective_key:
                 return False, "Falta la API Key de OpenAI.", 0.0
