@@ -6,9 +6,8 @@ ejecución de consultas directas, ejecución de tareas de desarrollo
 y formateo con persona butler de Darius.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
 
 from src.darius_ai.core.antigravity_bridge import (
     AntigravityAgentBridge,
@@ -36,28 +35,30 @@ class TestAntigravityAgentBridgeUnit:
         assert "señor" in prompt
         assert "DARIUS" in prompt
 
-    @pytest.mark.asyncio
-    async def test_ask_agent_async_with_mock(self):
-        bridge = AntigravityAgentBridge()
+    def test_ask_agent_async_with_mock(self):
+        async def _run():
+            bridge = AntigravityAgentBridge()
 
-        # Mockeamos el runtime de Agent para una prueba hermética y determinista
-        mock_response = MagicMock()
-        mock_response.text = "He verificado el estado del repositorio, señor. Todo opera nominalmente."
-        mock_response.tool_calls = [MagicMock(name="run_command")]
+            # Mockeamos el runtime de Agent para una prueba hermética y determinista
+            mock_response = MagicMock()
+            mock_response.text = "He verificado el estado del repositorio, señor. Todo opera nominalmente."
+            mock_response.tool_calls = [MagicMock(name="run_command")]
 
-        with patch.object(bridge, "_execute_agent_chat", new_callable=AsyncMock) as mock_exec:
-            mock_exec.return_value = AntigravityResult(
-                success=True,
-                response_text=mock_response.text,
-                tool_calls=["run_command: git status"],
-                execution_time_seconds=0.45,
-            )
+            with patch.object(bridge, "_execute_agent_chat", new_callable=AsyncMock) as mock_exec:
+                mock_exec.return_value = AntigravityResult(
+                    success=True,
+                    response_text=mock_response.text,
+                    tool_calls=["run_command: git status"],
+                    execution_time_seconds=0.45,
+                )
 
-            res = await bridge.ask_agent_async("Revisa el estado de git")
-            assert res.success is True
-            assert "repositorio" in res.response_text
-            assert len(res.tool_calls) == 1
-            assert "git status" in res.tool_calls[0]
+                res = await bridge.ask_agent_async("Revisa el estado de git")
+                assert res.success is True
+                assert "repositorio" in res.response_text
+                assert len(res.tool_calls) == 1
+                assert "git status" in res.tool_calls[0]
+
+        asyncio.run(_run())
 
     def test_ask_agent_sync_wrapper(self):
         bridge = AntigravityAgentBridge()
