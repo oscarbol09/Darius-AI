@@ -140,7 +140,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.title("DARIUS AI — Configuración del Asistente")
         self.geometry("620x780")
         self.minsize(540, 720)
-        self.configure(fg_color="#090D16")
+        self.configure(fg_color=theme.BG_CANVAS)
         self.attributes("-topmost", True)
         self.grab_set()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -215,7 +215,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
     def _build_ui(self):
         # ── 1. HEADER ────────────────────────────────────────────────────────
         header_frame = ctk.CTkFrame(
-            self, fg_color="#111827", corner_radius=12, border_width=1, border_color=theme.BORDER_SUBTLE
+            self, fg_color=theme.BG_CARD, corner_radius=12, border_width=1, border_color=theme.BORDER_SUBTLE
         )
         header_frame.pack(padx=16, pady=(16, 8), fill="x")
 
@@ -243,7 +243,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             command=self._on_tab_changed,
             selected_color=theme.ACCENT_PRIMARY,
             selected_hover_color=theme.ACCENT_PRIMARY_HOVER,
-            unselected_color="#1F2937",
+            unselected_color=theme.BG_CARD_INNER,
             unselected_hover_color="#374151",
             text_color=theme.TEXT_PRIMARY,
             font=("Segoe UI", 11, "bold"),
@@ -259,7 +259,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Card Selector Proveedor
         llm_selector_card = ctk.CTkFrame(
-            self.llm_container, fg_color="#111827", corner_radius=12, border_width=1, border_color=theme.BORDER_SUBTLE
+            self.llm_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         llm_selector_card.pack(fill="x", pady=(0, 8))
 
@@ -280,13 +284,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             llm_selector_card,
             values=provider_options,
             command=self._on_provider_changed,
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             button_color=theme.ACCENT_PRIMARY,
             button_hover_color=theme.ACCENT_PRIMARY_HOVER,
             text_color=theme.TEXT_PRIMARY,
-            dropdown_fg_color="#111827",
+            dropdown_fg_color=theme.BG_CARD,
             dropdown_text_color=theme.TEXT_PRIMARY,
-            dropdown_hover_color="#1F2937",
+            dropdown_hover_color=theme.BG_CARD_INNER,
             font=("Segoe UI", 11, "bold"),
             height=36,
             corner_radius=8,
@@ -296,7 +300,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Formulario Dinámico LLM
         self.llm_form_card = ctk.CTkFrame(
-            self.llm_container, fg_color="#111827", corner_radius=12, border_width=1, border_color=theme.BORDER_SUBTLE
+            self.llm_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         self.llm_form_card.pack(fill="both", expand=True)
 
@@ -314,7 +322,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             placeholder_text="Introduce tu clave de API…",
             show="●",
             font=("Consolas", 11),
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             border_color="#374151",
             text_color=theme.TEXT_PRIMARY,
             height=36,
@@ -327,7 +335,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             text="👁",
             width=38,
             height=36,
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             hover_color="#374151",
             text_color=theme.TEXT_PRIMARY,
             font=("Segoe UI", 13),
@@ -347,7 +355,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.llm_form_card,
             placeholder_text="http://localhost:11434/v1",
             font=("Consolas", 11),
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             border_color="#374151",
             text_color=theme.TEXT_PRIMARY,
             height=36,
@@ -364,11 +372,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.llm_form_card,
             values=["gemini-3.5-flash-lite"],
             font=("Consolas", 11),
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             border_color="#374151",
             button_color=theme.ACCENT_PRIMARY,
             button_hover_color=theme.ACCENT_PRIMARY_HOVER,
-            dropdown_fg_color="#111827",
+            dropdown_fg_color=theme.BG_CARD,
             dropdown_text_color=theme.TEXT_PRIMARY,
             text_color=theme.TEXT_PRIMARY,
             height=36,
@@ -388,7 +396,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.llm_hint_label.pack(anchor="w", padx=16, pady=(2, 6))
 
         # 5. Status Box LLM
-        self.llm_status_box = ctk.CTkFrame(self.llm_form_card, fg_color="#1F2937", corner_radius=8)
+        self.llm_status_box = ctk.CTkFrame(self.llm_form_card, fg_color=theme.BG_CARD_INNER, corner_radius=8)
         self.llm_status_box.pack(fill="x", padx=16, pady=(4, 8))
 
         self.llm_status_icon = ctk.CTkLabel(
@@ -413,7 +421,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.llm_test_btn = ctk.CTkButton(
             llm_action_row,
             text="🧪 PROBAR CONEXIÓN",
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             hover_color="#374151",
             border_color=theme.ACCENT_PRIMARY,
             border_width=1,
@@ -442,7 +450,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Card Selector Motor TTS
         tts_selector_card = ctk.CTkFrame(
-            self.tts_container, fg_color="#111827", corner_radius=12, border_width=1, border_color=theme.BORDER_SUBTLE
+            self.tts_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         tts_selector_card.pack(fill="x", pady=(0, 8))
 
@@ -458,13 +470,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             tts_selector_card,
             values=tts_options,
             command=self._on_tts_engine_changed,
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             button_color=theme.ACCENT_PRIMARY,
             button_hover_color=theme.ACCENT_PRIMARY_HOVER,
             text_color=theme.TEXT_PRIMARY,
-            dropdown_fg_color="#111827",
+            dropdown_fg_color=theme.BG_CARD,
             dropdown_text_color=theme.TEXT_PRIMARY,
-            dropdown_hover_color="#1F2937",
+            dropdown_hover_color=theme.BG_CARD_INNER,
             font=("Segoe UI", 11, "bold"),
             height=36,
             corner_radius=8,
@@ -476,7 +488,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Formulario Dinámico TTS
         self.tts_form_card = ctk.CTkFrame(
-            self.tts_container, fg_color="#111827", corner_radius=12, border_width=1, border_color=theme.BORDER_SUBTLE
+            self.tts_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         self.tts_form_card.pack(fill="both", expand=True)
 
@@ -497,7 +513,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             placeholder_text="Introduce tu ElevenLabs API Key…",
             show="●",
             font=("Consolas", 11),
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             border_color="#374151",
             text_color=theme.TEXT_PRIMARY,
             height=36,
@@ -510,7 +526,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             text="👁",
             width=38,
             height=36,
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             hover_color="#374151",
             text_color=theme.TEXT_PRIMARY,
             font=("Segoe UI", 13),
@@ -529,11 +545,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.tts_form_card,
             values=ELEVENLABS_VOICE_PRESETS,
             font=("Consolas", 11),
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             border_color="#374151",
             button_color=theme.ACCENT_PRIMARY,
             button_hover_color=theme.ACCENT_PRIMARY_HOVER,
-            dropdown_fg_color="#111827",
+            dropdown_fg_color=theme.BG_CARD,
             dropdown_text_color=theme.TEXT_PRIMARY,
             text_color=theme.TEXT_PRIMARY,
             height=36,
@@ -554,11 +570,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.tts_form_card,
             values=ELEVENLABS_MODEL_PRESETS,
             font=("Consolas", 11),
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             border_color="#374151",
             button_color=theme.ACCENT_PRIMARY,
             button_hover_color=theme.ACCENT_PRIMARY_HOVER,
-            dropdown_fg_color="#111827",
+            dropdown_fg_color=theme.BG_CARD,
             dropdown_text_color=theme.TEXT_PRIMARY,
             text_color=theme.TEXT_PRIMARY,
             height=36,
@@ -590,7 +606,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.tts_hint_label.pack(anchor="w", padx=16, pady=(2, 6))
 
         # Status Box TTS
-        self.tts_status_box = ctk.CTkFrame(self.tts_form_card, fg_color="#1F2937", corner_radius=8)
+        self.tts_status_box = ctk.CTkFrame(self.tts_form_card, fg_color=theme.BG_CARD_INNER, corner_radius=8)
         self.tts_status_box.pack(fill="x", padx=16, pady=(4, 8))
 
         self.tts_status_icon = ctk.CTkLabel(
@@ -615,7 +631,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.tts_test_btn = ctk.CTkButton(
             tts_action_row,
             text="🔊 PROBAR VOZ",
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             hover_color="#374151",
             border_color=theme.ACCENT_PRIMARY,
             border_width=1,
@@ -636,7 +652,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             text="💾 GUARDAR Y APLICAR",
             fg_color=theme.ACCENT_PRIMARY,
             hover_color=theme.ACCENT_PRIMARY_HOVER,
-            text_color="#090D16",
+            text_color=theme.BG_CANVAS,
             font=("Segoe UI", 11, "bold"),
             height=40,
             corner_radius=8,
@@ -647,7 +663,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         ctk.CTkButton(
             bottom_row,
             text="CERRAR",
-            fg_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
             hover_color="#374151",
             text_color=theme.TEXT_PRIMARY,
             font=("Segoe UI", 11),
