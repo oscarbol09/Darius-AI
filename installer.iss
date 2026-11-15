@@ -12,7 +12,7 @@
 #define MyAppExeName "DariusAI.exe"
 
 [Setup]
-AppId={{D4R1U5-A1-W1ND0W5-V850}}
+AppId={{D4R1U5-A1-W1ND0W5-V710}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
