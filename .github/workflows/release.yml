@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Nombre del Tag / Versión (ej. v7.1.0)'
+        description: 'Nombre del Tag / Versión (ej. v8.5.0)'
         required: false
-        default: 'v7.1.0'
+        default: 'v8.5.0'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

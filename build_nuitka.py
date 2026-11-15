@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 # -- Inyección de Versión Dinámica SRE --
-raw_tag = os.environ.get("GITHUB_REF_NAME", "7.1.0").lstrip("v")
+raw_tag = os.environ.get("GITHUB_REF_NAME", "8.5.0").lstrip("v")
 parts = raw_tag.split(".")
 while len(parts) < 4:
     parts.append("0")
@@ -29,7 +29,7 @@ def main():
     os.chdir(root_dir)
 
     print("=" * 70)
-    print("  DARIUS AI — COMPILACIÓN NATIVA STANDALONE CON NUITKA (v7.1.0)")
+    print("  DARIUS AI — COMPILACIÓN NATIVA STANDALONE CON NUITKA (v8.5.0)")
     print("=" * 70)
 
     # 1. Asegurar icono
