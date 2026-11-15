@@ -21,6 +21,7 @@ SpeechRecognition>=3.10.0
 PyAudio>=0.2.14
 edge-tts>=6.1.0
 sounddevice>=0.5.0
+soundfile>=0.12.1
 
 # -- Integración con APIs de Windows y Hardware --------------------------------
 pywin32>=306
