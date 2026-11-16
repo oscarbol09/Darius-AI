@@ -11,25 +11,51 @@ Uso:
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
-# -- Inyección de Versión Dinámica SRE --
-raw_tag = os.environ.get("GITHUB_REF_NAME", "7.1.0").lstrip("v")
-parts = raw_tag.split(".")
-while len(parts) < 4:
-    parts.append("0")
-win_version = ".".join(parts[:4])
-# ---------------------------------------
+
+def _load_project_version(root_dir: Path) -> str:
+    """Lee la versión canónica desde pyproject.toml."""
+    pyproject = root_dir / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+            ver = str(data.get("project", {}).get("version", "")).strip()
+            if ver:
+                return ver
+        except Exception as exc:
+            print(f"[WARN] No se pudo leer pyproject.toml ({exc}); usando fallback.")
+    return "8.5.0"
+
+
+def _resolve_windows_version(root_dir: Path) -> tuple[str, str]:
+    """
+    Resuelve la versión semántica y el formato Windows de 4 componentes (X.Y.Z.0).
+    Ignora nombres de rama no numéricos (ej. 'main' durante workflow_dispatch).
+    """
+    fallback_ver = _load_project_version(root_dir)
+    candidate = os.environ.get("DARIUS_RELEASE_VERSION") or os.environ.get("GITHUB_REF_NAME", "")
+    cleaned = candidate.strip().lstrip("v")
+    match = re.match(r"^(\d+(?:\.\d+){1,3})", cleaned)
+    semver = match.group(1) if match else fallback_ver
+
+    parts = semver.split(".")
+    while len(parts) < 4:
+        parts.append("0")
+    return semver, ".".join(parts[:4])
 
 
 def main():
     root_dir = Path(__file__).resolve().parent
     os.chdir(root_dir)
+    semver, win_version = _resolve_windows_version(root_dir)
 
     print("=" * 70)
-    print("  DARIUS AI — COMPILACIÓN NATIVA STANDALONE CON NUITKA (v7.1.0)")
+    print(f"  DARIUS AI — COMPILACIÓN NATIVA STANDALONE CON NUITKA (v{semver})")
     print("=" * 70)
 
     # 1. Asegurar icono
@@ -39,11 +65,10 @@ def main():
         print("\n[*] Generando icono de la aplicación...")
         subprocess.run([sys.executable, str(icon_script)], check=True)  # noqa: S603
 
-    # 2. Asegurar archivo de configuración base
-    config_path = root_dir / "config.json"
-    if not config_path.exists():
-        print("\n[*] Creando config.json base para empaquetado...")
-        config_path.write_text('{"assistant": {"name": "darius"}}', encoding="utf-8")
+    # 2. Verificar plantilla de configuración para empaquetado
+    template_path = root_dir / "config.template.json"
+    if not template_path.exists():
+        raise FileNotFoundError("Falta config.template.json requerido para empaquetar Darius AI.")
 
     # 3. Verificar dependencias de build
     print("\n[*] Verificando herramientas de compilación...")
@@ -79,7 +104,7 @@ def main():
         "--include-package-data=customtkinter",
         "--include-package=speech_recognition",
         "--include-package-data=speech_recognition",
-        "--include-data-files=config.json=config.json",
+        "--include-data-files=config.template.json=config.json",
         "--include-data-files=assets/darius.ico=assets/darius.ico",
         f"--windows-icon-from-ico={icon_path}",
         "--company-name=Oscarbol09",

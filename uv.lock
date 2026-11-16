@@ -4,5 +4,5 @@ requires-python = ">=3.11"
 
 [[package]]
 name = "darius-ai"
-version = "7.0.0"
+version = "8.5.0"
 source = { editable = "." }

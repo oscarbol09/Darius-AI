@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "darius-ai"
-version = "7.1.0"
+version = "8.5.0"
 description = "Asistente de inteligencia artificial nativo para Windows con control por voz y automatización"
 authors = [
     { name = "Oscarbol09", email = "oscarbol09@users.noreply.github.com" },
@@ -12,6 +12,46 @@ authors = [
 license = { text = "GPL-3.0-or-later" }
 readme = "README.md"
 requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31.0",
+    "httpx>=0.27.0",
+    "google-genai>=1.0.0",
+    "google-antigravity>=0.1.0; sys_platform == 'win32'",
+    "python-dotenv>=1.0.0",
+    "customtkinter>=5.2.0",
+    "Pillow>=10.0.0",
+    "SpeechRecognition>=3.10.0",
+    "PyAudio>=0.2.14",
+    "edge-tts>=6.1.0",
+    "sounddevice>=0.5.0",
+    "soundfile>=0.12.1",
+    "pywin32>=306; sys_platform == 'win32'",
+    "comtypes>=1.2.0; sys_platform == 'win32'",
+    "pycaw>=20181226; sys_platform == 'win32'",
+    "keyboard>=0.13.5",
+    "psutil>=5.9.0",
+    "numpy>=1.24.0",
+    "mss>=9.0.0",
+    "beautifulsoup4>=4.12.0",
+    "defusedxml>=0.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.9.0",
+    "mypy>=1.10.0",
+    "pip-audit>=2.7.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+vision = [
+    "opencv-python>=4.9.0",
+    "pytesseract>=0.3.10",
+]
+wakeword = [
+    "pvporcupine>=3.0.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/oscarbol09/Darius-AI"
@@ -22,7 +62,7 @@ target-version = "py311"
 line-length = 120
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "S", "B", "SIM"]
+select = ["E", "F", "W", "I", "N", "UP", "S", "B", "SIM", "C4", "PIE"]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["S101"]
@@ -36,19 +76,28 @@ python_files = ["test_*.py"]
 addopts = "--tb=short"
 markers = [
     "live: pruebas que realizan llamadas de red o hardware en vivo (excluidas en CI hermético)",
+    "windows: pruebas exclusivas de entorno Windows (Win32 API/ctypes)",
 ]
 
 [tool.coverage.run]
 source = ["src"]
+branch = true
 omit = ["test_*.py", ".venv/*", "antenv/*"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+fail_under = 80
 
 [tool.pyright]
 executionEnvironments = [
   { root = "." }
 ]
 extraPaths = ["."]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
 
