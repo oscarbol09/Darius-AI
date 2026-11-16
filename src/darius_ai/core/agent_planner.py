@@ -165,7 +165,6 @@ REGLAS OBLIGATORIAS:
 """
 
 
-
 class AgentPlannerEngine:
     """
     Motor de planificación y orquestación multi-paso.
@@ -296,11 +295,7 @@ class AgentPlannerEngine:
                 fact = p.get("fact", "") or prev_result
                 if action == "read":
                     prof = u_engine.read_profile()
-                    out = "\n".join(
-                        f"### {k}\n" + "\n".join(f"- {item}" for item in v)
-                        for k, v in prof.items()
-                        if v
-                    )
+                    out = "\n".join(f"### {k}\n" + "\n".join(f"- {item}" for item in v) for k, v in prof.items() if v)
                     return True, out or "Perfil de usuario vacío."
                 elif action == "add":
                     ok = u_engine.add_fact(cat, fact)
@@ -368,7 +363,7 @@ class AgentPlannerEngine:
                 return True, f"Lanzando aplicación: {desc or app_name}"
 
             elif t == "human_gui":
-                from src.darius_ai.gui.human_gui import gui
+                from src.darius_ai.automation.human_input import gui
 
                 action = p.get("action", "type")
                 if action == "type":
@@ -377,8 +372,9 @@ class AgentPlannerEngine:
                     return True, f"Texto escrito: {txt[:30]}..."
                 elif action == "hotkey":
                     keys = p.get("keys", "enter")
-                    gui.human_hotkey(keys)
-                    return True, f"Atajo ejecutado: {keys}"
+                    key_list = [k.strip() for k in re.split(r"[,+\s]+", keys) if k.strip()]
+                    gui.human_hotkey(*key_list)
+                    return True, f"Atajo ejecutado: {' + '.join(key_list)}"
                 elif action == "click":
                     gui.human_click()
                     return True, "Clic ejecutado."
@@ -534,11 +530,11 @@ class AgentPlannerEngine:
             elif t in ("darius_lockdown", "tactical_lockdown"):
                 from src.darius_ai.core.darius_lockdown import get_darius_lockdown_engine
 
-                engine = get_darius_lockdown_engine()
+                lockdown_engine = get_darius_lockdown_engine()
                 level = p.get("level", "silence")
                 if level == "lockdown":
-                    return engine.trigger_emergency_lockdown(lock_workstation=True)
-                return engine.trigger_tactical_silence()
+                    return lockdown_engine.trigger_emergency_lockdown(lock_workstation=True)
+                return lockdown_engine.trigger_tactical_silence()
 
             elif t == "track_orbital_iss":
                 from src.darius_ai.core.orbital_radar import get_orbital_radar
@@ -574,10 +570,10 @@ class AgentPlannerEngine:
             elif t == "query_space_weather":
                 from src.darius_ai.core.space_weather_oracle import get_space_weather_oracle
 
-                oracle = get_space_weather_oracle()
-                ok, report, alocution = oracle.get_current_space_weather()
+                space_oracle = get_space_weather_oracle()
+                ok, report, alocution = space_oracle.get_current_space_weather()
                 if ok and report:
-                    return True, oracle.format_vocal_briefing(report)
+                    return True, space_oracle.format_vocal_briefing(report)
                 return True, alocution
 
             # Fallback a AgenticBridge si no se resolvió arriba
@@ -674,7 +670,6 @@ class AgentPlannerEngine:
                     "output": output,
                 }
             )
-
 
             if ok:
                 success_count += 1

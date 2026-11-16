@@ -77,9 +77,7 @@ class AirTrafficSentinel:
         self._cache_timestamp: float = 0.0
         self._cache_key: tuple[float, float, float] = (0.0, 0.0, 0.0)
 
-    def _calculate_bounding_box(
-        self, lat: float, lon: float, radius_km: float
-    ) -> tuple[float, float, float, float]:
+    def _calculate_bounding_box(self, lat: float, lon: float, radius_km: float) -> tuple[float, float, float, float]:
         """Compute geographic bounding box (lamin, lomin, lamax, lomax) clamped to global coordinates."""
         delta_lat = radius_km / 111.0
         cos_lat = max(0.001, math.cos(math.radians(lat)))
@@ -237,11 +235,7 @@ class AirTrafficSentinel:
         cache_key = (round(lat, 3), round(lon, 3), round(radius_km, 1))
         now = time.time()
 
-        if (
-            self._cache_data
-            and (now - self._cache_timestamp) < self.cache_ttl_seconds
-            and self._cache_key == cache_key
-        ):
+        if self._cache_data and (now - self._cache_timestamp) < self.cache_ttl_seconds and self._cache_key == cache_key:
             logger.debug("Returning cached air traffic contacts (age=%.1fs)", now - self._cache_timestamp)
             limited = self._cache_data[:max_contacts]
             return True, limited, self.format_vocal_radar(limited)

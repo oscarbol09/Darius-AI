@@ -28,9 +28,7 @@ class AgentEvent:
     message: str
     status: str = "running"  # running | success | warning | error
     duration_ms: float = 0.0
-    time_str: str = field(
-        default_factory=lambda: datetime.datetime.now().strftime("%H:%M:%S")
-    )
+    time_str: str = field(default_factory=lambda: datetime.datetime.now().strftime("%H:%M:%S"))
 
 
 class TelemetryTracker:
@@ -120,6 +118,7 @@ def trace_step(
     """
     Decorador para medir y registrar automáticamente la ejecución de un paso agéntico.
     """
+
     def decorator(func: Callable):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):

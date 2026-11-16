@@ -136,17 +136,16 @@ class WebcamSentinel:
 
     def _trigger_async_biometrics(self, face_roi: Any = None) -> None:
         """Dispara la verificación biométrica en un hilo secundario para no bloquear el centinela."""
-        if self._biometrics_engine is None:
+        engine = self._biometrics_engine
+        if engine is None:
             return
 
         def _worker() -> None:
             try:
                 if face_roi is not None:
-                    res = self._biometrics_engine.verify_face_frame(face_roi)
+                    res = engine.verify_face_frame(face_roi)
                 else:
-                    res = self._biometrics_engine.verify_live_user(
-                        timeout_seconds=2.0, camera_index=self._camera_index
-                    )
+                    res = engine.verify_live_user(timeout_seconds=2.0, camera_index=self._camera_index)
                 self._emit("on_biometric_verified", result=res)
             except Exception as e:
                 log.debug(f"[Sentinel] Error en verificación biométrica asíncrona: {e}")

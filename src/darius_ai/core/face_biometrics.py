@@ -353,10 +353,7 @@ class FaceBiometricsEngine:
                 "Desafío de autenticación secundario requerido."
             )
         elif result.status == "CAMERA_UNAVAILABLE":
-            return (
-                "Sensores ópticos no disponibles. "
-                "Autenticación biométrica degradada a protocolo de contingencia."
-            )
+            return "Sensores ópticos no disponibles. Autenticación biométrica degradada a protocolo de contingencia."
         else:
             return f"Estado de autenticación biométrica: {result.status}. Acceso restringido."
 

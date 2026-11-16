@@ -577,7 +577,6 @@ SYSTEM_ACTIONS: dict[str, dict] = {
         "desc": "Auditoría perimetral y estado de seguridad",
         "return_output": True,
     },
-
     "procesos que mas consumen": {
         "action": {
             "type": "powershell",
@@ -1234,6 +1233,7 @@ $ip     = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlia
             "protocolo de emergencia",
         ],
         "desc": "Detener tareas, vaciar bitácoras y bloquear estación de trabajo",
+        "confirm": True,
         "return_output": True,
     },
     "posicion estacion espacial": {
@@ -1339,6 +1339,41 @@ $ip     = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.InterfaceAlia
             "modo antigravity",
         ],
         "desc": "Verificar y consultar estado del agente autónomo Antigravity",
+        "return_output": True,
+    },
+    "activar centinela": {
+        "action": {"type": "python", "run": "sentinel_activate"},
+        "aliases": [
+            "activar centinela de presencia",
+            "iniciar centinela",
+            "encender centinela",
+            "modo centinela",
+            "activar vigilancia",
+        ],
+        "desc": "Activar centinela de presencia humana",
+        "return_output": True,
+    },
+    "desactivar centinela": {
+        "action": {"type": "python", "run": "sentinel_deactivate"},
+        "aliases": [
+            "desactivar centinela de presencia",
+            "apagar centinela",
+            "detener centinela",
+            "parar centinela",
+        ],
+        "desc": "Desactivar centinela de presencia humana",
+        "return_output": True,
+    },
+    "generar dossier": {
+        "action": {"type": "python", "run": "generate_dossier"},
+        "aliases": [
+            "crear dossier",
+            "ficha de inteligencia",
+            "investigar objetivo",
+            "dossier de inteligencia",
+            "generar ficha de inteligencia",
+        ],
+        "desc": "Generar ficha de inteligencia estructurada (Target Dossier)",
         "return_output": True,
     },
 }
@@ -1496,7 +1531,9 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                 items = [f"{k}: {', '.join(v)}" for k, v in prof.items() if v]
                 return (
                     True,
-                    "Perfil del usuario: " + "; ".join(items) if items else "Perfil de usuario sin datos registrados aún.",
+                    "Perfil del usuario: " + "; ".join(items)
+                    if items
+                    else "Perfil de usuario sin datos registrados aún.",
                 )
             elif workspace_cmd == "security_audit":
                 from src.darius_ai.core.security_guard import (
@@ -1546,9 +1583,9 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
             elif workspace_cmd in ("darius_protocol", "stark_protocol"):
                 from src.darius_ai.core.darius_protocol import get_darius_engine
 
-                engine = get_darius_engine()
-                diag = engine.run_diagnostic(with_sfx=True)
-                return True, engine.generate_vocal_briefing(diag)
+                darius_engine = get_darius_engine()
+                diag = darius_engine.run_diagnostic(with_sfx=True)
+                return True, darius_engine.generate_vocal_briefing(diag)
             elif workspace_cmd in ("darius_wit", "jarvis_wit"):
                 from src.darius_ai.core.darius_persona import DariusPersona
 
@@ -1556,16 +1593,16 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
             elif workspace_cmd == "news_headlines":
                 from src.darius_ai.core.news_sentinel import NewsSentinel
 
-                sentinel = NewsSentinel()
-                headlines = sentinel.get_top_headlines(category="technology", limit=4)
-                return True, sentinel.format_vocal_briefing(headlines, category="tecnología")
+                news_sentinel = NewsSentinel()
+                headlines = news_sentinel.get_top_headlines(category="technology", limit=4)
+                return True, news_sentinel.format_vocal_briefing(headlines, category="tecnología")
             elif workspace_cmd == "lexicon_lookup":
                 from src.darius_ai.core.lexicon_oracle import LexiconOracle
 
-                oracle = LexiconOracle()
-                found, entry, _ = oracle.lookup("inteligencia artificial")
+                lex_oracle = LexiconOracle()
+                found, entry, _ = lex_oracle.lookup("inteligencia artificial")
                 if found and entry:
-                    return True, oracle.format_vocal_definition(entry)
+                    return True, lex_oracle.format_vocal_definition(entry)
                 return True, "No se encontró la definición solicitada en el léxico, señor."
             elif workspace_cmd == "youtube_search":
                 from src.darius_ai.system.media_controller import media_controller
@@ -1575,16 +1612,19 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                 from src.darius_ai.core.visual_intel_ocr import VisualIntelOCR
 
                 ocr = VisualIntelOCR()
-                res = ocr.ocr_screen_region()
-                if res.text.strip():
-                    return True, f"Texto detectado en pantalla ({res.word_count} palabras):\n{res.text[:200]}..."
+                ocr_res = ocr.ocr_screen_region()
+                if ocr_res.text.strip():
+                    return (
+                        True,
+                        f"Texto detectado en pantalla ({ocr_res.word_count} palabras):\n{ocr_res.text[:200]}...",
+                    )
                 return True, "No se detectó texto legible en la pantalla, señor."
             elif workspace_cmd == "biometric_auth":
                 from src.darius_ai.core.face_biometrics import get_face_biometrics_engine
 
-                engine = get_face_biometrics_engine()
-                res = engine.verify_live_user(timeout_seconds=2.0)
-                return True, engine.get_biometric_greeting(res)
+                bio_engine = get_face_biometrics_engine()
+                bio_res = bio_engine.verify_live_user(timeout_seconds=2.0)
+                return True, bio_engine.get_biometric_greeting(bio_res)
             elif workspace_cmd in ("darius_timer_create", "stark_timer_create"):
                 from src.darius_ai.core.darius_timer import get_darius_timer_manager
 
@@ -1617,13 +1657,13 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
             elif workspace_cmd == "tactical_silence":
                 from src.darius_ai.core.darius_lockdown import get_darius_lockdown_engine
 
-                engine = get_darius_lockdown_engine()
-                return engine.trigger_tactical_silence()
+                lockdown_engine = get_darius_lockdown_engine()
+                return lockdown_engine.trigger_tactical_silence()
             elif workspace_cmd == "emergency_lockdown":
                 from src.darius_ai.core.darius_lockdown import get_darius_lockdown_engine
 
-                engine = get_darius_lockdown_engine()
-                return engine.trigger_emergency_lockdown(lock_workstation=True)
+                lockdown_engine = get_darius_lockdown_engine()
+                return lockdown_engine.trigger_emergency_lockdown(lock_workstation=True)
             elif workspace_cmd == "orbital_iss":
                 from src.darius_ai.core.orbital_radar import get_orbital_radar
 
@@ -1635,10 +1675,10 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
             elif workspace_cmd == "air_traffic":
                 from src.darius_ai.core.air_traffic_sentinel import get_air_traffic_sentinel
 
-                sentinel = get_air_traffic_sentinel()
-                ok, contacts, alocution = sentinel.scan_overhead()
+                air_sentinel = get_air_traffic_sentinel()
+                ok, contacts, alocution = air_sentinel.scan_overhead()
                 if ok and contacts:
-                    return True, sentinel.format_vocal_radar(contacts)
+                    return True, air_sentinel.format_vocal_radar(contacts)
                 return True, alocution
             elif workspace_cmd == "seismic_alert":
                 from src.darius_ai.core.seismic_sensor import get_seismic_sensor
@@ -1651,10 +1691,10 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
             elif workspace_cmd == "space_weather":
                 from src.darius_ai.core.space_weather_oracle import get_space_weather_oracle
 
-                oracle = get_space_weather_oracle()
-                ok, report, alocution = oracle.get_current_space_weather()
+                space_oracle = get_space_weather_oracle()
+                ok, report, alocution = space_oracle.get_current_space_weather()
                 if ok and report:
-                    return True, oracle.format_vocal_briefing(report)
+                    return True, space_oracle.format_vocal_briefing(report)
                 return True, alocution
             elif workspace_cmd == "gods_eye_protocol":
                 from src.darius_ai.audio.sound_effects import get_sfx_engine
@@ -1695,34 +1735,67 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
             elif workspace_cmd == "gemini_live_start":
                 from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
 
-                engine = get_gemini_live_engine()
+                live_engine = get_gemini_live_engine()
                 import asyncio
                 import threading
 
-                threading.Thread(target=lambda: asyncio.run(engine.start_async()), daemon=True).start()
-                return True, "Iniciando enlace neuronal bidireccional con Gemini Live, señor. Canal full-duplex en línea."
+                threading.Thread(target=lambda: asyncio.run(live_engine.start_async()), daemon=True).start()
+                return (
+                    True,
+                    "Iniciando enlace neuronal bidireccional con Gemini Live, señor. Canal full-duplex en línea.",
+                )
             elif workspace_cmd == "gemini_live_stop":
                 from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
 
-                engine = get_gemini_live_engine()
+                live_engine = get_gemini_live_engine()
                 import asyncio
                 import threading
 
-                threading.Thread(target=lambda: asyncio.run(engine.stop_async()), daemon=True).start()
+                threading.Thread(target=lambda: asyncio.run(live_engine.stop_async()), daemon=True).start()
                 return True, "Enlace Gemini Live desconectado, señor. Retornando a canal de síntesis estándar."
             elif workspace_cmd == "antigravity_agent_status":
                 from src.darius_ai.core.antigravity_bridge import get_antigravity_bridge
 
-                bridge = get_antigravity_bridge()
-                if bridge.is_available():
-                    return True, "El Agente Antigravity está en línea y vinculado para resolver tareas autónomas, señor."
+                ag_bridge = get_antigravity_bridge()
+                if ag_bridge.is_available():
+                    return (
+                        True,
+                        "El Agente Antigravity está en línea y vinculado para resolver tareas autónomas, señor.",
+                    )
                 return False, "El runtime de Antigravity no está disponible en este entorno, señor."
+            elif workspace_cmd == "sentinel_activate":
+                from src.darius_ai.core.webcam_sentinel import get_webcam_sentinel
+
+                webcam_sentinel = get_webcam_sentinel()
+                ok = webcam_sentinel.start()
+                if ok:
+                    return True, "Centinela de presencia humana activado en segundo plano, señor."
+                return False, "No fue posible iniciar el centinela (cámara u OpenCV no disponible)."
+            elif workspace_cmd == "sentinel_deactivate":
+                from src.darius_ai.core.webcam_sentinel import get_webcam_sentinel
+
+                webcam_sentinel = get_webcam_sentinel()
+                webcam_sentinel.stop()
+                return True, "Centinela de presencia humana desactivado, señor."
+            elif workspace_cmd == "generate_dossier":
+                from src.darius_ai.core.target_dossier import get_dossier_engine
+
+                dossier_engine = get_dossier_engine()
+                dossier = dossier_engine.synthesize_dossier(
+                    target_name="Darius AI Core",
+                    category="project",
+                    context="Ecosistema de IA autónoma local",
+                )
+                dossier_engine.save_to_obsidian(dossier)
+                return (
+                    True,
+                    f"Dossier de inteligencia generado para {dossier.target_name}. {dossier.to_speech_summary()}",
+                )
             fn = action.get("fn")
             if callable(fn):
                 res = fn()
                 return True, str(res) if res is not None else ""
             return True, ""
-
 
         elif open_window:
             if atype == "powershell":

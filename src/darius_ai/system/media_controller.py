@@ -327,4 +327,3 @@ def get_media_controller() -> MediaController:
 
 # Instancia singleton accesible globalmente
 media_controller = get_media_controller()
-

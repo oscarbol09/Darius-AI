@@ -249,9 +249,7 @@ class DariusProtocolEngine:
         # Estado nominal / óptimo
         net_str = f"online con latencia de {net.get('latency_ms', 0):.1f} ms" if net.get("online") else "en modo local"
         bat_str = (
-            "alimentación AC continua"
-            if bat.get("status") == "DESKTOP"
-            else f"batería al {bat.get('percent', 100)}%"
+            "alimentación AC continua" if bat.get("status") == "DESKTOP" else f"batería al {bat.get('percent', 100)}%"
         )
 
         return (

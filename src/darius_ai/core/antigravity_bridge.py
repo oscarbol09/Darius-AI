@@ -177,9 +177,7 @@ class AntigravityAgentBridge:
                         )
                         return future.result()
                 else:
-                    return asyncio.run(
-                        self.ask_agent_async(prompt, system_prompt=system_prompt, timeout=timeout)
-                    )
+                    return asyncio.run(self.ask_agent_async(prompt, system_prompt=system_prompt, timeout=timeout))
             except Exception as exc:
                 log.error(f"[AntigravityBridge] Error síncrono al consultar agente: {exc}")
                 return AntigravityResult(

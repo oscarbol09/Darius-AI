@@ -100,12 +100,23 @@ class ASTValidator:
             if node.attr.startswith("_"):
                 raise UnsafeCodeError(f"Access to private/dunder attribute '{node.attr}' is blocked")
 
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id in _FORBIDDEN_NAMES
-        ):
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _FORBIDDEN_NAMES:
             raise UnsafeCodeError(f"Call to '{node.func.id}' is not allowed")
+
+        elif isinstance(node, ast.ClassDef):
+            raise UnsafeCodeError("Class definitions ('class') are not permitted in sandbox")
+
+        elif isinstance(node, ast.Try):
+            for handler in node.handlers:
+                if handler.type is None:
+                    raise UnsafeCodeError("Catching all exceptions (bare 'except:') is not permitted in sandbox")
+                blocked_exceptions = {"BaseException", "KeyboardInterrupt", "SystemExit"}
+                if isinstance(handler.type, ast.Name) and handler.type.id in blocked_exceptions:
+                    raise UnsafeCodeError(f"Catching '{handler.type.id}' is not permitted in sandbox")
+                elif isinstance(handler.type, ast.Tuple):
+                    for elt in handler.type.elts:
+                        if isinstance(elt, ast.Name) and elt.id in blocked_exceptions:
+                            raise UnsafeCodeError(f"Catching '{elt.id}' is not permitted in sandbox")
 
 
 def _build_safe_builtins() -> dict[str, Any]:

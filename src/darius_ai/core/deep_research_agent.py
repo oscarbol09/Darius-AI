@@ -141,8 +141,7 @@ class DeepResearchAgent:
 
         # 5. Synthesize findings using LLM
         sources_context = "\n".join(
-            f"[{i + 1}] {s['title']} ({s['url']})\nSnippet: {s['snippet']}\n"
-            for i, s in enumerate(sources)
+            f"[{i + 1}] {s['title']} ({s['url']})\nSnippet: {s['snippet']}\n" for i, s in enumerate(sources)
         )
 
         synthesis_prompt = (
@@ -169,9 +168,7 @@ class DeepResearchAgent:
 
         # 6. Format Markdown report with footnotes and bibliography
         bibliography = "\n".join(f"- [{i + 1}] {s['title']} - {s['url']}" for i, s in enumerate(sources))
-        findings_markdown = "\n".join(
-            f"- {kf}" if not kf.startswith("-") else kf for kf in key_findings
-        )
+        findings_markdown = "\n".join(f"- {kf}" if not kf.startswith("-") else kf for kf in key_findings)
 
         markdown_report = (
             f"# Research Report: {topic}\n\n"
@@ -232,9 +229,7 @@ class DeepResearchAgent:
 
         if not key_findings:
             key_findings = [
-                f"{s['title']}: {s['snippet'][:180]} [{i + 1}]"
-                for i, s in enumerate(sources[:5])
-                if s.get("snippet")
+                f"{s['title']}: {s['snippet'][:180]} [{i + 1}]" for i, s in enumerate(sources[:5]) if s.get("snippet")
             ]
             if not key_findings:
                 key_findings = [f"Identified {len(sources)} verified sources on {topic} [1]."]

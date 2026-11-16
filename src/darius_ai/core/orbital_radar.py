@@ -57,26 +57,19 @@ class OrbitalRadar:
         self._cache_timestamp = 0.0
 
     @staticmethod
-    def calculate_distance_to_observer(
-        iss_lat: float, iss_lon: float, obs_lat: float, obs_lon: float
-    ) -> float:
+    def calculate_distance_to_observer(iss_lat: float, iss_lon: float, obs_lat: float, obs_lon: float) -> float:
         """Calculate Great-Circle distance to observer in kilometers using Haversine formula."""
         phi1 = math.radians(iss_lat)
         phi2 = math.radians(obs_lat)
         delta_phi = math.radians(obs_lat - iss_lat)
         delta_lambda = math.radians(obs_lon - iss_lon)
 
-        a = (
-            math.sin(delta_phi / 2.0) ** 2
-            + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
-        )
+        a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
         c = 2.0 * math.atan2(math.sqrt(a), math.sqrt(max(0.0, 1.0 - a)))
         return EARTH_RADIUS_KM * c
 
     @staticmethod
-    def calculate_bearing_to_observer(
-        from_lat: float, from_lon: float, to_lat: float, to_lon: float
-    ) -> float:
+    def calculate_bearing_to_observer(from_lat: float, from_lon: float, to_lat: float, to_lon: float) -> float:
         """Calculate initial azimuth/bearing from observer to target coordinates in degrees (0-360)."""
         phi1 = math.radians(from_lat)
         phi2 = math.radians(to_lat)

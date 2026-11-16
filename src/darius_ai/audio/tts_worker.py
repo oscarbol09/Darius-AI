@@ -53,6 +53,7 @@ class TTSWorker:
         except Exception as e:
             log.warning(f"SAPI5 no disponible para TTS: {e}")
             sapi_speaker = None
+        self._sapi_speaker = sapi_speaker
 
         while True:
             text = self._queue.get()
@@ -95,7 +96,6 @@ class TTSWorker:
                 import pythoncom
 
                 pythoncom.CoUninitialize()
-
 
     def _speak_elevenlabs(self, text: str) -> bool:
         """Intenta sintetizar con ElevenLabs y caché en disco."""
@@ -140,6 +140,20 @@ class TTSWorker:
                 self._queue.task_done()
             except Exception:
                 break
+
+    def interrupt(self) -> None:
+        """Detiene de inmediato la alocución vocal, vacía la cola y desbloquea el estado (Barge-in)."""
+        self.clear_queue()
+        with contextlib.suppress(Exception):
+            import sounddevice as sd
+
+            sd.stop()
+        if hasattr(self, "_sapi_speaker") and self._sapi_speaker is not None:
+            with contextlib.suppress(Exception):
+                # En SAPI 5, Speak("", 2) donde 2 = SVSFPurgeBeforeSpeak purga la voz activa
+                self._sapi_speaker.Speak("", 2)
+        self.is_speaking.clear()
+        log.info("[TTS] Alocución interrumpida atómicamente por el usuario (Barge-in).")
 
     def stop(self):
         """Detiene el worker enviando señal None."""

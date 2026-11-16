@@ -37,7 +37,6 @@ def _normalize_search_word(word: str) -> str:
     return w.replace("th", "t")
 
 
-
 _RESERVED_DOS_NAMES = {
     "CON",
     "PRN",
@@ -119,7 +118,6 @@ class ObsidianBrain:
             self._vault_dir = fallback
 
         return self._vault_dir
-
 
     # ── Guardado de Memorias y Notas ──────────────────────────────────────────
 
@@ -283,8 +281,7 @@ class ObsidianBrain:
             # Puntuación combinada: exacta y normalizada (resuelve TesisForge <-> ThesisForge)
             score = sum(text_lower.count(w) + norm_text.count(nw) for w, nw in zip(words, norm_words, strict=False))
             title_score = sum(
-                stem_lower.count(w) * 5 + norm_stem.count(nw) * 6
-                for w, nw in zip(words, norm_words, strict=False)
+                stem_lower.count(w) * 5 + norm_stem.count(nw) * 6 for w, nw in zip(words, norm_words, strict=False)
             )
 
             # Puntuación difusa en el título
@@ -311,7 +308,6 @@ class ObsidianBrain:
 
         matches.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
         return matches[:max_results]
-
 
     def get_memory_context(self, query: str = "") -> str:
         """

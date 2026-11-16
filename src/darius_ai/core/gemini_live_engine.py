@@ -74,9 +74,7 @@ class GeminiLiveEngine:
     def __post_init__(self):
         if self.api_key is None:
             self.api_key = (
-                cfg.llm_gemini_api_key
-                or cfg.get("gemini", "api_key", default="")
-                or os.getenv("GEMINI_API_KEY", "")
+                cfg.llm_gemini_api_key or cfg.get("gemini", "api_key", default="") or os.getenv("GEMINI_API_KEY", "")
             )
         elif not isinstance(self.api_key, str):
             self.api_key = str(self.api_key)
@@ -88,7 +86,6 @@ class GeminiLiveEngine:
     @property
     def state(self) -> LiveSessionState:
         return self._state
-
 
     def is_active(self) -> bool:
         return self._state in (
@@ -193,7 +190,7 @@ class GeminiLiveEngine:
                 )
             )
             connect_config = types.LiveConnectConfig(
-                response_modalities=["AUDIO"],
+                response_modalities=[types.Modality.AUDIO],
                 speech_config=speech_config,
                 system_instruction=types.Content(
                     parts=[
@@ -284,7 +281,6 @@ class GeminiLiveEngine:
         log.info("[GeminiLive] Sesión en vivo desconectada.")
 
     def start_live_session(self) -> tuple[bool, str]:
-
         """Inicia sincrónicamente la sesión de Gemini Live gestionando su bucle en un hilo dedicado."""
         if self.is_running:
             return True, "Sesión en vivo de Gemini Live ya activa."
@@ -451,7 +447,6 @@ class GeminiLiveEngine:
                 with contextlib.suppress(Exception):
                     pa.terminate()
             log.debug("[GeminiLive] Flujo de reproducción cerrado.")
-
 
     def format_vocal_status(self) -> str:
         """Genera un reporte conciso del estado de Gemini Live para el usuario."""

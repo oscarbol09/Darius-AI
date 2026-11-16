@@ -27,9 +27,9 @@ log = logging.getLogger("DARIUS.ApprovalStore")
 
 class RiskTier(StrEnum):
     TRIVIAL = "trivial"  # Ejecuta de inmediato sin preguntar
-    LOW = "low"          # Pregunta una vez, luego recuerda
-    MEDIUM = "medium"    # Pregunta siempre a menos que se indique always_approve
-    HIGH = "high"        # Siempre pregunta, nunca auto-recuerda
+    LOW = "low"  # Pregunta una vez, luego recuerda
+    MEDIUM = "medium"  # Pregunta siempre a menos que se indique always_approve
+    HIGH = "high"  # Siempre pregunta, nunca auto-recuerda
 
 
 class Decision(StrEnum):

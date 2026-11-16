@@ -23,8 +23,8 @@ class ComplexityTier(StrEnum):
 
 
 class ModelTarget(StrEnum):
-    LOCAL_FAST = "local_fast"          # Modelos locales ligeros (Ollama, Groq rápido)
-    STANDARD = "standard"              # Modelos estándar balanceados (Gemini Flash, GPT-4o-mini)
+    LOCAL_FAST = "local_fast"  # Modelos locales ligeros (Ollama, Groq rápido)
+    STANDARD = "standard"  # Modelos estándar balanceados (Gemini Flash, GPT-4o-mini)
     FRONTIER_REASONING = "frontier_reasoning"  # Modelos de razonamiento profundo (DeepSeek-R1, o1, Claude Sonnet)
 
 

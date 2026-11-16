@@ -12,6 +12,7 @@ Soporta:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -48,13 +49,28 @@ DESTRUCTIVE_KEYWORDS = {
     "del /f",
     "del /s",
     "rm -rf",
+    "del",
+    "rmdir",
+    "copy",
+    "move",
+    "reg",
+    "schtasks",
+    "net",
+    "attrib",
 }
 
 
 def is_destructive(action_text: str) -> bool:
     """Evalúa si una acción o comando propuesto es potencialmente destructivo."""
     norm = action_text.lower().strip()
-    return any(k in norm for k in DESTRUCTIVE_KEYWORDS)
+    for k in DESTRUCTIVE_KEYWORDS:
+        if " " in k or "-" in k or "/" in k:
+            if k in norm:
+                return True
+        else:
+            if re.search(rf"\b{re.escape(k)}\b", norm):
+                return True
+    return False
 
 
 class AgenticBridge:
@@ -100,7 +116,7 @@ class AgenticBridge:
         """Ejecuta un comando en CMD de Windows."""
         try:
             res = subprocess.run(  # noqa: S603
-                f"{self._cmd} /c {command}",
+                [self._cmd, "/c", command],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -218,7 +234,7 @@ class AgenticBridge:
     def human_mouse_move(self, x: int, y: int) -> tuple[bool, str]:
         """Mueve el ratón suavemente con física de curva de Bézier."""
         try:
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             gui.human_mouse_move(x, y)
             return True, f"Ratón movido a ({x}, {y})."
@@ -234,7 +250,7 @@ class AgenticBridge:
     ) -> tuple[bool, str]:
         """Ejecuta un clic o doble clic con duraciones humanas."""
         try:
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             gui.human_click(x=x, y=y, button=button, double=double)
             action_name = "Doble clic" if double else f"Clic {button}"
@@ -246,7 +262,7 @@ class AgenticBridge:
     def human_type(self, text: str, wpm: int = 70) -> tuple[bool, str]:
         """Escribe texto en pantalla con cadencia mecanográfica humana."""
         try:
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             gui.human_type(text, wpm=wpm)
             preview = text[:30] + ("..." if len(text) > 30 else "")
@@ -257,7 +273,7 @@ class AgenticBridge:
     def human_hotkey(self, keys: str) -> tuple[bool, str]:
         """Presiona una combinación de teclas (ej: 'ctrl+c', 'win+r')."""
         try:
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             key_list = [k.strip() for k in re.split(r"[,+\s]+", keys) if k.strip()]
             gui.human_hotkey(*key_list)
@@ -274,7 +290,7 @@ class AgenticBridge:
             if not safe:
                 return False, f"URL bloqueada por seguridad perimetral SSRF: {msg}"
 
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             res = gui.scrape_web_content(url, max_chars=MAX_OUTPUT_CHARS)
             if res.get("success"):
@@ -313,6 +329,35 @@ class AgenticBridge:
                 "output": "Ejecución abortada: patrón de inyección de prompt detectado en argumentos.",
                 "is_destructive": False,
             }
+
+        # Control Human-in-the-Loop (HITL): verificar y solicitar aprobación PREVIA para acciones destructivas
+        if destructive:
+            try:
+                from src.darius_ai.core.approval_store import ApprovalStore, Decision, RiskTier
+
+                store = ApprovalStore()
+                perm_key = f"{tool_clean}:{json.dumps({'tool': tool_clean, 'args': args_clean}, sort_keys=True)}"
+                perm_decision = store.check_permission(perm_key, tier=RiskTier.HIGH)
+                if perm_decision != Decision.ALWAYS_APPROVE:
+                    action = store.propose_action(
+                        action_type=tool_clean,
+                        description=f"Ejecución de {tool_clean} con argumentos: {args_clean}",
+                        payload={"tool": tool_clean, "args": args_clean},
+                        tier=RiskTier.HIGH,
+                    )
+                    return {
+                        "success": False,
+                        "tool": tool_name,
+                        "output": (
+                            "Acción bloqueada. Requiere autorización humana explícita. "
+                            f"Acción propuesta con ID: {action.id}"
+                        ),
+                        "is_destructive": True,
+                        "requires_approval": True,
+                        "action_id": action.id,
+                    }
+            except Exception as exc:
+                log.warning(f"[AgenticBridge] Error al verificar autorización en ApprovalStore: {exc}")
 
         if tool_clean in ("flush_dns", "limpiar_dns", "ipconfig_flushdns"):
             ok, out = self.flush_dns()
@@ -411,9 +456,9 @@ class AgenticBridge:
         ):
             from src.darius_ai.core.darius_protocol import get_darius_engine
 
-            engine = get_darius_engine()
-            diag = engine.run_diagnostic(with_sfx=True)
-            out = engine.generate_vocal_briefing(diag)
+            darius_engine = get_darius_engine()
+            diag = darius_engine.run_diagnostic(with_sfx=True)
+            out = darius_engine.generate_vocal_briefing(diag)
             ok = True
         elif tool_clean in (
             "darius_persona",
@@ -438,11 +483,11 @@ class AgenticBridge:
         elif tool_clean in ("lexicon_oracle", "definir_palabra", "diccionario", "lexico"):
             from src.darius_ai.core.lexicon_oracle import LexiconOracle
 
-            oracle = LexiconOracle()
+            lex_oracle = LexiconOracle()
             target_word = args_clean.strip()
-            found, entry, suggs = oracle.lookup(target_word)
+            found, entry, suggs = lex_oracle.lookup(target_word)
             if found and entry:
-                out = oracle.format_vocal_definition(entry)
+                out = lex_oracle.format_vocal_definition(entry)
                 ok = True
             elif suggs:
                 out = f"No encontré '{target_word}', señor. ¿Quizás quiso decir: {', '.join(suggs)}?"
@@ -458,16 +503,16 @@ class AgenticBridge:
             from src.darius_ai.core.visual_intel_ocr import VisualIntelOCR
 
             ocr = VisualIntelOCR()
-            res = ocr.ocr_screen_region()
-            ok = bool(res.text.strip())
-            out = res.text if ok else "No se detectó texto en la pantalla, señor."
+            ocr_res = ocr.ocr_screen_region()
+            ok = bool(ocr_res.text.strip())
+            out = ocr_res.text if ok else "No se detectó texto en la pantalla, señor."
         elif tool_clean in ("face_biometrics", "biometric_auth", "reconocimiento_facial"):
             from src.darius_ai.core.face_biometrics import get_face_biometrics_engine
 
-            engine = get_face_biometrics_engine()
-            res = engine.verify_live_user(timeout_seconds=2.0)
-            out = engine.get_biometric_greeting(res)
-            ok = res.verified
+            bio_engine = get_face_biometrics_engine()
+            bio_res = bio_engine.verify_live_user(timeout_seconds=2.0)
+            out = bio_engine.get_biometric_greeting(bio_res)
+            ok = bio_res.verified
         elif tool_clean in (
             "darius_timer",
             "stark_timer",
@@ -523,11 +568,11 @@ class AgenticBridge:
         ):
             from src.darius_ai.core.darius_lockdown import get_darius_lockdown_engine
 
-            engine = get_darius_lockdown_engine()
+            lockdown_engine = get_darius_lockdown_engine()
             if any(k in args_clean.lower() for k in ("rojo", "lockdown", "bloqueo", "emergencia", "kill")):
-                ok, out = engine.trigger_emergency_lockdown(lock_workstation=True)
+                ok, out = lockdown_engine.trigger_emergency_lockdown(lock_workstation=True)
             else:
-                ok, out = engine.trigger_tactical_silence()
+                ok, out = lockdown_engine.trigger_tactical_silence()
         elif tool_clean in ("track_orbital_iss", "orbital_radar", "iss", "estacion_espacial", "posicion_iss"):
             from src.darius_ai.core.orbital_radar import get_orbital_radar
 
@@ -538,10 +583,10 @@ class AgenticBridge:
         elif tool_clean in ("scan_overhead_air_traffic", "air_traffic", "radar_aereo", "trafico_aereo", "vuelos"):
             from src.darius_ai.core.air_traffic_sentinel import get_air_traffic_sentinel
 
-            sentinel = get_air_traffic_sentinel()
-            ok_air, contacts, alocution = sentinel.scan_overhead()
+            air_sentinel = get_air_traffic_sentinel()
+            ok_air, contacts, alocution = air_sentinel.scan_overhead()
             ok = ok_air
-            out = sentinel.format_vocal_radar(contacts) if ok_air and contacts else alocution
+            out = air_sentinel.format_vocal_radar(contacts) if ok_air and contacts else alocution
         elif tool_clean in ("check_seismic_activity", "seismic_sensor", "sismos", "terremotos", "alerta_sismica"):
             from src.darius_ai.core.seismic_sensor import get_seismic_sensor
 
@@ -552,10 +597,10 @@ class AgenticBridge:
         elif tool_clean in ("query_space_weather", "space_weather", "clima_espacial", "tormenta_solar", "indice_kp"):
             from src.darius_ai.core.space_weather_oracle import get_space_weather_oracle
 
-            oracle = get_space_weather_oracle()
-            ok_sw, report, alocution = oracle.get_current_space_weather()
+            space_oracle = get_space_weather_oracle()
+            ok_sw, report, alocution = space_oracle.get_current_space_weather()
             ok = ok_sw
-            out = oracle.format_vocal_briefing(report) if ok_sw and report else alocution
+            out = space_oracle.format_vocal_briefing(report) if ok_sw and report else alocution
         elif tool_clean in ("gods_eye_protocol", "protocolo_ojo_de_dios", "ojo_de_dios", "radar_global"):
             from src.darius_ai.audio.sound_effects import get_sfx_engine
             from src.darius_ai.core.air_traffic_sentinel import get_air_traffic_sentinel
@@ -600,20 +645,6 @@ class AgenticBridge:
         # Sanitización de credenciales y tokens en la salida de cualquier herramienta
         out = CredentialStripper().strip(out)
 
-        if destructive:
-            try:
-                from src.darius_ai.core.approval_store import ApprovalStore, RiskTier
-
-                store = ApprovalStore()
-                store.propose_action(
-                    action_type=tool_clean,
-                    description=f"Ejecución de {tool_clean} con argumentos: {args_clean}",
-                    payload={"tool": tool_clean, "args": args_clean},
-                    tier=RiskTier.HIGH,
-                )
-            except Exception as exc:
-                log.warning(f"[AgenticBridge] No se pudo registrar en ApprovalStore: {exc}")
-
         return {
             "success": ok,
             "tool": tool_name,
@@ -623,7 +654,6 @@ class AgenticBridge:
 
     # Alias idiomático para llamadas directas
     execute_tool = parse_and_execute_tool
-
 
 
 # Instancia singleton accesible globalmente

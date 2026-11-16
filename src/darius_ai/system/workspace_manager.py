@@ -17,6 +17,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
@@ -341,6 +342,11 @@ def open_url_on_monitor(
     if not u:
         return False
 
+    parsed = urllib.parse.urlsplit(u)
+    if parsed.scheme.lower() not in ("http", "https"):
+        log.warning(f"URL rechazada por esquema no permitido: {u}")
+        return False
+
     chrome = find_chrome_executable()
     if chrome:
         ml, mt, _, _ = get_monitor_bounds(monitor_index)
@@ -352,6 +358,7 @@ def open_url_on_monitor(
             args.append(f"--window-size={window_size[0]},{window_size[1]}")
         if fullscreen:
             args.append("--start-fullscreen")
+        args.append("--")
         args.append(u)
 
         detached = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
@@ -379,6 +386,12 @@ def play_spotify_or_song(uri_or_url: str) -> None:
     target = uri_or_url.strip()
     if not target:
         return
+
+    parsed = urllib.parse.urlsplit(target)
+    if parsed.scheme.lower() not in ("http", "https", "spotify"):
+        log.warning(f"URI/URL de audio rechazada por esquema no permitido: {target}")
+        return
+
     if sys.platform == "win32":
         try:
             os.startfile(target)  # noqa: S606

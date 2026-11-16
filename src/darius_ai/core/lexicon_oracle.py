@@ -46,10 +46,7 @@ class LexiconOracle:
         # English Curated Technical & Scientific Terms
         "algorithm": {
             "definitions": [
-                (
-                    "A finite sequence of well-defined computer-implementable instructions "
-                    "to solve a problem or compute."
-                )
+                ("A finite sequence of well-defined computer-implementable instructions to solve a problem or compute.")
             ],
             "synonyms": ["procedure", "method", "computational recipe"],
             "antonyms": [],
@@ -335,10 +332,7 @@ class LexiconOracle:
         },
         "base de datos": {
             "definitions": [
-                (
-                    "Estructura organizada para recopilar, consultar y modificar datos "
-                    "de forma rápida y persistente."
-                )
+                ("Estructura organizada para recopilar, consultar y modificar datos de forma rápida y persistente.")
             ],
             "synonyms": ["repositorio estructurado", "almacén de datos"],
             "antonyms": [],
@@ -596,9 +590,7 @@ class LexiconOracle:
             Butler vocal dialogue string.
         """
         if entry is None or not entry.definitions:
-            return (
-                "Señor, no dispongo de una entrada léxica concluyente en los registros disponibles para vocalizar."
-            )
+            return "Señor, no dispongo de una entrada léxica concluyente en los registros disponibles para vocalizar."
 
         primary_def = entry.definitions[0]
         # Clean newline artifacts if any

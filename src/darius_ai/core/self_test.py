@@ -423,7 +423,6 @@ def run_self_test() -> list[CheckResult]:
     return checks
 
 
-
 def print_self_test_report(results: list[CheckResult]) -> int:
     """Imprime el reporte en terminal con formato visual estructurado."""
     print("\n" + "=" * 75, flush=True)

@@ -284,4 +284,3 @@ __all__ = [
     "get_dialogue_stack",
     "get_stark_dialogue_stack",
 ]
-

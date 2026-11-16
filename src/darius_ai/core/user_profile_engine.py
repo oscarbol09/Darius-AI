@@ -101,7 +101,6 @@ class UserProfileEngine:
         cat_clean = category.strip()
         return _CATEGORY_ALIASES.get(cat_clean.lower(), cat_clean)
 
-
     def _read_profile_unlocked(self) -> dict[str, list[str]]:
         """Lectura interna del perfil sin adquirir candado (requiere lock externo)."""
         profile: dict[str, list[str]] = {cat: [] for cat in DEFAULT_CATEGORIES}
@@ -122,7 +121,7 @@ class UserProfileEngine:
                 current_category = self._canonicalize_category(raw_header)
                 if current_category not in profile:
                     profile[current_category] = []
-            elif (line_str.startswith("- ") or line_str.startswith("* ")) and current_category is not None:
+            elif line_str.startswith(("- ", "* ")) and current_category is not None:
                 fact = line_str[2:].strip()
                 if fact and fact not in profile[current_category]:
                     profile[current_category].append(fact)
@@ -266,7 +265,7 @@ class UserProfileEngine:
             re.IGNORECASE,
         )
         if m_restr:
-            fact_text = clause[m_restr.start():].strip()
+            fact_text = clause[m_restr.start() :].strip()
             return ("Restricciones y Hábitos", self._format_fact(fact_text))
 
         # 2. Preferencias y Estilo
@@ -276,7 +275,7 @@ class UserProfileEngine:
             re.IGNORECASE,
         )
         if m_pref:
-            fact_text = clause[m_pref.start():].strip()
+            fact_text = clause[m_pref.start() :].strip()
             return ("Preferencias y Estilo", self._format_fact(fact_text))
 
         # 3. Proyectos Activos
@@ -288,7 +287,7 @@ class UserProfileEngine:
             re.IGNORECASE,
         )
         if m_proj:
-            fact_text = clause[m_proj.start():].strip()
+            fact_text = clause[m_proj.start() :].strip()
             return ("Proyectos Activos", self._format_fact(fact_text))
 
         # 4. Stack Tecnológico
@@ -299,7 +298,7 @@ class UserProfileEngine:
             re.IGNORECASE,
         )
         if m_tech:
-            fact_text = clause[m_tech.start():].strip()
+            fact_text = clause[m_tech.start() :].strip()
             return ("Stack Tecnológico", self._format_fact(fact_text))
 
         # 5. Identidad y Rol
@@ -310,7 +309,7 @@ class UserProfileEngine:
             re.IGNORECASE,
         )
         if m_id:
-            fact_text = clause[m_id.start():].strip()
+            fact_text = clause[m_id.start() :].strip()
             return ("Identidad y Rol", self._format_fact(fact_text))
 
         return None
@@ -323,7 +322,6 @@ class UserProfileEngine:
             return ""
         # Capitalizar primera letra preservando el resto
         return clean[0].upper() + clean[1:]
-
 
     def get_profile_prompt_injection(self) -> str:
         """Genera un fragmento compacto en Markdown para inyectar en el prompt del sistema."""

@@ -311,3 +311,17 @@ class TaskScheduler:
                 log.error(f"[Scheduler] Error en ciclo de sondeo: {e}")
 
             self._stop_event.wait(self.poll_interval)
+
+
+_SCHEDULER_INSTANCE: TaskScheduler | None = None
+_SCHEDULER_LOCK = threading.Lock()
+
+
+def get_task_scheduler() -> TaskScheduler:
+    """Retorna la instancia global del programador de tareas."""
+    global _SCHEDULER_INSTANCE
+    if _SCHEDULER_INSTANCE is None:
+        with _SCHEDULER_LOCK:
+            if _SCHEDULER_INSTANCE is None:
+                _SCHEDULER_INSTANCE = TaskScheduler()
+    return _SCHEDULER_INSTANCE

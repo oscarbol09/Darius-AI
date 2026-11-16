@@ -149,6 +149,7 @@ class ProceduralSFX:
 
     def play_target_lock(self, blocking: bool = False) -> None:
         """Tono doble ascendente (600 Hz -> 900 Hz) para fijación o confirmación."""
+
         def _exec():
             tone1 = generate_tone_wave(600.0, duration=0.10, wave_type="sine", gain=0.3)
             tone2 = generate_tone_wave(900.0, duration=0.14, wave_type="sine", gain=0.3)
@@ -160,6 +161,7 @@ class ProceduralSFX:
 
     def play_success_chime(self, blocking: bool = False) -> None:
         """Arpegio armónico C5 -> E5 -> G5 (523 Hz, 659 Hz, 784 Hz)."""
+
         def _exec():
             c5 = generate_tone_wave(523.25, duration=0.11, wave_type="sine", gain=0.25)
             e5 = generate_tone_wave(659.25, duration=0.11, wave_type="sine", gain=0.25)
@@ -172,6 +174,7 @@ class ProceduralSFX:
 
     def play_scan_pulse(self, blocking: bool = False) -> None:
         """Pulso corto de radar/escaneo a 1200 Hz tipo onda cuadrada filtrada."""
+
         def _exec():
             pulse = generate_tone_wave(1200.0, duration=0.06, wave_type="square", gain=0.15)
             self._play_buffer(pulse)
@@ -180,6 +183,7 @@ class ProceduralSFX:
 
     def play_alert_tone(self, blocking: bool = False) -> None:
         """Tono dual de advertencia o atención a 440 Hz / 880 Hz."""
+
         def _exec():
             t1 = generate_tone_wave(440.0, duration=0.12, wave_type="triangle", gain=0.28)
             t2 = generate_tone_wave(880.0, duration=0.15, wave_type="sine", gain=0.28)
@@ -191,6 +195,7 @@ class ProceduralSFX:
 
     def play_click_tone(self, blocking: bool = False) -> None:
         """Tono percusivo ultra-corto para respuesta táctil en botones."""
+
         def _exec():
             click = generate_tone_wave(900.0, duration=0.025, wave_type="triangle", gain=0.18)
             self._play_buffer(click)
@@ -202,6 +207,7 @@ class ProceduralSFX:
         Pulso acústico discreto de doble tono (880 Hz -> 1320 Hz) para telemetría
         en segundo plano, integrado en la telemetría acústica de Darius AI.
         """
+
         def _exec():
             tick1 = generate_tone_wave(880.0, duration=0.05, wave_type="sine", gain=0.12)
             gap = np.zeros(int(self._sample_rate * 0.04), dtype=np.float32)
@@ -216,6 +222,7 @@ class ProceduralSFX:
         Ping de radar/sonar cibernético a 480 Hz con armónico sutil a 960 Hz y decaimiento
         para telemetría acústica de Darius AI.
         """
+
         def _exec():
             sub = generate_tone_wave(480.0, duration=0.35, wave_type="sine", gain=0.22)
             harmonic = generate_tone_wave(960.0, duration=0.25, wave_type="sine", gain=0.08)

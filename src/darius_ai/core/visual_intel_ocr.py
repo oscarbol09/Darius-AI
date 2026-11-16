@@ -113,6 +113,7 @@ def preprocess_image(image_input: Image.Image | np.ndarray | str | Path) -> Imag
       4. Binarización de Otsu.
     """
     # 1. Cargar imagen en PIL
+    img: Image.Image
     if isinstance(image_input, (str, Path)):
         p = Path(image_input)
         if not p.is_file():
@@ -414,6 +415,7 @@ Write-Output $res.Text
         Intenta los motores configurados según el orden de preferencia.
         """
         # Cargar imagen inicial
+        img: Image.Image
         if isinstance(image_input, (str, Path)):
             p = Path(image_input)
             if not p.is_file():

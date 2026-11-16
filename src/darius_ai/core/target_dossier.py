@@ -50,9 +50,7 @@ class TargetDossier:
     risk_flags: list[str] = field(default_factory=list)
     sources: list[str] = field(default_factory=list)
     confidence_score: float = 0.85
-    generated_at: str = field(
-        default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    )
+    generated_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     def to_markdown(self) -> str:
         """Genera la representación completa en Markdown con Frontmatter YAML para Obsidian."""
@@ -219,11 +217,13 @@ class TargetDossierEngine:
                     text_content = ""
                     if isinstance(item.get("text"), str):
                         text_content = item.get("text", "")
-                    hits.append({
-                        "title": item.get("title", ""),
-                        "url": item.get("url", ""),
-                        "snippet": text_content[:500],
-                    })
+                    hits.append(
+                        {
+                            "title": item.get("title", ""),
+                            "url": item.get("url", ""),
+                            "snippet": text_content[:500],
+                        }
+                    )
                 return hits
         except Exception as e:
             log.debug(f"[Dossier] Exa API consulta falló o no respondió: {e}")

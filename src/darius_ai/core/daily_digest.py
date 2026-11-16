@@ -14,6 +14,8 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+from src.darius_ai.core.config_loader import cfg
+
 log = logging.getLogger("DARIUS.DailyDigest")
 
 
@@ -61,7 +63,8 @@ class DailyDigestEngine:
         try:
             if self.vault_path.exists():
                 today_str = datetime.now().strftime("%Y-%m-%d")
-                daily_file = self.vault_path / "Diario" / f"{today_str}.md"
+                daily_folder = cfg.obsidian_daily_notes_folder or "Diario"
+                daily_file = self.vault_path / daily_folder / f"{today_str}.md"
                 if not daily_file.exists():
                     daily_file = self.vault_path / f"{today_str}.md"
 

@@ -6,22 +6,13 @@ Redirige todas las llamadas y tipos hacia DariusLockdownEngine.
 
 from __future__ import annotations
 
-try:
-    from src.darius_ai.core.darius_lockdown import (
-        DariusLockdownEngine,
-        StarkLockdownEngine,
-        get_darius_lockdown_engine,
-        get_stark_lockdown_engine,
-        lockdown_engine,
-    )
-except ImportError:
-    from darius_ai.core.darius_lockdown import (
-        DariusLockdownEngine,
-        StarkLockdownEngine,
-        get_darius_lockdown_engine,
-        get_stark_lockdown_engine,
-        lockdown_engine,
-    )
+from src.darius_ai.core.darius_lockdown import (
+    DariusLockdownEngine,
+    StarkLockdownEngine,
+    get_darius_lockdown_engine,
+    get_stark_lockdown_engine,
+    lockdown_engine,
+)
 
 __all__ = [
     "DariusLockdownEngine",

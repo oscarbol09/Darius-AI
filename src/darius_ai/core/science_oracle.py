@@ -256,10 +256,7 @@ class ScienceOracle:
             # Formatear notación científica para voz
             exponent = 19
             base = val / 1.602176634
-            return (
-                f"{val:g} julios equivalen a {base:.3f} por 10 a la {exponent} "
-                f"electronvoltios, {self.user_name}."
-            )
+            return f"{val:g} julios equivalen a {base:.3f} por 10 a la {exponent} electronvoltios, {self.user_name}."
 
         # eV a Joules: "5 ev a julios"
         match = re.search(
@@ -270,10 +267,7 @@ class ScienceOracle:
         if match:
             val = float(match.group(1))
             base = val * 1.602176634
-            return (
-                f"{val:g} electronvoltios equivalen a {base:.2f} por 10 a la menos 19 "
-                f"julios, {self.user_name}."
-            )
+            return f"{val:g} electronvoltios equivalen a {base:.2f} por 10 a la menos 19 julios, {self.user_name}."
 
         # Años luz a km: "2 años luz a kilómetros"
         match = re.search(
@@ -285,8 +279,7 @@ class ScienceOracle:
             val = float(match.group(1))
             base = val * 0.946073
             return (
-                f"{val:g} años luz equivalen aproximadamente a {base:.3f} por 10 a la 13 "
-                f"kilómetros, {self.user_name}."
+                f"{val:g} años luz equivalen aproximadamente a {base:.3f} por 10 a la 13 kilómetros, {self.user_name}."
             )
 
         # Unidad astronómica a km: "1 unidad astronómica a km"
@@ -299,10 +292,7 @@ class ScienceOracle:
             val = float(match.group(1))
             res = val * 149597870.7
             formatted_res = _format_number_es(res, 0)
-            return (
-                f"{val:g} unidad astronómica equivale a {formatted_res} "
-                f"kilómetros, {self.user_name}."
-            )
+            return f"{val:g} unidad astronómica equivale a {formatted_res} kilómetros, {self.user_name}."
 
         # PSI a bar: "100 psi a bar"
         match = re.search(r"(\d+(?:\.\d+)?)\s*psi\s*(?:a|en)\s*bar", query, re.IGNORECASE)
@@ -349,9 +339,6 @@ class ScienceOracle:
             val = float(match.group(1))
             res = val * 745.7
             formatted_res = _format_number_es(res, 0)
-            return (
-                f"{val:g} caballos de fuerza equivalen a {formatted_res} "
-                f"vatios, {self.user_name}."
-            )
+            return f"{val:g} caballos de fuerza equivalen a {formatted_res} vatios, {self.user_name}."
 
         return None

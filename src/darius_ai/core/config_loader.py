@@ -30,13 +30,14 @@ def get_user_data_dir() -> Path:
     """
     Retorna el directorio para almacenar datos mutables del usuario.
     Si se ejecuta empaquetado (sys.frozen), usa %APPDATA%/DariusAI.
-    Si se ejecuta desde el código fuente, usa el directorio raíz del proyecto.
+    Si se ejecuta desde el código fuente, usa .darius_data en la raíz del proyecto.
     """
     if getattr(sys, "frozen", False):
         appdata = os.getenv("APPDATA") or os.path.expanduser("~")
         data_dir = Path(appdata) / "DariusAI"
     else:
-        data_dir = Path(__file__).resolve().parent
+        project_root = Path(__file__).resolve().parents[3]
+        data_dir = project_root / ".darius_data"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir
 
@@ -49,7 +50,7 @@ def get_app_resource_dir() -> Path:
         if hasattr(sys, "_MEIPASS"):
             return Path(sys._MEIPASS)  # PyInstaller
         return Path(sys.executable).resolve().parent  # Nuitka / Onedir
-    return Path(__file__).resolve().parent
+    return Path(__file__).resolve().parents[3]
 
 
 _BASE_DIR = Path(__file__).parent
@@ -60,6 +61,7 @@ _DEFAULTS: dict = {
     "assistant": {
         "name": "darius",
         "user_name": "Oscar",
+        "language": "en",
     },
     "gemini": {
         "model": "gemini-3.5-flash-lite",
@@ -133,6 +135,7 @@ _DEFAULTS: dict = {
     "listen_key": "right ctrl",
     "name_similarity_cutoff": 0.60,
     "min_words_without_name": 99,
+    "project_roots": [],
 }
 
 
@@ -204,6 +207,23 @@ class _Config:
     @property
     def user_name(self) -> str:
         return str(self.get("assistant", "user_name", default="Oscar"))
+
+    @property
+    def language(self) -> str:
+        """Active assistant language ('en' for English, 'es' for Spanish)."""
+        val = str(self.get("assistant", "language", default="en")).strip().lower()
+        return "es" if val.startswith("es") else "en"
+
+    def set_language(self, lang: str) -> None:
+        """Sets and persists the active language in config.json and updates the i18n engine."""
+        clean = "es" if lang.strip().lower().startswith("es") else "en"
+        self.set(clean, "assistant", "language")
+        try:
+            from src.darius_ai.core.i18n import get_i18n
+
+            get_i18n().set_language(clean)
+        except Exception as exc:
+            log.debug(f"[Config] No se pudo sincronizar idioma en i18n: {exc}")
 
     @property
     def gemini_model(self) -> str:
@@ -289,6 +309,13 @@ class _Config:
     def min_words_without_name(self) -> int:
         return int(self.get("min_words_without_name", default=99))
 
+    @property
+    def project_roots(self) -> list[str]:
+        raw = self.get("project_roots", default=[])
+        if isinstance(raw, list):
+            return [str(p).strip() for p in raw if str(p).strip()]
+        return []
+
     # ── Propiedades BYOK Multi-Proveedor ──────────────────────────────────────
 
     @property
@@ -302,6 +329,10 @@ class _Config:
     @property
     def llm_gemini_model(self) -> str:
         return str(self.get("llm", "gemini_model", default="gemini-3.5-flash-lite"))
+
+    @property
+    def llm_antigravity_api_key(self) -> str:
+        return str(self.get("llm", "antigravity_api_key", default=""))
 
     @property
     def llm_antigravity_model(self) -> str:
@@ -526,6 +557,7 @@ _SCHEMA: dict = {
     "listen_key": str,
     "name_similarity_cutoff": (int, float),
     "min_words_without_name": int,
+    "project_roots": list,
 }
 
 
@@ -632,9 +664,11 @@ def _load() -> _Config:
         except Exception as e:
             log.warning(f"[Config] Error leyendo config.json, usando defaults: {e}")
     else:
-        # Primera ejecución: si existe plantilla en los recursos empaquetados, úsala
+        # Primera ejecución: si existe plantilla en los recursos empaquetados o raíz, úsala
         template_file = get_app_resource_dir() / "config.json"
-        if template_file.exists() and template_file != _CONFIG_FILE:
+        if not template_file.exists():
+            template_file = get_app_resource_dir() / "config.template.json"
+        if template_file.exists() and template_file.resolve() != _CONFIG_FILE.resolve():
             try:
                 template_data = json.loads(template_file.read_text(encoding="utf-8"))
                 template_data.pop("_comment", None)

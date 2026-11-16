@@ -14,20 +14,22 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-try:
-    from src.darius_ai.audio.sound_effects import get_sfx_engine
-except ImportError:
-    try:
-        from darius_ai.audio.sound_effects import get_sfx_engine
-    except ImportError:
 
-        def get_sfx_engine():
-            return None
+def _resolve_sfx_engine() -> Any:
+    try:
+        from src.darius_ai.audio.sound_effects import get_sfx_engine as _get_sfx_engine
+
+        return _get_sfx_engine()
+    except ImportError:
+        return None
+
+
+get_sfx_engine = _resolve_sfx_engine
 
 
 log = logging.getLogger("DARIUS.TIMER")

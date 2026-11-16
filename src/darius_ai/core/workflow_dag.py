@@ -161,7 +161,7 @@ class WorkflowDAG:
 
     def topological_sort(self) -> list[str]:
         """Returns node IDs in topological order using Kahn's algorithm."""
-        in_degree: dict[str, int] = {nid: 0 for nid in self._nodes}
+        in_degree: dict[str, int] = dict.fromkeys(self._nodes, 0)
         for edge in self._edges:
             in_degree[edge.target] = in_degree.get(edge.target, 0) + 1
 
@@ -186,7 +186,7 @@ class WorkflowDAG:
         if not valid:
             raise ValueError(f"Graph contains a cycle; execution stages impossible: {msg}")
 
-        in_degree: dict[str, int] = {nid: 0 for nid in self._nodes}
+        in_degree: dict[str, int] = dict.fromkeys(self._nodes, 0)
         for edge in self._edges:
             in_degree[edge.target] = in_degree.get(edge.target, 0) + 1
 

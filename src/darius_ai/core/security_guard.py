@@ -23,6 +23,27 @@ _BLOCKED_HOSTS: frozenset[str] = frozenset(
     }
 )
 
+_LOOPBACK_DOMAINS: frozenset[str] = frozenset(
+    {
+        "localhost",
+        "localhost.localdomain",
+        "localtest.me",
+        "lvh.me",
+        "vcap.me",
+        "nip.io",
+        "sslip.io",
+    }
+)
+
+_LOOPBACK_SUFFIXES: tuple[str, ...] = (
+    ".localhost",
+    ".localtest.me",
+    ".lvh.me",
+    ".vcap.me",
+    ".nip.io",
+    ".sslip.io",
+)
+
 _BLOCKED_CIDRS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
     ipaddress.ip_network("0.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
@@ -99,7 +120,7 @@ def is_safe_url(url: str, allow_dns_lookup: bool = False) -> tuple[bool, str]:
 
     norm_host = hostname.strip().lower()
 
-    if norm_host in ("localhost", "localhost.localdomain") or norm_host.endswith(".localhost"):
+    if norm_host in _LOOPBACK_DOMAINS or any(norm_host.endswith(s) for s in _LOOPBACK_SUFFIXES):
         return False, f"Blocked host: '{hostname}' (localhost loopback prohibited)"
 
     if norm_host in _BLOCKED_HOSTS or norm_host.endswith(".metadata.google.internal"):
@@ -167,6 +188,11 @@ class AntiSSRFValidator:
 # ============================================================================
 
 _CREDENTIAL_RULES: list[tuple[str, re.Pattern[str]]] = [
+    ("google_key", re.compile(r"\bAIzaSy[A-Za-z0-9_\-]{33}\b")),
+    ("groq_key", re.compile(r"\bgsk_[a-zA-Z0-9]{50,}\b")),
+    ("nvidia_key", re.compile(r"\bnvapi-[a-zA-Z0-9_\-]{40,}\b")),
+    ("anthropic_key", re.compile(r"\bsk-ant-[a-zA-Z0-9_\-]{20,}\b")),
+    ("openrouter_key", re.compile(r"\bsk-or-[a-zA-Z0-9_\-]{20,}\b")),
     ("openai_key", re.compile(r"\bsk-[a-zA-Z0-9_\-]{20,}\b")),
     ("aws_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
     ("github_token", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36}\b")),
@@ -180,6 +206,7 @@ _CREDENTIAL_RULES: list[tuple[str, re.Pattern[str]]] = [
         "private_key",
         re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----"),
     ),
+    ("elevenlabs_key", re.compile(r"\b[a-f0-9]{32}\b")),
 ]
 
 

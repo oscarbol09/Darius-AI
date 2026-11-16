@@ -24,8 +24,44 @@ Nota de migración:
 import asyncio
 import contextlib
 import logging
+import os
+import sys
+from pathlib import Path
 
 log = logging.getLogger("DARIUS.EdgeTTS")
+
+
+def _play_audio_file(file_path: Path | str) -> bool:
+    """
+    Reproduce un archivo de audio (MP3/WAV) mediante Win32 MCI o fallback a sounddevice.
+    Evita dependencias problemáticas como playsound.
+    """
+    target_str = str(file_path)
+    if sys.platform == "win32":
+        try:
+            import ctypes
+
+            winmm = ctypes.windll.winmm
+            alias = f"darius_edge_{os.getpid()}_{id(target_str)}"
+            open_cmd = f'open "{target_str}" type mpegvideo alias {alias}'
+            if winmm.mciSendStringW(open_cmd, None, 0, None) == 0:
+                winmm.mciSendStringW(f"play {alias} wait", None, 0, None)
+                winmm.mciSendStringW(f"close {alias}", None, 0, None)
+                return True
+        except Exception as e:
+            log.warning(f"Error reproduciendo audio con Win32 MCI: {e}")
+
+    try:
+        import sounddevice as sd
+        import soundfile as sf
+
+        data, fs = sf.read(target_str)
+        sd.play(data, fs)
+        sd.wait()
+        return True
+    except Exception as e:
+        log.warning(f"Error reproduciendo audio con sounddevice/soundfile: {e}")
+        return False
 
 
 class EdgeTTS:
@@ -76,9 +112,7 @@ class EdgeTTS:
         """
         Asíncrono: genera audio con edge-tts y lo reproduce limpiamente.
         """
-        import os
         import tempfile
-        from pathlib import Path
 
         tmp_file = Path(tempfile.gettempdir()) / f"darius_edge_{os.getpid()}_{id(text)}.mp3"
         try:
@@ -86,14 +120,7 @@ class EdgeTTS:
 
             communicate = edge_tts.Communicate(text, self.voice)
             await communicate.save(str(tmp_file))
-            try:
-                import playsound
-
-                playsound.playsound(str(tmp_file))
-                return True
-            except ImportError:
-                log.warning("playsound no disponible. Instala con: pip install playsound")
-                return False
+            return _play_audio_file(tmp_file)
         except ImportError:
             log.warning("edge-tts no instalado. Instala con: pip install edge-tts")
             return False

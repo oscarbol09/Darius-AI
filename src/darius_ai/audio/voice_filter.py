@@ -98,7 +98,6 @@ def check_name_in_text(
     return False, text
 
 
-
 def process_recognized_text(
     text: str,
     mode: str,
@@ -137,4 +136,3 @@ def process_recognized_text(
 
 # Alias para interoperabilidad y claridad semántica
 should_process_command = process_recognized_text
-

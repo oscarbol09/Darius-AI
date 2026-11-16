@@ -105,7 +105,7 @@ def _call_gemini_rest(
     clean_model = model.strip() or "gemini-3.5-flash-lite"
     if "/" in clean_model:
         clean_model = clean_model.split("/")[-1]
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_model}:generateContent"
 
     contents: list[dict] = []
     if history:
@@ -148,10 +148,14 @@ def _call_gemini_rest(
         payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
 
     data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "x-goog-api-key": api_key,
+    }
     req = _req.Request(  # noqa: S310
         url,
         data=data,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
     try:
@@ -200,6 +204,21 @@ def _get_system_time_context() -> str:
         "noviembre",
         "diciembre",
     ]
+    days_en = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    months_en = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+    ]
     dia_semana = dias[now.weekday()]
     dia = now.day
     mes = meses[now.month - 1]
@@ -209,6 +228,18 @@ def _get_system_time_context() -> str:
     tz_name = now.tzname() or "Local"
     offset = now.strftime("%z")
     formatted_offset = f"UTC{offset[:3]}:{offset[3:]}" if offset else "UTC"
+
+    if getattr(cfg, "language", "en") == "en":
+        dia_semana_en = days_en[now.weekday()]
+        mes_en = months_en[now.month - 1]
+        hora_12_en = now.strftime("%I:%M %p")
+        return (
+            f"[SYSTEM LOCAL DATE AND TIME]\n"
+            f"- System date: {dia_semana_en}, {mes_en} {dia}, {anio}\n"
+            f"- System time: {hora_12_en} ({hora_24} 24h format)\n"
+            f"- System time zone: {tz_name} ({formatted_offset})\n"
+            "You must base any temporal reference, date, or time exclusively on these local system telemetry data."
+        )
 
     return (
         f"[HORA Y FECHA LOCAL DEL EQUIPO]\n"
@@ -228,7 +259,8 @@ def _get_local_project_context(prompt: str) -> str:
     import re
 
     user_home = pathlib.Path.home()
-    roots = [
+    configured_roots = [pathlib.Path(p).expanduser() for p in cfg.project_roots]
+    roots = configured_roots or [
         user_home / "Documents" / "Proyectos Personales GH",
         user_home / "Documents" / "Proyectos Colaboración GH",
     ]
@@ -296,39 +328,70 @@ def _build_system_instruction(prompt: str = "") -> str:
         assistant_name=cfg.assistant_name,
     )
 
-    base = (
-        f"{darius_persona_block}\n\n"
-        f"{time_context}\n\n"
-        "[HERRAMIENTAS Y EJECUCIÓN AUTÓNOMA DEL SISTEMA]\n"
-        "Tienes acceso a herramientas locales para interactuar con Windows, GitHub y la Web:\n"
-        "- [ACTION: flush_dns()] -> Limpia y vacía la caché de resolución DNS de Windows.\n"
-        "- [ACTION: top_processes(count=5)] -> Consulta los procesos con mayor consumo de RAM.\n"
-        "- [ACTION: system_summary()] -> Diagnóstico rápido de CPU, RAM libre y disco C:.\n"
-        "- [ACTION: execute_gh(args)] -> GitHub CLI. Ej: execute_gh(pr list --repo user/repo).\n"
-        "- [ACTION: execute_git(args)] -> Git local. Ej: execute_git(status --short).\n"
-        "- [ACTION: execute_powershell(command)] -> PowerShell de forma no interactiva.\n"
-        "- [ACTION: human_type(texto)] -> Escribe texto en pantalla con cadencia mecanográfica humana.\n"
-        "- [ACTION: human_click(x=100, y=200)] -> Realiza clic en coordenadas con física humana.\n"
-        '- [ACTION: human_hotkey(keys="ctrl+v")] -> Presiona combinaciones de teclas.\n'
-        '- [ACTION: scrape_web(url="https://...")] -> Extrae contenido limpio de una página web.\n'
-        '- [ACTION: media_action(action="play_pause")] -> Control multimedia (play, next, prev, vol, mute).\n'
-        '- [ACTION: science_oracle(query="...")] -> Consulta enciclopédica o constantes físicas.\n'
-        "- [ACTION: darius_protocol()] -> Diagnóstico integral de sistemas y telemetría de Darius.\n\n"
-        "REGLAS DE EJECUCIÓN:\n"
-        "1. Para preguntas generales, dudas conceptuales, explicaciones sobre proyectos del usuario, o diálogo "
-        "ordinario,\n"
-        "   RESPONDE DIRECTAMENTE en español en lenguaje natural con tu tono característico de mayordomo de IA "
-        "leal,\n"
-        "   culto y conciso. NO uses herramientas a menos que sea una acción física explícita en el sistema.\n"
-        "2. Emite una acción `[ACTION: nombre_herramienta(args)]` ÚNICAMENTE si el usuario solicita explícitamente\n"
-        "   ejecutar una operación sobre el sistema operativo (ej: abrir/cerrar programas, volumen, multimedia,\n"
-        "   comandos de Git/GitHub, flush de DNS, o diagnosticar hardware).\n"
-        "3. NUNCA ejecutes `execute_git` en Darius-AI cuando el usuario pregunte por otros proyectos (como "
-        "ThesisForge,\n"
-        "   MacroSentinel, etc.) o haga consultas teóricas.\n"
-        "4. Si la consulta involucra proyectos del usuario o notas personales, básate en el [CONTEXTO DE MEMORIA EN\n"
-        "   OBSIDIAN] y en la [INFORMACIÓN DE PROYECTOS LOCALES DEL USUARIO]."
-    )
+    is_en = getattr(cfg, "language", "en") == "en"
+    if is_en:
+        base = (
+            f"{darius_persona_block}\n\n"
+            f"{time_context}\n\n"
+            "[SYSTEM AUTONOMOUS TOOLS & EXECUTION]\n"
+            "You have access to local system tools to interact with Windows, GitHub, and the Web:\n"
+            "- [ACTION: flush_dns()] -> Clears and flushes the Windows DNS resolution cache.\n"
+            "- [ACTION: top_processes(count=5)] -> Queries processes consuming the highest RAM.\n"
+            "- [ACTION: system_summary()] -> Quick diagnostics of CPU, free RAM, and C: disk.\n"
+            "- [ACTION: execute_gh(args)] -> GitHub CLI. E.g.: execute_gh(pr list --repo user/repo).\n"
+            "- [ACTION: execute_git(args)] -> Local Git. E.g.: execute_git(status --short).\n"
+            "- [ACTION: execute_powershell(command)] -> Non-interactive PowerShell command execution.\n"
+            "- [ACTION: human_type(text)] -> Types text on screen with human-like typing cadence.\n"
+            "- [ACTION: human_click(x=100, y=200)] -> Clicks coordinates with natural mouse physics.\n"
+            '- [ACTION: human_hotkey(keys="ctrl+v")] -> Presses keyboard shortcut combination.\n'
+            '- [ACTION: scrape_web(url="https://...")] -> Extracts clean content from webpage.\n'
+            '- [ACTION: media_action(action="play_pause")] -> Media control (play, next, prev, vol, mute).\n'
+            '- [ACTION: science_oracle(query="...")] -> Scientific encyclopedia query or physical constants.\n'
+            "- [ACTION: darius_protocol()] -> Full diagnostic routine and telemetry of Darius systems.\n\n"
+            "EXECUTION RULES:\n"
+            "1. For general inquiries, conceptual questions, explanations of user projects, or ordinary conversation,\n"
+            "   RESPOND DIRECTLY in English in natural language with your characteristic tone of a loyal AI butler,\n"
+            "   dignified and concise. DO NOT use tools unless an explicit system physical operation is requested.\n"
+            "2. Issue an action `[ACTION: tool_name(args)]` ONLY if the user explicitly requests an operation\n"
+            "   on the OS (e.g., open/close programs, volume, multimedia, git/github, DNS flush, hardware).\n"
+            "3. NEVER execute `execute_git` on Darius-AI for other projects or conceptual topics.\n"
+            "4. If the query refers to user projects or personal notes, rely on [OBSIDIAN MEMORY CONTEXT] and\n"
+            "   [LOCAL USER PROJECT INFORMATION]."
+        )
+    else:
+        base = (
+            f"{darius_persona_block}\n\n"
+            f"{time_context}\n\n"
+            "[HERRAMIENTAS Y EJECUCIÓN AUTÓNOMA DEL SISTEMA]\n"
+            "Tienes acceso a herramientas locales para interactuar con Windows, GitHub y la Web:\n"
+            "- [ACTION: flush_dns()] -> Limpia y vacía la caché de resolución DNS de Windows.\n"
+            "- [ACTION: top_processes(count=5)] -> Consulta los procesos con mayor consumo de RAM.\n"
+            "- [ACTION: system_summary()] -> Diagnóstico rápido de CPU, RAM libre y disco C:.\n"
+            "- [ACTION: execute_gh(args)] -> GitHub CLI. Ej: execute_gh(pr list --repo user/repo).\n"
+            "- [ACTION: execute_git(args)] -> Git local. Ej: execute_git(status --short).\n"
+            "- [ACTION: execute_powershell(command)] -> PowerShell de forma no interactiva.\n"
+            "- [ACTION: human_type(texto)] -> Escribe texto en pantalla con cadencia mecanográfica humana.\n"
+            "- [ACTION: human_click(x=100, y=200)] -> Realiza clic en coordenadas con física humana.\n"
+            '- [ACTION: human_hotkey(keys="ctrl+v")] -> Presiona combinaciones de teclas.\n'
+            '- [ACTION: scrape_web(url="https://...")] -> Extrae contenido limpio de una página web.\n'
+            '- [ACTION: media_action(action="play_pause")] -> Control multimedia (play, next, prev, vol, mute).\n'
+            '- [ACTION: science_oracle(query="...")] -> Consulta enciclopédica o constantes físicas.\n'
+            "- [ACTION: darius_protocol()] -> Diagnóstico integral de sistemas y telemetría de Darius.\n\n"
+            "REGLAS DE EJECUCIÓN:\n"
+            "1. Para preguntas generales, dudas conceptuales, explicaciones sobre proyectos del usuario, o diálogo "
+            "ordinario,\n"
+            "   RESPONDE DIRECTAMENTE en español en lenguaje natural con tu tono característico de mayordomo de IA "
+            "leal,\n"
+            "   culto y conciso. NO uses herramientas a menos que sea una acción física explícita en el sistema.\n"
+            "2. Emite una acción `[ACTION: nombre_herramienta(args)]` ÚNICAMENTE si el usuario pide\n"
+            "   ejecutar una operación sobre el sistema operativo (ej: abrir/cerrar programas, volumen, multimedia,\n"
+            "   comandos de Git/GitHub, flush de DNS, o diagnosticar hardware).\n"
+            "3. NUNCA ejecutes `execute_git` en Darius-AI cuando el usuario pregunte por otros proyectos (como "
+            "ThesisForge,\n"
+            "   MacroSentinel, etc.) o haga consultas teóricas.\n"
+            "4. Si la consulta involucra proyectos o notas personales, básate en el [CONTEXTO DE MEMORIA EN\n"
+            "   OBSIDIAN] y en la [INFORMACIÓN DE PROYECTOS LOCALES DEL USUARIO]."
+        )
     try:
         from src.darius_ai.core.obsidian_brain import brain
 
@@ -344,6 +407,17 @@ def _build_system_instruction(prompt: str = "") -> str:
             base += f"\n\n{proj_context}"
     except Exception as e:
         log.debug(f"No se pudo cargar contexto de proyectos locales: {e}")
+
+    try:
+        from src.darius_ai.core.skill_registry import SkillRegistry
+
+        skills_reg = SkillRegistry()
+        skills_reg.discover_skills()
+        if skills_reg.list_skills():
+            cat = skills_reg.format_catalog_prompt()
+            base += f"\n\n[HABILIDADES PROCEDIMENTALES REGISTRADAS]\n{cat}"
+    except Exception as e:
+        log.debug(f"No se pudo cargar SkillRegistry: {e}")
 
     return base
 
@@ -471,11 +545,23 @@ def ask_gemini(
     prompt: str,
     history: list[dict] | None = None,
     image_b64: str | None = None,
+    max_tokens: int | None = None,
 ) -> tuple[str, str]:
     """Consulta a Google Gemini usando la clave configurada o entorno vía REST con fallback defensivo."""
     api_key = resolve_provider_key("gemini")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY no está configurada")
+
+    if max_tokens is None:
+        try:
+            from src.darius_ai.core.complexity_router import ComplexityRouter
+
+            _, _, budget, _ = ComplexityRouter().analyze(prompt)
+            effective_tokens = max(cfg.gemini_max_tokens, budget)
+        except Exception:
+            effective_tokens = cfg.gemini_max_tokens
+    else:
+        effective_tokens = max_tokens
 
     system_instruction = _build_system_instruction(prompt)
     primary_model = cfg.llm_gemini_model or cfg.gemini_model or "gemini-3.5-flash-lite"
@@ -502,7 +588,7 @@ def ask_gemini(
                 system_instruction=system_instruction,
                 history=history,
                 image_b64=image_b64,
-                max_tokens=cfg.gemini_max_tokens,
+                max_tokens=effective_tokens,
                 temperature=cfg.gemini_temperature,
             )
             if cand_model != primary_model:
@@ -518,7 +604,6 @@ def ask_gemini(
             err_str = str(exc).lower()
             # Rotar si hay sobrecarga temporal o error de disponibilidad (503, 500, 429, spikes, high demand)
             if not any(
-
                 code in err_str
                 for code in (
                     "404",
@@ -539,7 +624,6 @@ def ask_gemini(
 
     error_msg = _classify_error_message(last_exc or RuntimeError("Error desconocido en Gemini"), "Gemini")
     raise RuntimeError(error_msg) from last_exc
-
 
 
 def ask_openai(
@@ -812,6 +896,15 @@ def get_ai_response(
         return witty_retort, "Darius Wit Engine"
 
     active = cfg.active_provider or "gemini"
+
+    try:
+        from src.darius_ai.core.complexity_router import ComplexityRouter
+
+        _, tier, budget, target = ComplexityRouter().analyze(prompt)
+        log.info(f"[ComplexityRouter] Consulta: tier={tier}, target={target}, budget={budget}")
+    except Exception as exc:
+        log.debug(f"[ComplexityRouter] Error al analizar: {exc}")
+
     provider_callers = {
         "gemini": ask_gemini,
         "antigravity": ask_antigravity,
@@ -862,7 +955,6 @@ def get_ai_response(
                 log.warning(f"Fallback {p_name} falló: {fb_exc}")
 
         return _classify_error_message(primary_exc, active.upper()), "error"
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────
