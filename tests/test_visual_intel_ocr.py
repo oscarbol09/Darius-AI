@@ -168,12 +168,16 @@ class TestOCRImageExecution:
 
     def test_ocr_image_tier1_winrt_success(self, ocr):
         img = Image.new("RGB", (100, 100), color="white")
-        with patch.object(ocr, "_ocr_winrt", return_value=OCRResult(
-            text="Recognized by WinRT",
-            confidence=0.92,
-            engine_used="winrt",
-            duration_ms=15.0,
-        )):
+        with patch.object(
+            ocr,
+            "_ocr_winrt",
+            return_value=OCRResult(
+                text="Recognized by WinRT",
+                confidence=0.92,
+                engine_used="winrt",
+                duration_ms=15.0,
+            ),
+        ):
             res = ocr.ocr_image(img, tier_preference=["winrt"])
             assert res.text == "Recognized by WinRT"
             assert res.engine_used == "winrt"
@@ -220,12 +224,16 @@ class TestOCRImageExecution:
 
     def test_ocr_image_with_numpy_input(self, ocr):
         arr = np.ones((50, 50, 3), dtype=np.uint8) * 255
-        with patch.object(ocr, "_ocr_winrt", return_value=OCRResult(
-            text="NumPy test",
-            confidence=0.90,
-            engine_used="winrt",
-            duration_ms=10.0,
-        )):
+        with patch.object(
+            ocr,
+            "_ocr_winrt",
+            return_value=OCRResult(
+                text="NumPy test",
+                confidence=0.90,
+                engine_used="winrt",
+                duration_ms=10.0,
+            ),
+        ):
             res = ocr.ocr_image(arr, tier_preference=["winrt"])
             assert res.text == "NumPy test"
 
@@ -233,12 +241,16 @@ class TestOCRImageExecution:
         img_path = tmp_path / "test_ocr.png"
         Image.new("RGB", (60, 60), color="blue").save(img_path)
 
-        with patch.object(ocr, "_ocr_winrt", return_value=OCRResult(
-            text="Path test",
-            confidence=0.91,
-            engine_used="winrt",
-            duration_ms=11.0,
-        )):
+        with patch.object(
+            ocr,
+            "_ocr_winrt",
+            return_value=OCRResult(
+                text="Path test",
+                confidence=0.91,
+                engine_used="winrt",
+                duration_ms=11.0,
+            ),
+        ):
             res = ocr.ocr_image(str(img_path), tier_preference=["winrt"])
             assert res.text == "Path test"
 
@@ -536,12 +548,16 @@ class TestEngineInternalsAndCoverage:
 
     def test_ocr_image_unknown_tier_and_no_preprocess(self, ocr):
         img = Image.new("RGB", (20, 20), color="white")
-        with patch.object(ocr, "_ocr_winrt", return_value=OCRResult(
-            text="Direct",
-            confidence=0.9,
-            engine_used="winrt",
-            duration_ms=10.0,
-        )):
+        with patch.object(
+            ocr,
+            "_ocr_winrt",
+            return_value=OCRResult(
+                text="Direct",
+                confidence=0.9,
+                engine_used="winrt",
+                duration_ms=10.0,
+            ),
+        ):
             res = ocr.ocr_image(img, preprocess=False, tier_preference=["fake_tier", "winrt"])
             assert res.text == "Direct"
 
@@ -557,12 +573,16 @@ class TestEngineInternalsAndCoverage:
         Image.new("RGB", (30, 30), color="white").save(p)
         with (
             patch("PIL.ImageGrab.grabclipboard", return_value=[str(p)]),
-            patch.object(ocr, "ocr_image", return_value=OCRResult(
-                text="File in clipboard",
-                confidence=0.9,
-                engine_used="winrt",
-                duration_ms=12.0,
-            )),
+            patch.object(
+                ocr,
+                "ocr_image",
+                return_value=OCRResult(
+                    text="File in clipboard",
+                    confidence=0.9,
+                    engine_used="winrt",
+                    duration_ms=12.0,
+                ),
+            ),
         ):
             res = ocr.ocr_clipboard()
             assert res.text == "File in clipboard"
@@ -572,4 +592,3 @@ class TestEngineInternalsAndCoverage:
             res = ocr.ocr_clipboard()
             assert res.text == ""
             assert res.engine_used == "none"
-

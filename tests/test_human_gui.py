@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.darius_ai.gui.human_gui import (
+from src.darius_ai.automation.human_input import (
     FailsafeError,
     HumanGUIAutomator,
 )
@@ -137,8 +137,8 @@ class TestMouseAndKeyboardActions:
 class TestWebScraping:
     """Pruebas para el raspado y extracción de páginas web."""
 
-    @patch("urllib.request.urlopen")
-    def test_scrape_web_success(self, mock_urlopen):
+    @patch("urllib.request.OpenerDirector.open")
+    def test_scrape_web_success(self, mock_open):
         mock_resp = MagicMock()
         mock_resp.read.return_value = (
             b"<!DOCTYPE html><html><head><title>Noticias Tech</title>"
@@ -149,7 +149,7 @@ class TestWebScraping:
             b"<footer>Copyright</footer></body></html>"
         )
         mock_resp.__enter__.return_value = mock_resp
-        mock_urlopen.return_value = mock_resp
+        mock_open.return_value = mock_resp
 
         data = HumanGUIAutomator.scrape_web_content("https://noticias.example.com")
         assert data["success"] is True
@@ -159,9 +159,9 @@ class TestWebScraping:
         assert "<style>" not in data["content"]
         assert "<nav>" not in data["content"]
 
-    @patch("urllib.request.urlopen")
-    def test_scrape_web_http_error(self, mock_urlopen):
-        mock_urlopen.side_effect = urllib.error.HTTPError(
+    @patch("urllib.request.OpenerDirector.open")
+    def test_scrape_web_http_error(self, mock_open):
+        mock_open.side_effect = urllib.error.HTTPError(
             url="https://fail.example.com",
             code=404,
             msg="Not Found",

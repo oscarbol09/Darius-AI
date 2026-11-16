@@ -158,8 +158,10 @@ class TestBroadcastDiscovery:
             "Loopback": sstats(isup=True, duplex=0, speed=0, mtu=65536),
         }
 
-        with patch("src.darius_ai.system.wol_dispatcher.psutil.net_if_addrs", return_value=mock_ifaces), \
-             patch("src.darius_ai.system.wol_dispatcher.psutil.net_if_stats", return_value=mock_stats):
+        with (
+            patch("src.darius_ai.system.wol_dispatcher.psutil.net_if_addrs", return_value=mock_ifaces),
+            patch("src.darius_ai.system.wol_dispatcher.psutil.net_if_stats", return_value=mock_stats),
+        ):
             addrs = dispatcher.get_broadcast_addresses()
 
             assert "192.168.1.255" in addrs

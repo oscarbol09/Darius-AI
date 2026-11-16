@@ -300,4 +300,3 @@ def test_workflow_dag_advanced_condition_expressions():
     # Fallback to key lookup on syntax error
     assert _safe_eval_condition("ready", ctx) is True
     assert _safe_eval_condition("nonexistent", ctx) is False
-

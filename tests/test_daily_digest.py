@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -22,9 +23,15 @@ def temp_digest():
 
 
 def test_collect_metrics(temp_digest):
-    metrics = temp_digest.collect_metrics()
+    with (
+        patch("src.darius_ai.core.agentic_bridge.bridge.get_system_summary", return_value=(True, "RAM: 8 GB libres")),
+        patch("src.darius_ai.core.agentic_bridge.bridge.execute_git", return_value=(True, "")),
+        patch("src.darius_ai.core.news_sentinel.NewsSentinel.get_top_headlines", return_value=[]),
+    ):
+        metrics = temp_digest.collect_metrics()
     assert isinstance(metrics, DigestMetrics)
-    assert metrics.system_summary != ""
+    assert metrics.system_summary == "RAM: 8 GB libres"
+    assert metrics.git_summary == "Repositorio local limpio, sin cambios pendientes."
     assert isinstance(metrics.pending_tasks, list)
     assert isinstance(metrics.recent_notes, list)
 

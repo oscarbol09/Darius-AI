@@ -210,7 +210,6 @@ class TestGuiV85NavigationAndModes:
             app.setup_tts_config()
             assert app.tts_voice_token is None
 
-
     def test_status_label_alias_binding(self):
         """Verifica que status_label se enlace limpiamente con lbl_status_pill o lbl_system_badge."""
         from src.darius_ai.gui.app import DariusFinal
@@ -224,4 +223,3 @@ class TestGuiV85NavigationAndModes:
             app.cyber_top_bar, "lbl_status_pill", getattr(app.cyber_top_bar, "lbl_system_badge", None)
         )
         assert app.status_label is mock_pill
-

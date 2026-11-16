@@ -146,3 +146,45 @@ class TestBentoDashboardWidget:
         # Invocar botón Protocolo Darius
         view._on_launch_protocol()
         mock_app._cmd_darius_protocol.assert_called_once()
+
+    def test_collect_hardware_metrics_and_situational_seismic(self, app_fixture):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        view, _ = app_fixture
+        hw = view._collect_hardware_metrics()
+        assert hw.ram_total_gb > 0
+
+        fake_seismic = MagicMock()
+        fake_seismic.get_recent_earthquakes.return_value = (
+            True,
+            [SimpleNamespace(magnitude=5.2, place="Pacifico")],
+            "OK",
+        )
+
+        class ImmediateThread:
+            def __init__(self, target=None, **_rest):
+                self._target = target
+
+            def start(self):
+                if self._target:
+                    self._target()
+
+        fake_radar = MagicMock()
+        fake_radar.get_iss_position.return_value = (False, None, "err")
+        fake_space = MagicMock()
+        fake_space.get_current_space_weather.return_value = (False, None, "err")
+        fake_air = MagicMock()
+        fake_air.scan_overhead.return_value = (False, [], "err")
+
+        with (
+            patch("threading.Thread", ImmediateThread),
+            patch("src.darius_ai.core.seismic_sensor.get_seismic_sensor", return_value=fake_seismic),
+            patch("src.darius_ai.core.orbital_radar.get_orbital_radar", return_value=fake_radar),
+            patch("src.darius_ai.core.space_weather_oracle.get_space_weather_oracle", return_value=fake_space),
+            patch("src.darius_ai.core.air_traffic_sentinel.get_air_traffic_sentinel", return_value=fake_air),
+            patch.object(view, "after") as mock_after,
+        ):
+            view._tick_situational()
+            fake_seismic.get_recent_earthquakes.assert_called_once_with(min_magnitude=4.5)
+            mock_after.assert_called()

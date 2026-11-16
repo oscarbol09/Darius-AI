@@ -146,8 +146,3 @@ def test_check_live_and_antigravity_suite():
     assert res.name == "LIVE & AGENT BRIDGE"
     assert "Gemini Live OK" in res.detail
     assert "Antigravity Agent" in res.detail
-
-
-
-
-

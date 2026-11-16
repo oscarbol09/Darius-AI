@@ -224,13 +224,14 @@ def test_cache_ttl_expiration(mock_get):
     }
     mock_get.return_value = mock_response
 
-    # Short TTL for test: 0.1s
-    engine = WebSearchEngine(ttl_seconds=0.1)
+    engine = WebSearchEngine(ttl_seconds=1.0)
     res1 = engine.search("ttl test")
     assert len(res1) == 1
     assert mock_get.call_count == 1
 
-    time.sleep(0.15)  # Wait for cache expiration
+    # Expirar caché determinísticamente sin time.sleep()
+    for k, (ts, val) in list(engine._cache.items()):
+        engine._cache[k] = (ts - 2.0, val)
 
     res2 = engine.search("ttl test")
     assert len(res2) == 1
@@ -295,7 +296,10 @@ def test_search_instant_answer_nested_subtopics(mock_get):
                 "Name": "Frameworks",
                 "Topics": [
                     {"Text": "Django - Web framework for perfectionists", "FirstURL": "https://djangoproject.com"},
-                    {"Text": "Flask - Lightweight WSGI web application framework", "FirstURL": "https://flask.palletsprojects.com"},
+                    {
+                        "Text": "Flask - Lightweight WSGI web application framework",
+                        "FirstURL": "https://flask.palletsprojects.com",
+                    },
                 ],
             }
         ],
@@ -357,4 +361,3 @@ def test_is_safe_search_url_edge_cases():
 def test_clean_snippet_empty():
     """Verify clean_snippet handles empty/none strings."""
     assert WebSearchEngine.clean_snippet("") == ""
-

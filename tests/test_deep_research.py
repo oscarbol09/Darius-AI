@@ -341,3 +341,31 @@ def test_deep_research_agent_empty_snippet_findings():
     assert len(findings) == 1
     assert "verified sources" in findings[0]
 
+
+def test_search_duckduckgo_parses_html_and_uddg_redirects():
+    from src.darius_ai.core.deep_research import _search_duckduckgo
+
+    sample_html = """
+    <div class="result">
+      <a class="result__a" href="https://duckduckgo.com/l/?uddg=https%3A%2F%2Fexample.org%2Fpaper">Paper Title</a>
+      <a class="result__snippet">Quantum benchmark summary.</a>
+    </div>
+    <div class="result">
+      <a class="result__a" href="https://docs.python.org/3/">Python Docs</a>
+      <a class="result__snippet">Official docs.</a>
+    </div>
+    """
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = sample_html.encode("utf-8")
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        results = _search_duckduckgo("quantum", max_results=2)
+
+    assert len(results) == 2
+    assert results[0]["url"] == "https://example.org/paper"
+    assert results[0]["title"] == "Paper Title"
+    assert results[1]["url"] == "https://docs.python.org/3/"
+
+    with patch("urllib.request.urlopen", side_effect=RuntimeError("offline")):
+        assert _search_duckduckgo("quantum") == []

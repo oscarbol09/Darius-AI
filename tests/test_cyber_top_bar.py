@@ -154,5 +154,3 @@ class TestCyberTopBarWidget:
         assert "Sistema: Escaneo Activo" in pill_text
         assert "Red: Conectado" in pill_text
         assert "IA: gpt-4o" in pill_text
-
-

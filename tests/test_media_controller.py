@@ -321,5 +321,3 @@ class TestSearchAndPlayYouTube:
         success, msg = controller.search_and_play_youtube("lofi hip hop")
         assert success is False
         assert "Error al abrir YouTube" in msg
-
-

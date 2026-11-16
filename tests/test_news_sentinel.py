@@ -289,12 +289,13 @@ def test_cache_ttl_expiration_triggers_fresh_fetch(mock_get):
     mock_resp.text = SAMPLE_RSS_XML
     mock_get.return_value = mock_resp
 
-    # Sentinel with short TTL (0.05 seconds)
-    sentinel = NewsSentinel(ttl_seconds=0.05)
+    sentinel = NewsSentinel(ttl_seconds=1.0)
     sentinel.get_top_headlines(category="technology", limit=2)
     assert mock_get.call_count >= 1
 
-    time.sleep(0.06)
+    # Expirar caché determinísticamente sin time.sleep()
+    for k, (ts, val) in list(sentinel._cache.items()):
+        sentinel._cache[k] = (ts - 2.0, val)
 
     # Next call should re-fetch
     sentinel.get_top_headlines(category="technology", limit=2)
@@ -452,6 +453,7 @@ def test_rss_malformed_xml_handled_gracefully(mock_get):
 @patch("src.darius_ai.core.news_sentinel.httpx.get")
 def test_duckduckgo_html_scraper_fallback(mock_get):
     """Verify DuckDuckGo HTML scraping operates when Instant Answer is empty."""
+
     def side_effect(url, **kwargs):
         if "api.duckduckgo.com" in url:
             mock_api = MagicMock()
@@ -522,8 +524,5 @@ def test_duckduckgo_html_http_error_handled(mock_get):
     mock_get.return_value = mock_resp
 
     sentinel = NewsSentinel()
-    headlines = sentinel._fetch_from_duckduckgo_html(
-        query="test", category="technology", limit=5
-    )
+    headlines = sentinel._fetch_from_duckduckgo_html(query="test", category="technology", limit=5)
     assert headlines == []
-

@@ -3,6 +3,7 @@
 import datetime
 from pathlib import Path
 
+from src.darius_ai.core.config_loader import cfg
 from src.darius_ai.core.obsidian_brain import ObsidianBrain, _sanitize_filename
 
 
@@ -111,8 +112,8 @@ class TestObsidianBrainOperations:
         fake_cerebro = fake_docs / "Cerebro(obsidian)"
         fake_cerebro.mkdir(parents=True)
 
+        monkeypatch.setattr(type(cfg), "obsidian_vault_path", property(lambda self: ""))
         monkeypatch.setattr(Path, "home", lambda: tmp_path)
         brain = ObsidianBrain(vault_path="")
         resolved = brain.vault_path
         assert resolved == fake_cerebro.resolve()
-

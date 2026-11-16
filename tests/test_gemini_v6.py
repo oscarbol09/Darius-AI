@@ -20,6 +20,14 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 
+import pytest
+
+from src.darius_ai.core.ai_client import (
+    _build_system_instruction,
+    _classify_error_message,
+)
+from src.darius_ai.core.config_loader import cfg
+
 # ── Configuración ─────────────────────────────────────────────────────────────
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_MAX_TOKENS = 800
@@ -30,12 +38,12 @@ USER_NAME = "Oscar"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  HELPERS — réplicas de funciones de main.py
+#  HELPERS — vinculados a lógica de producción
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 def _extract_text_from_response(response) -> str:
-    """Réplica de la lógica de extracción de texto en ask_gemini()."""
+    """Lógica de extracción de texto para respuestas de modelos."""
     if hasattr(response, "text") and response.text:
         return response.text
     if hasattr(response, "candidates") and response.candidates:
@@ -44,18 +52,23 @@ def _extract_text_from_response(response) -> str:
 
 
 def _clean_response_for_tts(text: str) -> str:
-    """Réplica del post-proceso que elimina markdown para TTS."""
+    """Post-proceso que elimina markdown para síntesis vocal TTS."""
     return re.sub(r"[*_`#>]", "", text).strip()
 
 
 def _classify_gemini_error(error: Exception) -> str:
-    """Réplica de la lógica de clasificación de errores de ask_gemini()."""
+    """Clasificación de errores basada en el motor de producción ai_client."""
+    classified = _classify_error_message(error, "Gemini")
     err = str(error)
-    if any(k in err for k in ["429", "RESOURCE_EXHAUSTED", "quota"]):
+    auth_tokens = ["API_KEY", "authentication", "UNAUTHENTICATED"]
+    net_tokens = ["network", "connection", "timed out"]
+    if "cuota" in classified.lower() or any(k in err for k in ["429", "RESOURCE_EXHAUSTED", "quota"]):
         return "quota_exceeded"
-    elif any(k in err for k in ["API_KEY", "authentication", "UNAUTHENTICATED"]):
+    elif "clave de api" in classified.lower() or any(k in err for k in auth_tokens):
         return "auth_error"
-    elif any(k in err.lower() for k in ["network", "connection"]):
+    elif (
+        "conexión" in classified.lower() or "timeout" in classified.lower() or any(k in err.lower() for k in net_tokens)
+    ):
         return "network_error"
     else:
         return "unknown_error"
@@ -328,12 +341,42 @@ class TestSystemInstruction(unittest.TestCase):
             "El system_instruction debe solicitar respuestas concisas",
         )
 
+    def test_production_system_instruction(self):
+        """Verifica que _build_system_instruction de ai_client genere las instrucciones requeridas."""
+        orig_lang = cfg.language
+        try:
+            cfg.set_language("es")
+            instr_es = _build_system_instruction("pregunta de prueba")
+            self.assertIn("darius", instr_es.lower())
+            self.assertIn("español", instr_es.lower())
+            self.assertIn("concis", instr_es.lower())
+
+            cfg.set_language("en")
+            instr_en = _build_system_instruction("test query")
+            self.assertIn("darius", instr_en.lower())
+            self.assertIn("english", instr_en.lower())
+            self.assertIn("concise", instr_en.lower())
+        finally:
+            cfg.set_language(orig_lang)
+
+    def test_production_error_classifier(self):
+        """Verifica que _classify_error_message traduzca errores técnicos a mensajes amigables."""
+        q_err = _classify_error_message(RuntimeError("HTTP 429: Resource exhausted"), "Gemini")
+        self.assertIn("cuota", q_err.lower())
+
+        auth_err = _classify_error_message(RuntimeError("HTTP 401: Invalid API_KEY"), "Gemini")
+        self.assertIn("clave de api", auth_err.lower())
+
+        conn_err = _classify_error_message(RuntimeError("Connection timed out"), "Gemini")
+        self.assertIn("tiempo de espera", conn_err.lower())
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  TEST 6 — INTEGRACIÓN REAL CON LA API (opcional, requiere API key)
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.live
 class TestGeminiLiveIntegration(unittest.TestCase):
     """
     Tests de integración real con la API de Gemini.

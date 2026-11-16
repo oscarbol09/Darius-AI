@@ -160,7 +160,7 @@ class TestDariusTacticalAcknowledgment:
         ack = persona.get_tactical_acknowledgment(action_type)
         assert isinstance(ack, str)
         assert len(ack) > 5
-        assert ack.endswith(".") or ack.endswith("!")
+        assert ack.endswith((".", "!"))
         valid_seeds = [
             "órdenes",
             "línea",
@@ -189,7 +189,7 @@ class TestDariusFormatButlerResponse:
         assert "¡Hola!" not in formatted
         assert "con mucho gusto" not in formatted.lower()
         assert "45°C" in formatted
-        assert formatted.startswith("La temperatura") or formatted.startswith("Señor, la temperatura")
+        assert formatted.startswith(("La temperatura", "Señor, la temperatura"))
 
     def test_strips_ai_farewells_and_emojis(self):
         persona = DariusPersona()

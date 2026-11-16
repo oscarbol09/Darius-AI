@@ -298,3 +298,23 @@ def test_interpreter_builtins_safe_import():
     with pytest.raises(UnsafeCodeError, match="Relative"):
         safe_import("math", level=1)
 
+
+def test_ast_validator_rejects_class_definitions():
+    """Verify class definitions are rejected to prevent MRO and subclass introspection attacks."""
+    with pytest.raises(UnsafeCodeError, match="Class definitions"):
+        ASTValidator.validate("class Exploit:\n    pass")
+
+
+def test_ast_validator_rejects_exception_evasion():
+    """Verify bare except and catching BaseException/SystemExit/KeyboardInterrupt are blocked."""
+    with pytest.raises(UnsafeCodeError, match="bare 'except:'"):
+        ASTValidator.validate("try:\n    x = 1\nexcept:\n    pass")
+
+    with pytest.raises(UnsafeCodeError, match="BaseException"):
+        ASTValidator.validate("try:\n    x = 1\nexcept BaseException:\n    pass")
+
+    with pytest.raises(UnsafeCodeError, match="SystemExit"):
+        ASTValidator.validate("try:\n    x = 1\nexcept SystemExit:\n    pass")
+
+    with pytest.raises(UnsafeCodeError, match="KeyboardInterrupt"):
+        ASTValidator.validate("try:\n    x = 1\nexcept (ValueError, KeyboardInterrupt):\n    pass")

@@ -82,3 +82,36 @@ class TestTelemetryFeedController:
             new_state2 = controller.toggle_sfx()
             assert new_state2 is True
             mock_sfx.set_enabled.assert_called_with(True)
+
+
+class TestTelemetryBarWidgetMocked:
+    def test_widget_init_toggle_and_tracker_updates(self):
+        import customtkinter as ctk
+
+        from src.darius_ai.gui import telemetry_bar as tb_mod
+
+        mock_sfx = MagicMock()
+        mock_sfx.is_enabled.return_value = True
+        mock_tracker = MagicMock()
+
+        with (
+            patch.object(ctk.CTkFrame, "__init__", return_value=None),
+            patch.object(tb_mod.TelemetryBarWidget, "grid_columnconfigure", create=True),
+            patch.object(tb_mod.TelemetryBarWidget, "after", create=True),
+            patch("src.darius_ai.gui.telemetry_bar.ctk.CTkLabel", return_value=MagicMock()),
+            patch("src.darius_ai.gui.telemetry_bar.ctk.CTkButton", return_value=MagicMock()),
+            patch("src.darius_ai.gui.telemetry_bar.get_sfx_engine", return_value=mock_sfx),
+            patch("src.darius_ai.gui.telemetry_bar.get_telemetry_tracker", return_value=mock_tracker),
+        ):
+            widget = tb_mod.TelemetryBarWidget(master=MagicMock())
+            mock_tracker.add_listener.assert_called_once()
+
+            # Simular evento del tracker
+            listener_cb = mock_tracker.add_listener.call_args[0][0]
+            listener_cb(AgentEvent(agent_name="AI", message="Listo", status="success"))
+            assert "AI" in widget.controller.get_current_display_text()
+
+            # Alternar SFX
+            mock_sfx.is_enabled.return_value = False
+            widget._on_toggle_sfx()
+            mock_sfx.play_click_tone.assert_called_once()

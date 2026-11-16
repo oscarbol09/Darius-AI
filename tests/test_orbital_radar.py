@@ -36,6 +36,22 @@ MOCK_OPEN_NOTIFY_SUCCESS = {
 class TestOrbitalRadar:
     """Test suite for OrbitalRadar and ISS tracking."""
 
+    @pytest.fixture(autouse=True)
+    def _fast_public_dns(self, monkeypatch):
+        import ipaddress
+        import socket
+
+        real_getaddrinfo = socket.getaddrinfo
+
+        def fake_getaddrinfo(host, port, *args, **kwargs):
+            try:
+                ipaddress.ip_address(str(host))
+                return real_getaddrinfo(host, port, *args, **kwargs)
+            except ValueError:
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
+
+        monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+
     def test_iss_position_dataclass_defaults(self) -> None:
         """Verify default values and types on ISSPosition dataclass."""
         pos = ISSPosition(latitude=10.5, longitude=-20.5, timestamp=1700000000.0)

@@ -237,7 +237,6 @@ class TestUserProfileEngineEdgeCases:
         engine = UserProfileEngine()
         assert engine.profile_path.name == "USER.md"
 
-
     def test_read_profile_handles_read_oserror(self, tmp_path: Path, monkeypatch):
         file_path = tmp_path / "USER.md"
         file_path.write_text("# Perfil\n", encoding="utf-8")
@@ -263,6 +262,3 @@ class TestUserProfileEngineEdgeCases:
     def test_format_fact_empty_returns_empty_string(self):
         assert UserProfileEngine._format_fact("  . , ; ") == ""
         assert UserProfileEngine._format_fact("") == ""
-
-
-

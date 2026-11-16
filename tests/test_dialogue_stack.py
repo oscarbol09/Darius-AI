@@ -345,5 +345,3 @@ def test_dialogue_stack_singleton_and_aliases():
     assert s1 is s2
     assert s1 is s3
     assert StarkDialogueStack is DariusDialogueStack
-
-

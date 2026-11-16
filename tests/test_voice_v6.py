@@ -23,6 +23,8 @@ import unittest
 import wave
 from difflib import SequenceMatcher
 
+import pytest
+
 # Añade la raíz del proyecto al path antes de importar módulos del proyecto
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _PROJECT_ROOT not in sys.path:
@@ -136,7 +138,6 @@ class TestNameModeFilter(unittest.TestCase):
     def test_empty_string_rejected(self):
         ok, _ = _process_recognized_text("", LISTEN_MODE_NAME)
         self.assertFalse(ok)
-
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -314,6 +315,7 @@ class TestRecognizerConfiguration(unittest.TestCase):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+@pytest.mark.live
 class TestLiveMicrophone(unittest.TestCase):
     """
     Tests de integración real con micrófono.

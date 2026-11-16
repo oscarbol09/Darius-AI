@@ -159,15 +159,21 @@ def test_timer_callback_without_arguments():
 
 def test_timer_callback_exception_handled():
     manager = DariusTimerManager()
+    callback_attempted = threading.Event()
 
     def failing_callback(_timer):
+        callback_attempted.set()
         raise RuntimeError("Fallo deliberado en callback")
 
     try:
-        timer = manager.create_timer(label="failing", seconds=0.05, on_expire_callback=failing_callback)
-        time.sleep(0.2)
-        # No debe crashear el thread del manager y el estado debe ser expired
+        timer = manager.create_timer(label="failing", seconds=0.02, on_expire_callback=failing_callback)
+        assert callback_attempted.wait(timeout=1.5) is True
+        # Esperar brevemente a que el manager actualice el estado tras el callback
+        deadline = time.monotonic() + 1.0
         fetched = manager.get_timer(timer.id)
+        while fetched is not None and fetched.status != "expired" and time.monotonic() < deadline:
+            time.sleep(0.01)
+            fetched = manager.get_timer(timer.id)
         assert fetched is not None
         assert fetched.status == "expired"
     finally:
@@ -177,12 +183,15 @@ def test_timer_callback_exception_handled():
 def test_timer_triggers_sfx_on_expiration():
     manager = DariusTimerManager()
     mock_sfx = MagicMock()
+    sfx_called = threading.Event()
+    mock_sfx.play_target_lock.side_effect = lambda *a, **kw: sfx_called.set()
+    mock_sfx.play_alert_tone.side_effect = lambda *a, **kw: sfx_called.set()
     target_mod = DariusTimerManager.__module__
 
     with patch(f"{target_mod}.get_sfx_engine", return_value=mock_sfx):
         try:
-            manager.create_timer(label="alarma", seconds=0.05)
-            time.sleep(0.25)
+            manager.create_timer(label="alarma", seconds=0.02)
+            assert sfx_called.wait(timeout=1.5) is True
             assert mock_sfx.play_target_lock.called or mock_sfx.play_alert_tone.called
         finally:
             manager.stop_all()

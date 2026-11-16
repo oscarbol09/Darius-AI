@@ -387,7 +387,9 @@ class TestWinCmdTypeB(unittest.TestCase):
                 self.assertEqual(entry["canonical"], expected_canonical)
 
     def test_run_gods_eye_actions(self):
-        """Verifica la ejecución mockeada de las acciones de Ojo de Dios."""
+        """Verifica la ejecución hermética de las acciones de Ojo de Dios sin red en vivo."""
+        import httpx
+
         actions = [
             "posicion estacion espacial",
             "trafico aereo sobrevuelo",
@@ -395,14 +397,18 @@ class TestWinCmdTypeB(unittest.TestCase):
             "clima espacial solar",
             "protocolo ojo de dios",
         ]
-        for act_name in actions:
-            with self.subTest(action=act_name):
-                entry = resolve_action(act_name)
-                self.assertIsNotNone(entry)
-                success, output = run_action(entry)
-                self.assertTrue(success)
-                self.assertIsInstance(output, str)
-                self.assertGreater(len(output), 0)
+        with (
+            patch("httpx.Client.get", side_effect=httpx.ConnectError("Hermetic unit test")),
+            patch("httpx.get", side_effect=httpx.ConnectError("Hermetic unit test")),
+        ):
+            for act_name in actions:
+                with self.subTest(action=act_name):
+                    entry = resolve_action(act_name)
+                    self.assertIsNotNone(entry)
+                    success, output = run_action(entry)
+                    self.assertTrue(success)
+                    self.assertIsInstance(output, str)
+                    self.assertGreater(len(output), 0)
 
     def test_resolve_darius_core_actions(self):
         """Verifica que las acciones y aliases de Darius Core resuelvan canónicamente."""
@@ -449,6 +455,64 @@ class TestWinCmdTypeB(unittest.TestCase):
                 self.assertIsInstance(output, str)
                 self.assertGreater(len(output), 0)
 
+    def test_resolve_sentinel_and_dossier_actions(self):
+        """Verifica que activar centinela, desactivar centinela y generar dossier resuelvan correctamente."""
+        queries = [
+            ("activar centinela", "activar centinela"),
+            ("activar centinela de presencia", "activar centinela"),
+            ("iniciar centinela", "activar centinela"),
+            ("desactivar centinela", "desactivar centinela"),
+            ("apagar centinela", "desactivar centinela"),
+            ("detener centinela", "desactivar centinela"),
+            ("generar dossier", "generar dossier"),
+            ("crear dossier", "generar dossier"),
+            ("ficha de inteligencia", "generar dossier"),
+        ]
+        for query, expected_canonical in queries:
+            with self.subTest(query=query):
+                entry = resolve_action(query)
+                self.assertIsNotNone(entry, f"'{query}' debe resolver")
+                self.assertEqual(entry["canonical"], expected_canonical)
+
+    @patch("src.darius_ai.core.webcam_sentinel.WebcamSentinel.start", return_value=True)
+    @patch("src.darius_ai.core.webcam_sentinel.WebcamSentinel.stop")
+    @patch("src.darius_ai.core.target_dossier.TargetDossierEngine.synthesize_dossier")
+    @patch("src.darius_ai.core.target_dossier.TargetDossierEngine.save_to_obsidian")
+    def test_run_sentinel_and_dossier_actions(self, mock_save, mock_synth, mock_stop, mock_start):
+        """Verifica la ejecución de activar centinela, desactivar centinela y generar dossier."""
+        from src.darius_ai.core.target_dossier import TargetDossier
+
+        mock_synth.return_value = TargetDossier(
+            target_name="Darius AI Core",
+            title_or_role="Sistema Autónomo",
+            organization="Ecosistema Darius",
+            summary="Dossier de prueba unitaria.",
+        )
+
+        # Activar centinela
+        entry = resolve_action("activar centinela")
+        self.assertIsNotNone(entry)
+        ok, msg = run_action(entry)
+        self.assertTrue(ok)
+        self.assertIn("activado", msg.lower())
+        mock_start.assert_called_once()
+
+        # Desactivar centinela
+        entry = resolve_action("desactivar centinela")
+        self.assertIsNotNone(entry)
+        ok, msg = run_action(entry)
+        self.assertTrue(ok)
+        self.assertIn("desactivado", msg.lower())
+        mock_stop.assert_called_once()
+
+        # Generar dossier
+        entry = resolve_action("generar dossier")
+        self.assertIsNotNone(entry)
+        ok, msg = run_action(entry)
+        self.assertTrue(ok)
+        self.assertIn("dossier", msg.lower())
+        mock_synth.assert_called_once()
+        mock_save.assert_called_once()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -964,15 +1028,19 @@ class TestDictionaryIntegrity(unittest.TestCase):
 # ═════════════════════════════════════════════════════════════════════════════
 
 try:
-    # Solo funciona en Windows con GUI; falla elegantemente en otros entornos
-    from main import _CMD_PATTERNS as _REAL_PATTERNS
+    from src.darius_ai.gui.app import _CMD_PATTERNS as _REAL_PATTERNS
 
     MAIN_PATTERNS_AVAILABLE = True
 except Exception:
-    MAIN_PATTERNS_AVAILABLE = False
+    try:
+        from main import _CMD_PATTERNS as _REAL_PATTERNS
+
+        MAIN_PATTERNS_AVAILABLE = True
+    except Exception:
+        MAIN_PATTERNS_AVAILABLE = False
 
 
-@unittest.skipUnless(MAIN_PATTERNS_AVAILABLE, "main.py no disponible (no Windows o sin GUI)")
+@unittest.skipUnless(MAIN_PATTERNS_AVAILABLE, "_CMD_PATTERNS de app/main no disponible")
 class TestPatternsMatchMain(unittest.TestCase):
     """
     Verifica que los patrones replicados en TestCmdPatterns coincidan

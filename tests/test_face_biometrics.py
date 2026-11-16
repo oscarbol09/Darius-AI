@@ -321,6 +321,7 @@ class TestDariusGreetings:
         assert "CUSTOM_ERROR" in msg_unknown
 
         from src.darius_ai.core.face_biometrics import get_biometric_greeting
+
         assert get_biometric_greeting(verified_res) == msg_verified
 
 
@@ -332,6 +333,7 @@ class TestFaceBiometricsEdgeCasesAndCoverage:
 
     def test_singleton_engine(self):
         from src.darius_ai.core.face_biometrics import get_face_biometrics_engine
+
         e1 = get_face_biometrics_engine()
         e2 = get_face_biometrics_engine()
         assert e1 is e2
@@ -421,6 +423,7 @@ class TestFaceBiometricsEdgeCasesAndCoverage:
 
         # Frame 2D en escala de grises
         import numpy as np
+
         frame_2d = np.zeros((100, 100), dtype=np.uint8)
         mock_cap.read.return_value = (True, frame_2d)
 

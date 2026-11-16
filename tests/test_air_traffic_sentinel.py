@@ -39,14 +39,14 @@ SAMPLE_OPENSKY_PAYLOAD = {
             1773439990,
             1773439995,
             -74.1200,  # lon
-            4.7200,   # lat
-            3200.0,   # baro altitude (m)
-            False,    # on ground
-            180.5,    # velocity (m/s) -> ~649.8 km/h
-            275.0,    # true track (deg)
-            -5.2,     # vertical rate (m/s)
+            4.7200,  # lat
+            3200.0,  # baro altitude (m)
+            False,  # on ground
+            180.5,  # velocity (m/s) -> ~649.8 km/h
+            275.0,  # true track (deg)
+            -5.2,  # vertical rate (m/s)
             None,
-            3250.0,   # geo altitude (m)
+            3250.0,  # geo altitude (m)
             "1200",
             False,
             0,
@@ -59,12 +59,12 @@ SAMPLE_OPENSKY_PAYLOAD = {
             1773439980,
             1773439990,
             -74.0500,  # lon
-            4.8000,   # lat
-            7500.0,   # baro altitude (m)
+            4.8000,  # lat
+            7500.0,  # baro altitude (m)
             False,
-            220.0,    # velocity (m/s) -> 792.0 km/h
-            90.0,     # true track
-            2.1,      # vertical rate
+            220.0,  # velocity (m/s) -> 792.0 km/h
+            90.0,  # true track
+            2.1,  # vertical rate
             None,
             7600.0,
             "2301",
@@ -79,7 +79,7 @@ SAMPLE_OPENSKY_PAYLOAD = {
             1773439980,
             1773439990,
             -70.0000,  # lon far away
-            8.0000,   # lat far away (> 500 km)
+            8.0000,  # lat far away (> 500 km)
             10000.0,
             False,
             250.0,
@@ -98,8 +98,8 @@ SAMPLE_OPENSKY_PAYLOAD = {
             "Unknown",
             1773439980,
             1773439990,
-            None,     # Missing longitude
-            None,     # Missing latitude
+            None,  # Missing longitude
+            None,  # Missing latitude
             None,
             False,
             None,
@@ -125,8 +125,8 @@ SAMPLE_ADSBLOL_PAYLOAD = {
             "lon": -74.0800,
             "alt_baro": 12000,  # ft -> ~3657.6 m
             "alt_geom": 12150,
-            "gs": 280.0,        # kts -> ~518.56 km/h
-            "track": 180.5,     # deg
+            "gs": 280.0,  # kts -> ~518.56 km/h
+            "track": 180.5,  # deg
             "baro_rate": -500,  # ft/min -> ~ -2.54 m/s
             "category": "A3",
         },

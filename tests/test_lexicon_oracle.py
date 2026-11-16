@@ -28,7 +28,10 @@ SAMPLE_DICTIONARY_API_RESPONSE = [
         "word": "algorithm",
         "phonetic": "/ˈæl.ɡə.ɹɪð.əm/",
         "phonetics": [
-            {"text": "/ˈæl.ɡə.ɹɪð.əm/", "audio": "https://api.dictionaryapi.dev/media/pronunciations/en/algorithm-us.mp3"}
+            {
+                "text": "/ˈæl.ɡə.ɹɪð.əm/",
+                "audio": "https://api.dictionaryapi.dev/media/pronunciations/en/algorithm-us.mp3",
+            }
         ],
         "meanings": [
             {
@@ -232,8 +235,13 @@ def test_anti_ssrf_validator_blocks_malicious_lookup():
 def test_fuzzy_matching_close_matches():
     """Verify close spelling mistakes return fuzzy suggestions."""
     oracle = LexiconOracle(load_vocabulary_data=False)
-    # Misspelled term
-    found, entry, suggestions = oracle.lookup("algoritm")
+    with patch("src.darius_ai.core.lexicon_oracle.httpx.get") as mock_get:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        mock_get.return_value = mock_resp
+
+        # Misspelled term
+        found, entry, suggestions = oracle.lookup("algoritm")
 
     assert found is False
     assert entry is None
@@ -374,4 +382,3 @@ def test_online_dictionaryapi_empty_data_handled(mock_get):
     oracle = LexiconOracle(load_vocabulary_data=False)
     entry = oracle._query_dictionary_api("empty_term")
     assert entry is None
-

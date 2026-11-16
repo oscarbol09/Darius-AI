@@ -132,6 +132,9 @@ def test_is_safe_url_blocks_localhost_and_internal_domains():
         "http://localhost:3000/dashboard",
         "http://localhost.localdomain/",
         "http://sub.localhost:8080/",
+        "http://localtest.me/",
+        "http://app.localtest.me:8080/",
+        "http://127.0.0.1.nip.io/",
     ]
     for url in bad_urls:
         safe, reason = is_safe_url(url, allow_dns_lookup=False)
@@ -274,6 +277,47 @@ def test_credential_stripper_rsa_and_private_keys():
     stripped = stripper.strip(text)
     assert "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3" not in stripped
     assert "[REDACTED" in stripped
+
+
+def test_credential_stripper_byok_providers():
+    stripper = CredentialStripper()
+
+    # Google Gemini key: AIzaSy + 33 chars
+    google_key = "AIzaSy" + "A" * 33
+    t_google = f"Gemini key is {google_key} here"
+    assert stripper.has_credentials(t_google) is True
+    assert "[REDACTED:google_key]" in stripper.strip(t_google)
+    assert google_key not in stripper.strip(t_google)
+
+    # Groq key: gsk_ + 50+ chars
+    groq_key = "".join(["gsk_", "a" * 52])
+    t_groq = f"Groq token: {groq_key}"
+    assert stripper.has_credentials(t_groq) is True
+    assert "[REDACTED:groq_key]" in stripper.strip(t_groq)
+
+    # NVIDIA key: nvapi- + 40+ chars
+    nv_key = "".join(["nvapi-", "x" * 42])
+    t_nv = f"NVIDIA NIM: {nv_key}"
+    assert stripper.has_credentials(t_nv) is True
+    assert "[REDACTED:nvidia_key]" in stripper.strip(t_nv)
+
+    # Anthropic key: sk-ant- + 20+ chars
+    ant_key = "".join(["sk-ant-", "api03-1234567890abcdef1234"])
+    t_ant = f"Claude key: {ant_key}"
+    assert stripper.has_credentials(t_ant) is True
+    assert "[REDACTED:anthropic_key]" in stripper.strip(t_ant)
+
+    # OpenRouter key: sk-or- + 20+ chars
+    or_key = "".join(["sk-or-", "v1-1234567890abcdef123456"])
+    t_or = f"OpenRouter: {or_key}"
+    assert stripper.has_credentials(t_or) is True
+    assert "[REDACTED:openrouter_key]" in stripper.strip(t_or)
+
+    # ElevenLabs key: 32 hex chars
+    el_key = "1234567890abcdef1234567890abcdef"
+    t_el = f"ElevenLabs API Key: {el_key}"
+    assert stripper.has_credentials(t_el) is True
+    assert "[REDACTED:elevenlabs_key]" in stripper.strip(t_el)
 
 
 def test_credential_stripper_clean_text():

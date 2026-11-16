@@ -92,3 +92,86 @@ class TestAntigravityAgentBridgeUnit:
             res = bridge.ask_agent("Prueba fallo")
             assert res.success is False
             assert "Error" in res.response_text or "fallo" in res.response_text.lower()
+
+    def test_execute_agent_chat_with_mocked_sdk_and_streaming(self):
+        import types
+
+        async def _run():
+            bridge = AntigravityAgentBridge()
+
+            class FakeAgent:
+                def __init__(self, _cfg):
+                    pass
+
+                async def __aenter__(self):
+                    return self
+
+                async def __aexit__(self, *_args):
+                    return None
+
+                async def chat(self, _prompt):
+                    resp = MagicMock()
+                    resp.text = "Análisis técnico completado."
+                    resp.tool_calls = ["read_file: main.py"]
+                    return resp
+
+            fake_mod = types.ModuleType("google.antigravity")
+            fake_mod.Agent = FakeAgent  # type: ignore[attr-defined]
+            fake_mod.CapabilitiesConfig = lambda **kw: kw  # type: ignore[attr-defined]
+            fake_mod.LocalAgentConfig = lambda **kw: kw  # type: ignore[attr-defined]
+
+            with patch.dict("sys.modules", {"google.antigravity": fake_mod}):
+                res = await bridge._execute_agent_chat("Audita main.py")
+                assert res.success is True
+                assert "Análisis técnico completado" in res.response_text
+                assert res.tool_calls == ["read_file: main.py"]
+
+        asyncio.run(_run())
+
+    def test_execute_agent_chat_timeout_and_exception(self):
+        import types
+
+        async def _run():
+            bridge = AntigravityAgentBridge()
+
+            class TimeoutAgent:
+                def __init__(self, _cfg):
+                    pass
+
+                async def __aenter__(self):
+                    return self
+
+                async def __aexit__(self, *_args):
+                    return None
+
+                async def chat(self, _prompt):
+                    raise TimeoutError("timed out")
+
+            fake_mod = types.ModuleType("google.antigravity")
+            fake_mod.Agent = TimeoutAgent  # type: ignore[attr-defined]
+            fake_mod.CapabilitiesConfig = lambda **kw: kw  # type: ignore[attr-defined]
+            fake_mod.LocalAgentConfig = lambda **kw: kw  # type: ignore[attr-defined]
+
+            with patch.dict("sys.modules", {"google.antigravity": fake_mod}):
+                res = await bridge._execute_agent_chat("Consulta lenta", timeout=1.0)
+                assert res.success is False
+                assert "Tiempo de espera agotado" in res.response_text
+
+        asyncio.run(_run())
+
+    def test_ask_agent_inside_running_event_loop_and_error_instruction(self):
+        bridge = AntigravityAgentBridge()
+
+        async def _invoke_from_loop():
+            with patch.object(bridge, "ask_agent_async", new_callable=AsyncMock) as mock_async:
+                mock_async.return_value = AntigravityResult(success=True, response_text="OK en loop")
+                res = bridge.ask_agent("Ping desde loop")
+                assert res.success is True
+                assert res.response_text == "OK en loop"
+
+        asyncio.run(_invoke_from_loop())
+
+        with patch.object(bridge, "ask_agent", return_value=AntigravityResult(success=False, response_text="Fallo")):
+            ok, msg = bridge.execute_development_instruction("Despliega")
+            assert ok is False
+            assert msg == "Fallo"

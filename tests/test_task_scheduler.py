@@ -5,7 +5,6 @@ test_task_scheduler.py — Tests unitarios para TaskScheduler (tareas programada
 from __future__ import annotations
 
 import tempfile
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -97,8 +96,16 @@ def test_schedule_cron_and_invalid_interval(temp_scheduler):
 
 
 def test_scheduler_worker_and_callback(temp_scheduler):
+    import threading
+
     executed = []
-    temp_scheduler.executor_callback = lambda t: executed.append(t.prompt)
+    done = threading.Event()
+
+    def _on_exec(t):
+        executed.append(t.prompt)
+        done.set()
+
+    temp_scheduler.executor_callback = _on_exec
 
     # Programar tarea ya vencida
     past_iso = (datetime.now(UTC) - timedelta(seconds=2)).isoformat()
@@ -109,9 +116,10 @@ def test_scheduler_worker_and_callback(temp_scheduler):
     )
 
     temp_scheduler.start()
-    time.sleep(1.2)
-    temp_scheduler.stop()
+    try:
+        assert done.wait(timeout=2.5) is True
+    finally:
+        temp_scheduler.stop()
 
     assert len(executed) >= 1
     assert "Tarea con callback" in executed
-

@@ -58,20 +58,22 @@ class TestTargetDossierEngine:
 
     @patch("src.darius_ai.core.target_dossier.get_ai_response")
     def test_synthesize_dossier_parses_json_llm_response(self, mock_ai, engine):
-        fake_llm_json = json.dumps({
-            "target_name": "Guido van Rossum",
-            "category": "person",
-            "title_or_role": "Benevolent Dictator For Life Emeritus",
-            "organization": "Python Software Foundation",
-            "summary": "Creador del lenguaje de programación Python.",
-            "key_attributes": ["Python", "C", "Compiladores"],
-            "career_or_history": [{"role": "Distinguished Engineer", "company": "Microsoft"}],
-            "social_profiles": {"github": "https://github.com/gvanrossum"},
-            "conversation_hooks": ["Evolución de tipado en Python"],
-            "risk_flags": [],
-            "sources": ["https://gvanrossum.github.io/"],
-            "confidence_score": 0.95,
-        })
+        fake_llm_json = json.dumps(
+            {
+                "target_name": "Guido van Rossum",
+                "category": "person",
+                "title_or_role": "Benevolent Dictator For Life Emeritus",
+                "organization": "Python Software Foundation",
+                "summary": "Creador del lenguaje de programación Python.",
+                "key_attributes": ["Python", "C", "Compiladores"],
+                "career_or_history": [{"role": "Distinguished Engineer", "company": "Microsoft"}],
+                "social_profiles": {"github": "https://github.com/gvanrossum"},
+                "conversation_hooks": ["Evolución de tipado en Python"],
+                "risk_flags": [],
+                "sources": ["https://gvanrossum.github.io/"],
+                "confidence_score": 0.95,
+            }
+        )
         mock_ai.return_value = (fake_llm_json, "gemini")
 
         dossier = engine.synthesize_dossier("Guido van Rossum", raw_research_text="Datos biográficos...")
@@ -108,6 +110,42 @@ class TestTargetDossierEngine:
         # Sin API key configurada debe retornar lista vacía limpiamente sin colapsar
         results = engine.query_exa_api("test query", api_key="")
         assert results == []
+
+        mock_resp = MagicMock()
+        mock_resp.read.return_value = (
+            b'{"results": [{"title": "Darius", "url": "https://example.com", "text": "Inteligencia local."}]}'
+        )
+        mock_resp.__enter__.return_value = mock_resp
+        mock_urlopen.return_value = mock_resp
+
+        hits = engine.query_exa_api("Darius AI", api_key="exa-test-key")
+        assert len(hits) == 1
+        assert hits[0]["title"] == "Darius"
+
+        mock_urlopen.side_effect = RuntimeError("timeout")
+        assert engine.query_exa_api("Darius AI", api_key="exa-test-key") == []
+
+    def test_dossier_markdown_and_speech_rendering(self):
+        dossier = TargetDossier(
+            target_name="Ada Lovelace",
+            category="person",
+            title_or_role="Mathematician",
+            organization="Analytical Engine",
+            summary="Pioneer of computing. Wrote the first algorithm.",
+            key_attributes=["Mathematics", "Algorithms"],
+            career_or_history=[{"role": "Researcher", "company": "London", "period": "1843"}],
+            social_profiles={"github": "https://github.com/ada", "website": "https://ada.example"},
+            conversation_hooks=["Babbage engine notes"],
+            risk_flags=["Historical archive only"],
+            sources=["https://ada.example"],
+        )
+        md = dossier.to_markdown()
+        assert "Ada Lovelace" in md
+        assert "Babbage engine notes" in md
+        assert "Historical archive only" in md
+        speech = dossier.to_speech_summary()
+        assert "Ada Lovelace" in speech
+        assert "Pioneer of computing." in speech
 
 
 class TestSingletonDossierEngine:

@@ -43,6 +43,22 @@ MOCK_NOAA_DICT_DATA = [
 
 
 class TestSpaceWeatherOracle:
+    @pytest.fixture(autouse=True)
+    def _fast_public_dns(self, monkeypatch):
+        import ipaddress
+        import socket
+
+        real_getaddrinfo = socket.getaddrinfo
+
+        def fake_getaddrinfo(host, port, *args, **kwargs):
+            try:
+                ipaddress.ip_address(str(host))
+                return real_getaddrinfo(host, port, *args, **kwargs)
+            except ValueError:
+                return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
+
+        monkeypatch.setattr(socket, "getaddrinfo", fake_getaddrinfo)
+
     """Test suite for SpaceWeatherOracle NOAA planetary K-index monitoring."""
 
     def test_space_weather_report_dataclass(self) -> None:

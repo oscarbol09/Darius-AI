@@ -73,6 +73,17 @@ def test_open_url_on_monitor_mocked():
         res = open_url_on_monitor("https://example.com", monitor_index=1, fullscreen=True)
         assert res is True
         mock_popen.assert_called_once()
+        args = mock_popen.call_args[0][0]
+        assert "--" in args
+        assert args[-1] == "https://example.com"
+
+
+def test_open_url_on_monitor_disallowed_scheme():
+    """URLs con esquemas no permitidos (file, javascript, etc.) deben ser rechazadas."""
+    with patch("subprocess.Popen") as mock_popen:
+        assert open_url_on_monitor("file:///C:/malicious.bat") is False
+        assert open_url_on_monitor("javascript:alert(1)") is False
+        mock_popen.assert_not_called()
 
 
 def test_play_spotify_or_song():
@@ -84,6 +95,18 @@ def test_play_spotify_or_song():
     with patch("os.startfile", create=True) as mock_startfile:
         play_spotify_or_song("spotify:track:12345")
         mock_startfile.assert_called_once_with("spotify:track:12345")
+
+
+def test_play_spotify_or_song_disallowed_scheme():
+    """URIs o archivos con esquemas no permitidos deben ser rechazados."""
+    with (
+        patch("os.startfile", create=True) as mock_startfile,
+        patch("webbrowser.open") as mock_browser,
+    ):
+        play_spotify_or_song("file:///C:/malicious.bat")
+        play_spotify_or_song("C:\\malicious.exe")
+        mock_startfile.assert_not_called()
+        mock_browser.assert_not_called()
 
 
 def test_check_and_update_cooldown():
@@ -160,3 +183,36 @@ def test_run_trading_mode():
     with patch("src.darius_ai.system.workspace_manager.open_url_on_monitor"):
         run_trading_mode(talk_fn=talk_mock, cooldown_secs=0.0)
         talk_mock.assert_called_once()
+
+
+def test_win32_window_manipulation_helpers_mocked():
+    from src.darius_ai.system.workspace_manager import (
+        bring_window_to_foreground,
+        get_process_main_hwnd,
+        send_f11_fullscreen,
+        snap_window_to_monitor,
+    )
+
+    mock_user32 = MagicMock()
+    mock_user32.GetForegroundWindow.return_value = 100
+    mock_user32.GetWindowThreadProcessId.side_effect = [10, 20]
+
+    with (
+        patch("sys.platform", "win32"),
+        patch("ctypes.windll", create=True) as mock_windll,
+        patch("src.darius_ai.system.workspace_manager.get_monitor_bounds", return_value=(0, 0, 1920, 1080)),
+    ):
+        mock_windll.user32 = mock_user32
+        assert bring_window_to_foreground(999) is True
+        mock_user32.SetForegroundWindow.assert_called_with(999)
+
+        send_f11_fullscreen(999)
+        assert mock_user32.keybd_event.call_count == 2
+
+        snap_window_to_monitor(999, 1, fullscreen=False, window_size=(1200, 800))
+        snap_window_to_monitor(999, 1, fullscreen=True)
+        assert mock_user32.SetWindowPos.call_count == 2
+
+    with patch("sys.platform", "linux"):
+        assert get_process_main_hwnd("Cursor.exe") is None
+        assert bring_window_to_foreground(123) is False

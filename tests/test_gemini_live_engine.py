@@ -6,7 +6,8 @@ manejo de interrupciones (barge-in), callbacks y estado offline/mock.
 """
 
 import asyncio
-from unittest.mock import AsyncMock, MagicMock
+import types
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.darius_ai.core.gemini_live_engine import (
     AVAILABLE_LIVE_VOICES,
@@ -112,6 +113,7 @@ class TestGeminiLiveEngineUnit:
 
     def test_mock_session_streaming(self):
         """Simula una sesión conectada con AsyncMock."""
+
         async def _run():
             engine = GeminiLiveEngine(api_key="mock_key")
             received_chunks = []
@@ -174,3 +176,84 @@ class TestGeminiLiveEngineUnit:
         ok_stop, msg_stop = engine.stop_live_session()
         assert ok_stop is True
 
+    def test_start_async_receive_loop_and_text_prompt(self):
+        async def _run():
+            events = []
+            engine = GeminiLiveEngine(
+                api_key="mock_key",
+                on_text_received=lambda t: events.append(("text", t)),
+                on_audio_received=lambda b: events.append(("audio", b)),
+                on_user_interrupted=lambda: events.append(("interrupt", True)),
+            )
+
+            part_audio = MagicMock(inline_data=MagicMock(data=b"\x01\x02"), text=None)
+            part_text = MagicMock(inline_data=None, text="Entendido, señor.")
+            sc1 = MagicMock(interrupted=True, model_turn=MagicMock(parts=[part_audio, part_text]))
+            msg1 = MagicMock(server_content=sc1)
+
+            class FakeSession:
+                def __init__(self):
+                    self.send = AsyncMock()
+                    self.close = AsyncMock()
+
+                async def receive(self):
+                    yield msg1
+
+            fake_session = FakeSession()
+
+            class FakeCtx:
+                async def __aenter__(self):
+                    return fake_session
+
+            fake_client = MagicMock()
+            fake_client.aio.live.connect.return_value = FakeCtx()
+
+            fake_genai = types.ModuleType("google.genai")
+            fake_genai.Client = MagicMock(return_value=fake_client)  # type: ignore[attr-defined]
+            fake_types = types.ModuleType("google.genai.types")
+            fake_types.SpeechConfig = lambda **kw: kw  # type: ignore[attr-defined]
+            fake_types.VoiceConfig = lambda **kw: kw  # type: ignore[attr-defined]
+            fake_types.PrebuiltVoiceConfig = lambda **kw: kw  # type: ignore[attr-defined]
+            fake_types.LiveConnectConfig = lambda **kw: kw  # type: ignore[attr-defined]
+            fake_types.Content = lambda **kw: kw  # type: ignore[attr-defined]
+            fake_types.Part = MagicMock()  # type: ignore[attr-defined]
+            fake_types.Modality = types.SimpleNamespace(AUDIO="AUDIO")  # type: ignore[attr-defined]
+            fake_genai.types = fake_types  # type: ignore[attr-defined]
+
+            fake_google = types.ModuleType("google")
+            fake_google.genai = fake_genai  # type: ignore[attr-defined]
+
+            with patch.dict(
+                "sys.modules",
+                {"google": fake_google, "google.genai": fake_genai, "google.genai.types": fake_types},
+            ):
+                started = await engine.start_async()
+                assert started is True
+                assert engine.is_active() is True
+                assert "activo" in engine.format_vocal_status().lower()
+
+                sent_txt = await engine.send_text_prompt_async("Hola Gemini Live")
+                assert sent_txt is True
+                fake_session.send.assert_awaited_once()
+
+                if engine._receive_task:
+                    await engine._receive_task
+
+                assert ("interrupt", True) in events
+                assert ("audio", b"\x01\x02") in events
+                assert ("text", "Entendido, señor.") in events
+                await engine.stop_async()
+
+        asyncio.run(_run())
+
+    def test_start_async_handles_connection_failure(self):
+        async def _run():
+            errors = []
+            engine = GeminiLiveEngine(api_key="mock_key", on_error=errors.append)
+            with patch("builtins.__import__", side_effect=RuntimeError("SDK fail")):
+                ok = await engine.start_async()
+            assert ok is False
+            assert engine.state == LiveSessionState.ERROR
+            assert len(errors) == 1
+
+        asyncio.run(_run())

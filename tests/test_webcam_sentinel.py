@@ -130,9 +130,7 @@ class TestWebcamSentinelBiometricsIntegration:
 
         time.sleep(0.05)
 
-        mock_engine.verify_live_user.assert_called_once_with(
-            timeout_seconds=2.0, camera_index=0
-        )
+        mock_engine.verify_live_user.assert_called_once_with(timeout_seconds=2.0, camera_index=0)
         on_biometrics.assert_called_once_with(result=mock_result)
 
     def test_async_biometrics_none_or_exception(self):
