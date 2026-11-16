@@ -15,7 +15,9 @@ Centro de mando táctico interactivo estructurado en tarjetas modulares Bento Gr
 from __future__ import annotations
 
 import contextlib
+import datetime
 import logging
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -163,6 +165,8 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
         self.app_ref = app_ref
         self._is_active = True
         self._anim_phase = 0.0
+        self._last_core_state: str | None = None
+        self._prev_net_io: tuple[float, int, int] | None = None
 
         self._setup_layout()
         self._start_telemetry_loop()
@@ -170,8 +174,8 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
     def _setup_layout(self) -> None:
         """Construye la cuadrícula Bento con geometría equilibrada."""
         # Configurar columnas del grid
-        self.grid_columnconfigure(0, weight=6, minsize=380)
-        self.grid_columnconfigure(1, weight=5, minsize=320)
+        self.grid_columnconfigure(0, weight=6, minsize=340)
+        self.grid_columnconfigure(1, weight=5, minsize=290)
 
         # ── 1. HERO CARD: CYBER CORE (Fila 0, Columna 0) ────────────────────
         self.hero_card = BentoCard(
@@ -438,30 +442,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             accent_color="#A855F7",
         )
         self.activity_card.grid(row=4, column=0, padx=8, pady=8, sticky="nsew")
-        act_body = self.activity_card.body_frame
-
-        recent_items = [
-            ("🟣", "Nota guardada en Obsidian", "Ideas para el proyecto Darius", "14:28"),
-            ("🔷", "Aplicación abierta", "Visual Studio Code / Cursor", "14:21"),
-            ("🔴", "Búsqueda en YouTube", "Arquitectura Clean Code en Python", "14:14"),
-            ("🌐", "Diagnosticar red", "Conexión nominal establecida (12 ms)", "14:10"),
-            ("💬", "Consulta a la IA", "Evaluación de modelos y copiloto", "14:03"),
-        ]
-        for icon_c, title_c, desc_c, time_c in recent_items:
-            row_f = ctk.CTkFrame(act_body, fg_color="transparent")
-            row_f.pack(fill="x", pady=2)
-            ctk.CTkLabel(row_f, text=icon_c, font=("Segoe UI", 12)).pack(side="left", padx=(0, 6))
-            txt_f = ctk.CTkFrame(row_f, fg_color="transparent")
-            txt_f.pack(side="left", fill="x", expand=True)
-            ctk.CTkLabel(
-                txt_f, text=title_c, font=theme.FONT_CAPTION_BOLD, text_color=theme.TEXT_PRIMARY, anchor="w"
-            ).pack(fill="x")
-            ctk.CTkLabel(txt_f, text=desc_c, font=theme.FONT_BADGE, text_color=theme.TEXT_MUTED, anchor="w").pack(
-                fill="x"
-            )
-            ctk.CTkLabel(row_f, text=time_c, font=theme.FONT_BADGE, text_color=theme.TEXT_MUTED).pack(
-                side="right", padx=4
-            )
+        self.refresh_activity_card()
 
         self.monitors_card = BentoCard(
             self,
@@ -472,13 +453,14 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
         self.monitors_card.grid(row=4, column=1, padx=8, pady=8, sticky="nsew")
         mon_body = self.monitors_card.body_frame
 
-        from src.darius_ai.system.workspace_manager import get_monitor_count
+        from src.darius_ai.system.workspace_manager import get_monitor_rects
 
-        n_mon = get_monitor_count()
-        self._create_situational_item(mon_body, "🖥 Monitor 1 (Principal):", "1920x1080 • Activo")
-        if n_mon > 1:
-            self._create_situational_item(mon_body, "🖥 Monitor 2 (Secundario):", "1920x1080 • Activo")
-        else:
+        rects = get_monitor_rects()
+        for idx, (left, top, right, bottom) in enumerate(rects):
+            w, h = right - left, bottom - top
+            title = f"🖥 Monitor {idx + 1}{' (Principal)' if idx == 0 else ' (Secundario)'}:"
+            self._create_situational_item(mon_body, title, f"{w}x{h} • Activo")
+        if len(rects) <= 1:
             self._create_situational_item(mon_body, "🖥 Monitor Secundario:", "No detectado (Mono-pantalla)")
 
     def _create_main_module_card(
@@ -686,28 +668,77 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
         self.air_val_lbl.configure(text=f"{data.aircraft_count} aeronaves en alcance")
         self.seismic_val_lbl.configure(text=data.seismic_summary)
 
+    def refresh_activity_card(self) -> None:
+        """Actualiza la tarjeta de actividad reciente desde el rastreador de telemetría."""
+        if not hasattr(self, "activity_card"):
+            return
+        act_body = self.activity_card.body_frame
+        for child in act_body.winfo_children():
+            child.destroy()
+
+        from src.darius_ai.core.telemetry_tracker import get_telemetry_tracker
+
+        events = get_telemetry_tracker().get_recent_events(limit=5)
+        if not events:
+            now_str = datetime.datetime.now().strftime("%H:%M")
+            display_items = [
+                ("🟢", "Inicialización del Sistema", "Subsistemas y modelos nominales", now_str),
+                ("🟣", "Memoria Simbiótica", "Enlace a Obsidian verificado", now_str),
+                ("🌐", "Conectividad de Red", "Telemetría y endpoints disponibles", now_str),
+            ]
+        else:
+            status_icons = {"success": "🟢", "warning": "🟡", "error": "🔴", "running": "🟣"}
+            display_items = [
+                (
+                    status_icons.get(evt.status, "🔷"),
+                    evt.agent_name,
+                    evt.message,
+                    evt.time_str[:5] if len(evt.time_str) >= 5 else evt.time_str,
+                )
+                for evt in reversed(events)
+            ]
+
+        for icon_c, title_c, desc_c, time_c in display_items:
+            row_f = ctk.CTkFrame(act_body, fg_color="transparent")
+            row_f.pack(fill="x", pady=2)
+            ctk.CTkLabel(row_f, text=icon_c, font=("Segoe UI", 12)).pack(side="left", padx=(0, 6))
+            txt_f = ctk.CTkFrame(row_f, fg_color="transparent")
+            txt_f.pack(side="left", fill="x", expand=True)
+            ctk.CTkLabel(
+                txt_f, text=title_c, font=theme.FONT_CAPTION_BOLD, text_color=theme.TEXT_PRIMARY, anchor="w"
+            ).pack(fill="x")
+            ctk.CTkLabel(txt_f, text=desc_c, font=theme.FONT_BADGE, text_color=theme.TEXT_MUTED, anchor="w").pack(
+                fill="x"
+            )
+            ctk.CTkLabel(row_f, text=time_c, font=theme.FONT_BADGE, text_color=theme.TEXT_MUTED).pack(
+                side="right", padx=4
+            )
+
     def set_core_state(self, state: str, energy: float = 0.0) -> None:
-        """Actualiza el estado operativo y anima el Cyber Core."""
+        """Actualiza el estado operativo y anima el Cyber Core con dirty-state checking."""
         norm_state = state.strip().upper()
         self.core_visualizer.set_state(norm_state)
 
-        state_texts = {
-            "IDLE": ("●", CORE_CYAN, "SISTEMA NOMINAL • EN ESPERA"),
-            "LISTENING": ("●", CORE_CYAN, "ESCUCHANDO • CAPTURA ACTIVA"),
-            "THINKING": ("●", CORE_AMBER, "PROCESANDO • RAZONAMIENTO IA"),
-            "PROCESSING": ("●", CORE_AMBER, "PROCESANDO • EJECUTANDO TAREA"),
-            "SPEAKING": ("●", CORE_EMERALD, "TRANSMITIENDO • ALOCUCIÓN VOCAL"),
-            "ALERT": ("●", CORE_CRIMSON, "ALERTA TÁCTICA • ATENCIÓN REQUERIDA"),
-        }
-        dot_char, color, label_text = state_texts.get(
-            norm_state, ("●", CORE_CYAN, f"ESTADO: {norm_state}")
-        )
-        self.core_status_dot.configure(text=dot_char, text_color=color)
-        self.core_status_lbl.configure(text=label_text, text_color=color)
+        if not hasattr(self, "_last_core_state") or self._last_core_state != norm_state:
+            self._last_core_state = norm_state
+            state_texts = {
+                "IDLE": ("●", CORE_CYAN, "SISTEMA NOMINAL • EN ESPERA"),
+                "LISTENING": ("●", CORE_CYAN, "ESCUCHANDO • CAPTURA ACTIVA"),
+                "THINKING": ("●", CORE_AMBER, "PROCESANDO • RAZONAMIENTO IA"),
+                "PROCESSING": ("●", CORE_AMBER, "PROCESANDO • EJECUTANDO TAREA"),
+                "SPEAKING": ("●", CORE_EMERALD, "TRANSMITIENDO • ALOCUCIÓN VOCAL"),
+                "ALERT": ("●", CORE_CRIMSON, "ALERTA TÁCTICA • ATENCIÓN REQUERIDA"),
+            }
+            dot_char, color, label_text = state_texts.get(norm_state, ("●", CORE_CYAN, f"ESTADO: {norm_state}"))
+            self.core_status_dot.configure(text=dot_char, text_color=color)
+            self.core_status_lbl.configure(text=label_text, text_color=color)
 
         # Actualizar un frame con la energía suministrada
         self._anim_phase += 0.05
-        self.core_visualizer.update_frame(phase=self._anim_phase, energy=energy, state=norm_state)
+        with contextlib.suppress(Exception):
+            self.core_visualizer.update_frame(phase=self._anim_phase, energy=energy, state=norm_state)
+            if hasattr(self, "context_mesh") and self.context_mesh is not None:
+                self.context_mesh.update_frame(phase=self._anim_phase, energy=energy)
 
     # =========================================================================
     #  BUCLE DE TELEMETRÍA AUTOMÁTICA
@@ -716,37 +747,66 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
         """Inicia el bucle de actualización no bloqueante de telemetría."""
         self._tick_hardware()
         self._tick_situational()
-        self._tick_animation()
+        if self.app_ref is None:
+            self._tick_animation()
+
+    def _collect_hardware_metrics(self) -> HardwareMetricsData:
+        """Recolecta métricas de sistema mediante psutil (seguro para hilo secundario)."""
+        import psutil
+
+        cpu = psutil.cpu_percent(interval=None)
+        ram = psutil.virtual_memory()
+        disk = psutil.disk_usage("C:\\") if hasattr(psutil, "disk_usage") else None
+
+        # Net I/O diferencial (Throughput real en KB/s)
+        net_io = psutil.net_io_counters() if hasattr(psutil, "net_io_counters") else None
+        now = time.time()
+        sent_kbps = 0.0
+        recv_kbps = 0.0
+        if net_io:
+            if self._prev_net_io is not None:
+                t_prev, s_prev, r_prev = self._prev_net_io
+                dt = max(0.2, now - t_prev)
+                sent_kbps = max(0.0, (net_io.bytes_sent - s_prev) / (1024.0 * dt))
+                recv_kbps = max(0.0, (net_io.bytes_recv - r_prev) / (1024.0 * dt))
+            self._prev_net_io = (now, net_io.bytes_sent, net_io.bytes_recv)
+
+        return HardwareMetricsData(
+            cpu_percent=cpu,
+            ram_percent=ram.percent,
+            ram_used_gb=ram.used / (1024.0**3),
+            ram_total_gb=ram.total / (1024.0**3),
+            disk_percent=disk.percent if disk else 0.0,
+            disk_free_gb=(disk.free / (1024.0**3)) if disk else 0.0,
+            net_sent_kbps=sent_kbps,
+            net_recv_kbps=recv_kbps,
+        )
 
     def _tick_hardware(self) -> None:
-        """Consulta métricas de psutil y programa el próximo tick."""
+        """Lanza lectura no bloqueante de psutil en hilo secundario y programa el próximo tick."""
         if not self._is_active:
             return
-        try:
-            import psutil
 
-            cpu = psutil.cpu_percent(interval=None)
-            ram = psutil.virtual_memory()
-            disk = psutil.disk_usage("C:\\") if hasattr(psutil, "disk_usage") else None
+        def _worker() -> None:
+            try:
+                data = self._collect_hardware_metrics()
 
-            # Net I/O
-            net_io = psutil.net_io_counters() if hasattr(psutil, "net_io_counters") else None
-            sent_kbps = (net_io.bytes_sent / 1024.0) % 9999.0 if net_io else 0.0
-            recv_kbps = (net_io.bytes_recv / 1024.0) % 9999.0 if net_io else 0.0
+                def _apply() -> None:
+                    if not self._is_active:
+                        return
+                    self.update_hardware_metrics(data)
+                    self._act_tick_count = getattr(self, "_act_tick_count", 0) + 1
+                    if self._act_tick_count % 5 == 0:
+                        self.refresh_activity_card()
 
-            data = HardwareMetricsData(
-                cpu_percent=cpu,
-                ram_percent=ram.percent,
-                ram_used_gb=ram.used / (1024.0**3),
-                ram_total_gb=ram.total / (1024.0**3),
-                disk_percent=disk.percent if disk else 0.0,
-                disk_free_gb=(disk.free / (1024.0**3)) if disk else 0.0,
-                net_sent_kbps=sent_kbps,
-                net_recv_kbps=recv_kbps,
-            )
-            self.update_hardware_metrics(data)
-        except Exception as e:
-            log.debug(f"Error consultando métricas de hardware: {e}")
+                with contextlib.suppress(Exception):
+                    self.after(0, _apply)
+            except Exception as e:
+                log.debug(f"Error consultando métricas de hardware: {e}")
+
+        import threading
+
+        threading.Thread(target=_worker, daemon=True, name="hw-telemetry").start()
 
         with contextlib.suppress(Exception):
             self.after(2000, self._tick_hardware)
@@ -768,17 +828,40 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
                 ok_sw, sw_rep, _ = oracle.get_current_space_weather()
 
                 iss_loc = f"{iss_pos.latitude:.1f}°, {iss_pos.longitude:.1f}°" if ok_iss and iss_pos else "En órbita"
-                dist = radar.calculate_distance_to_observer(
-                    iss_pos.latitude, iss_pos.longitude, 4.7110, -74.0721
-                ) if ok_iss and iss_pos else 0.0
+                dist = (
+                    radar.calculate_distance_to_observer(iss_pos.latitude, iss_pos.longitude, 4.7110, -74.0721)
+                    if ok_iss and iss_pos
+                    else 0.0
+                )
                 kp_txt = f"Kp {sw_rep.kp_index:.1f} ({sw_rep.storm_level})" if ok_sw and sw_rep else "Nominal G0"
+
+                aircraft_count = 0
+                with contextlib.suppress(Exception):
+                    from src.darius_ai.core.air_traffic_sentinel import get_air_traffic_sentinel
+
+                    air_sentinel = get_air_traffic_sentinel()
+                    ok_air, contacts, _ = air_sentinel.scan_overhead(max_contacts=10)
+                    if ok_air:
+                        aircraft_count = len(contacts)
+
+                seismic_txt = "Nominal (Estable)"
+                with contextlib.suppress(Exception):
+                    from src.darius_ai.core.seismic_sensor import get_seismic_sensor
+
+                    seismic = get_seismic_sensor()
+                    ok_seis, events, _ = seismic.get_recent_earthquakes(min_magnitude=4.5)
+                    if ok_seis and events:
+                        top = max(events, key=lambda ev: ev.magnitude)
+                        seismic_txt = f"M{top.magnitude:.1f} • {top.place[:18]}"
+                    elif ok_seis:
+                        seismic_txt = "Nominal (M<4.5)"
 
                 sit_data = SituationalMetricsData(
                     iss_location=iss_loc,
                     iss_distance_km=dist,
                     space_weather_kp=kp_txt,
-                    aircraft_count=3,
-                    seismic_summary="Nominal (M<4.5)",
+                    aircraft_count=aircraft_count,
+                    seismic_summary=seismic_txt,
                 )
                 with contextlib.suppress(Exception):
                     self.after(0, self.update_situational_metrics, sit_data)

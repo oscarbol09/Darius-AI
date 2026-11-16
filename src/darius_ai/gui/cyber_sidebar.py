@@ -39,9 +39,7 @@ NAV_ACTIVE_BORDER: Final[str] = "#00F0FF"
 NAV_INACTIVE_FG: Final[str] = "#94A3B8"
 NAV_HOVER_BG: Final[str] = "#131C2D"
 
-DEFAULT_INSPIRATIONAL_QUOTE: Final[str] = (
-    '"La tecnología es más poderosa cuando te da tiempo para pensar."\n— Darius —'
-)
+DEFAULT_INSPIRATIONAL_QUOTE: Final[str] = '"La tecnología es más poderosa cuando te da tiempo para pensar."\n— Darius —'
 
 NAV_ITEMS: Final[list[dict[str, str]]] = [
     {"id": "inicio", "label": "Inicio", "icon": "🏠"},

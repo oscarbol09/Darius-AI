@@ -18,6 +18,7 @@ from __future__ import annotations
 import contextlib
 import logging
 import math
+import tkinter as tk
 from collections.abc import Callable
 from typing import Any, Final
 
@@ -43,6 +44,48 @@ MIC_ACTIVE_ICON_COLOR: Final[str] = "#00F0FF"
 MIC_INACTIVE_ICON_COLOR: Final[str] = "#94A3B8"
 
 VOICE_MODES: Final[tuple[str, ...]] = ("PTT", "NOM", "AUTO", "GEMINI LIVE")
+
+
+class QuickTooltip:
+    """Tooltip flotante no invasivo para botones tácticos de control."""
+
+    def __init__(self, widget: Any, text: str) -> None:
+        self.widget = widget
+        self.text = text
+        self.tip_window: tk.Toplevel | None = None
+        self.widget.bind("<Enter>", self.show_tip)
+        self.widget.bind("<Leave>", self.hide_tip)
+
+    def show_tip(self, event: Any = None) -> None:
+        if self.tip_window or not self.text:
+            return
+        with contextlib.suppress(Exception):
+            x = self.widget.winfo_rootx() + 10
+            y = self.widget.winfo_rooty() - 28
+            self.tip_window = tw = tk.Toplevel(self.widget)
+            tw.wm_overrideredirect(True)
+            tw.wm_geometry(f"+{x}+{y}")
+            tw.attributes("-topmost", True)
+            lbl = tk.Label(
+                tw,
+                text=self.text,
+                justify="left",
+                background="#1E293B",
+                foreground="#F8FAFC",
+                relief="solid",
+                borderwidth=1,
+                font=("Segoe UI", 8),
+                padx=6,
+                pady=2,
+            )
+            lbl.pack()
+
+    def hide_tip(self, event: Any = None) -> None:
+        tw = self.tip_window
+        self.tip_window = None
+        if tw:
+            with contextlib.suppress(Exception):
+                tw.destroy()
 
 
 class FloatingVoiceCapsule(ctk.CTkFrame):
@@ -143,6 +186,7 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
             command=self.toggle_mic,
         )
         self.mic_button.place(relx=0.5, rely=0.5, anchor="center")
+        QuickTooltip(self.mic_button, "Activar/Desactivar Micrófono [Voz]")
 
         # 2. Indicador visual de forma de onda / RMS
         self.waveform_canvas = ctk.CTkCanvas(
@@ -151,14 +195,20 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
             height=26,
             bg=CAPSULE_BG,
             highlightthickness=0,
+            bd=0,
         )
         self.waveform_canvas.pack(side="left", padx=(0, 8), pady=6)
+
+        # Prealocar rectángulos una sola vez para evitar delete('all') y fugas en Tcl
+        self._bar_ids: list[int] = [
+            self.waveform_canvas.create_rectangle(0, 0, 0, 0, fill=theme.TEXT_MUTED, outline="") for _ in range(4)
+        ]
         self._draw_waveform()
 
         # 3. Campo de entrada de texto
         self.entry = ctk.CTkEntry(
             self,
-            placeholder_text='Di: "Hola Darius..."',
+            placeholder_text='Di: "Hola Darius..." o escribe un comando',
             font=theme.FONT_BODY,
             height=36,
             corner_radius=theme.RADIUS_MD,
@@ -185,10 +235,18 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
             command=self._on_submit,
         )
         self.submit_btn.pack(side="left", padx=(0, 10), pady=6)
+        QuickTooltip(self.submit_btn, "Enviar comando o pregunta [Enter]")
 
-        # 4. Modos de voz rápidos (PTT, NOM, AUTO, GEMINI LIVE)
+        # 4. Modos de voz rápidos (PTT, NOM, AUTO, GEMINI LIVE) con tooltips
         self.modes_container = ctk.CTkFrame(self, fg_color="transparent")
         self.modes_container.pack(side="right", padx=(0, 12), pady=6)
+
+        mode_tooltips = {
+            "PTT": "Pulsar para hablar [Ctrl]",
+            "NOM": "Activación por voz ('Darius')",
+            "AUTO": "Escucha continua activa",
+            "GEMINI LIVE": "Voz bidireccional continua",
+        }
 
         for mode in VOICE_MODES:
             btn = ctk.CTkButton(
@@ -205,35 +263,52 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
                 command=lambda m=mode: self.set_mode(m),
             )
             btn.pack(side="left", padx=2)
+            QuickTooltip(btn, mode_tooltips.get(mode, ""))
             self.mode_buttons[mode] = btn
 
     def _draw_waveform(self) -> None:
-        """Dibuja barras de nivel de audio en el canvas basadas en self._current_rms."""
+        """Actualiza atómicamente las coordenadas de las barras sin delete('all')."""
+        if not hasattr(self, "_bar_ids") or not self._bar_ids:
+            return
+
         with contextlib.suppress(Exception):
-            self.waveform_canvas.delete("all")
             width = 42
             height = 26
             num_bars = 4
             bar_width = 4
             gap = 5
-            start_x = (width - (num_bars * bar_width + (num_bars - 1) * gap)) / 2
+            start_x = (width - (num_bars * bar_width + (num_bars - 1) * gap)) / 2.0
 
-            norm = self._current_rms / 100.0
+            norm = max(0.0, min(1.0, self._current_rms / 100.0))
             color = HALO_ACTIVE_COLOR if self._is_mic_active else theme.TEXT_MUTED
 
-            for i in range(num_bars):
-                # Escalar barra según armónicos o RMS
+            for i, bar_id in enumerate(self._bar_ids):
                 scale = math.sin((i + 1) * 0.8) * 0.4 + 0.6
-                h = max(3.0, (height - 6) * norm * scale)
+                h = max(3.0, (height - 6.0) * norm * scale)
                 x0 = start_x + i * (bar_width + gap)
                 x1 = x0 + bar_width
-                y0 = (height - h) / 2
+                y0 = (height - h) / 2.0
                 y1 = y0 + h
-                self.waveform_canvas.create_rectangle(
-                    x0, y0, x1, y1,
-                    fill=color,
-                    outline="",
-                )
+                self.waveform_canvas.coords(bar_id, x0, y0, x1, y1)
+                self.waveform_canvas.itemconfig(bar_id, fill=color)
+
+    def set_rms_energy(self, rms: float) -> None:
+        """
+        Actualiza el nivel de energía sonora RMS de la cápsula [0.0, 100.0].
+
+        Args:
+            rms: Nivel de audio en escala 0 a 100.
+        """
+        self._current_rms = max(0.0, min(100.0, float(rms)))
+        self._draw_waveform()
+
+    def update_audio_level(self, rms_energy: float) -> None:
+        """Alias para set_rms_energy para compatibilidad total con consumidores."""
+        self.set_rms_energy(rms_energy)
+
+    def update_rms_level(self, rms_energy: float) -> None:
+        """Alias para set_rms_energy para compatibilidad total con consumidores."""
+        self.set_rms_energy(rms_energy)
 
     def _update_mic_styling(self) -> None:
         """Aplica la colorimetría correspondiente al estado activo o inactivo del mic."""
@@ -311,16 +386,6 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
             except Exception as exc:
                 log.error("Error al despachar on_mode_change(%s): %s", mode, exc)
 
-    def set_rms_energy(self, rms: float) -> None:
-        """
-        Actualiza el nivel de energía sonora RMS de la cápsula [0.0, 100.0].
-
-        Args:
-            rms: Nivel de audio en escala 0 a 100.
-        """
-        self._current_rms = max(0.0, min(100.0, float(rms)))
-        self._draw_waveform()
-
     def set_prompt_text(self, text: str) -> None:
         """Establece el texto dentro del campo de entrada."""
         self.entry.delete(0, "end")
@@ -377,3 +442,8 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
             with contextlib.suppress(Exception):
                 self.after_cancel(self._pulse_timer_id)
             self._pulse_timer_id = None
+
+    def destroy(self) -> None:
+        """Cancela temporizadores activos y destruye el widget de forma limpia."""
+        self._stop_pulse_animation()
+        super().destroy()

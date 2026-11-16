@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import re
+import socket
 import subprocess
 import sys
 import threading
@@ -48,10 +49,10 @@ try:
 
     WIN32_AVAILABLE = True
 except ImportError:
-    win32api = None  # type: ignore
-    win32com = None  # type: ignore
-    win32event = None  # type: ignore
-    winerror = None  # type: ignore
+    win32api = None
+    win32com = None
+    win32event = None
+    winerror = None
     WIN32_AVAILABLE = False
 from dotenv import load_dotenv
 
@@ -231,8 +232,6 @@ def enable_dpi_awareness():
             ctypes.windll.user32.SetProcessDPIAware()
 
 
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  CLASE PRINCIPAL
 # ─────────────────────────────────────────────────────────────────────────────
@@ -265,8 +264,10 @@ class DariusFinal(ctk.CTk):
         self._pending_action: dict | None = None
         self._pending_lock = threading.RLock()
         self._chat_file_lock = threading.Lock()
+        self._history_lock = threading.Lock()
         self._mic_device_index: int | None = None
         self._ptt_active = False
+        self._cached_network_status: tuple[float, bool] | None = None
 
         self.listen_mode = DEFAULT_LISTEN_MODE
         self.conversation_history: list[dict] = []
@@ -288,9 +289,16 @@ class DariusFinal(ctk.CTk):
         if cfg.acoustic_trigger_enabled:
             self._clap_detector.start()
 
+        from src.darius_ai.core.task_scheduler import get_task_scheduler
+
+        self._scheduler = get_task_scheduler()
+        self._scheduler.start()
+
         self.setup_ui()
+        self.setup_shortcuts()
         self.scan_apps_async()
         self._start_render_pipeline()
+        self._start_audio_level_monitor()
 
     # =========================================================================
     #  TTS / VOZ
@@ -315,7 +323,6 @@ class DariusFinal(ctk.CTk):
         except Exception as e:
             log.warning(f"No se pudo inicializar SAPI.SpVoice: {e}")
             self.tts_voice_token = None
-
 
     def configure_listener(self):
         self.listener.energy_threshold = MIC_ENERGY_THRESHOLD
@@ -342,6 +349,15 @@ class DariusFinal(ctk.CTk):
         self._append_chat_file("DARIUS", text)
         if not self.is_muted:
             self.tts_worker.speak(text)
+
+    def display_ai_response(self, text: str):
+        """Muestra la respuesta en el chat con formato Markdown y código intactos, y habla versión limpia."""
+        log.info(f"DARIUS (AI): {text[:80]}...")
+        self.after(0, self._insert_message, "Darius", text)
+        self._append_chat_file("DARIUS", text)
+        if not self.is_muted:
+            clean_speech = re.sub(r"[*_`#>]", "", text).strip()
+            self.tts_worker.speak(clean_speech)
 
     # =========================================================================
     #  HISTORIAL
@@ -885,6 +901,50 @@ class DariusFinal(ctk.CTk):
             command=self._open_byok_settings,
         ).pack(fill="x", padx=12, pady=(0, 10))
 
+        # ── Bitácora y Registro en Vivo (Live Log Viewer) ──
+        logs_card = ctk.CTkFrame(
+            page_sys,
+            fg_color=theme.BG_CARD_INNER,
+            corner_radius=theme.RADIUS_MD,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
+        )
+        logs_card.pack(fill="both", expand=True, padx=10, pady=6)
+
+        logs_header = ctk.CTkFrame(logs_card, fg_color="transparent")
+        logs_header.pack(fill="x", padx=12, pady=(10, 4))
+
+        ctk.CTkLabel(
+            logs_header,
+            text="📋 Bitácora del Sistema (darius.log)",
+            font=theme.FONT_BODY_BOLD,
+            text_color=theme.TEXT_PRIMARY,
+            anchor="w",
+        ).pack(side="left")
+
+        ctk.CTkButton(
+            logs_header,
+            text="🔄 Actualizar",
+            width=80,
+            height=26,
+            font=theme.FONT_BADGE,
+            fg_color=theme.BG_CARD,
+            hover_color=theme.BG_CARD_HOVER,
+            command=self._refresh_logs_display,
+        ).pack(side="right")
+
+        self.logs_textbox = ctk.CTkTextbox(
+            logs_card,
+            font=theme.FONT_CODE,
+            fg_color=theme.BG_CANVAS,
+            text_color=theme.TEXT_SECONDARY,
+            height=180,
+            wrap="none",
+            corner_radius=theme.RADIUS_SM,
+        )
+        self.logs_textbox.pack(fill="both", expand=True, padx=12, pady=(0, 10))
+        self._refresh_logs_display()
+
         # ── 4. FLOATING VOICE CAPSULE (Dock Flotante v8.5) ──────────────────
         initial_capsule_mode = "NOM"
         if self.listen_mode == LISTEN_MODE_PTT:
@@ -915,13 +975,61 @@ class DariusFinal(ctk.CTk):
         self.start_btn = getattr(self.cyber_top_bar, "btn_mute", None)
         self.settings_top_btn = getattr(self.cyber_top_bar, "btn_settings", None)
 
-
         # 2.4 Bottom Telemetry HUD Bar (Motor de Telemetría Darius)
         from src.darius_ai.gui.telemetry_bar import TelemetryBarWidget
 
         self.telemetry_bar = TelemetryBarWidget(self.main_studio_frame)
         self.telemetry_bar.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 4))
         self.current_page = "dashboard"
+
+    def setup_shortcuts(self):
+        """Configura atajos de teclado globales en la ventana para ergonomía y accesibilidad."""
+        # 1. Navegación por pestañas del sidebar (Ctrl+1 a Ctrl+6)
+        tab_bindings = {
+            "<Control-Key-1>": "inicio",
+            "<Control-Key-2>": "asistente",
+            "<Control-Key-3>": "automatizacion",
+            "<Control-Key-4>": "memoria",
+            "<Control-Key-5>": "configuracion",
+            "<Control-Key-6>": "logs",
+        }
+        for key_seq, tab_name in tab_bindings.items():
+            self.bind(key_seq, lambda _event, t=tab_name: self._show_page(t))
+
+        # 2. Ctrl+K: Enfocar barra de entrada de texto
+        def _focus_input(event=None):
+            if hasattr(self, "voice_capsule") and self.voice_capsule is not None:
+                if hasattr(self.voice_capsule, "entry"):
+                    self.voice_capsule.entry.focus_set()
+            elif hasattr(self, "text_input") and self.text_input is not None:
+                self.text_input.focus_set()
+
+        self.bind("<Control-k>", _focus_input)
+        self.bind("<Control-K>", _focus_input)
+
+        # 3. Ctrl+M: Alternar mute de audio
+        def _toggle_mute(event=None):
+            self._cmd_vol_mute()
+
+        self.bind("<Control-m>", _toggle_mute)
+        self.bind("<Control-M>", _toggle_mute)
+
+        # 4. Ctrl+,: Abrir modal de Ajustes BYOK
+        self.bind("<Control-comma>", lambda _event: self._open_byok_settings())
+
+        # 5. Escape: Barge-in atómico (interrumpir habla activa de Darius) o cancelar acción pendiente
+        def _on_escape(event=None):
+            if hasattr(self, "tts_worker") and self.tts_worker is not None and self.tts_worker.is_speaking.is_set():
+                self.tts_worker.interrupt()
+                self.set_status("INTERRUMPIDO", theme.ACCENT_AMBER)
+                return
+            with self._pending_lock:
+                if getattr(self, "_pending_action", None) is not None:
+                    self._pending_action = None
+                    self.set_status("ACCIÓN CANCELADA", theme.ACCENT_AMBER)
+                    self.talk("Acción cancelada.")
+
+        self.bind("<Escape>", _on_escape)
 
     def _show_page(self, page_id: str):
 
@@ -945,6 +1053,9 @@ class DariusFinal(ctk.CTk):
                 frame.grid(row=0, column=0, sticky="nsew")
             else:
                 frame.grid_forget()
+
+        if target_page == "system":
+            self._refresh_logs_display()
 
         # Sincronizar estado visual del sidebar si difiere
         if hasattr(self, "sidebar") and self.sidebar is not None:
@@ -1007,7 +1118,6 @@ class DariusFinal(ctk.CTk):
                     engine.stop_live_session()
 
         if hasattr(self, "voice_capsule") and self.voice_capsule is not None:
-
             reverse_mode = {v: k for k, v in mode_alias.items()}
             capsule_tag = reverse_mode.get(resolved_mode, resolved_mode.upper())
             if self.voice_capsule.current_mode != capsule_tag:
@@ -1036,9 +1146,17 @@ class DariusFinal(ctk.CTk):
 
     def _on_voice_capsule_mic_toggle(self, active: bool):
         """Gestiona el clic directo en el botón de micrófono de la cápsula flotante."""
+        if hasattr(self, "tts_worker") and self.tts_worker is not None and self.tts_worker.is_speaking.is_set():
+            self.tts_worker.interrupt()
+
         if active:
             if getattr(self, "is_muted", False):
                 self.toggle_mute()
+            with contextlib.suppress(Exception):
+                from src.darius_ai.audio.sound_effects import get_sfx_engine
+
+                get_sfx_engine().play_earcon_tick()
+
             self.set_status("🎙 ESCUCHANDO…", "#00F0FF")
             self.is_listening = True
             threading.Thread(target=self._one_shot_mic_listen, daemon=True, name="capsule-mic-oneshot").start()
@@ -1131,15 +1249,51 @@ class DariusFinal(ctk.CTk):
     def _open_byok_settings(self):
         from src.darius_ai.gui.byok_settings import BYOKSettingsModal
 
-        BYOKSettingsModal(self, on_save_callback=self._on_byok_settings_saved)
+        def _restore_sidebar_tab():
+            if hasattr(self, "sidebar") and self.sidebar is not None:
+                rev_map = {
+                    "dashboard": "inicio",
+                    "chat": "asistente",
+                    "workspaces": "automatizacion",
+                    "obsidian": "memoria",
+                    "system": "logs",
+                }
+                prev_tab = rev_map.get(getattr(self, "current_page", "dashboard"), "inicio")
+                self.sidebar.select_tab(prev_tab, dispatch_callback=False)
+
+        BYOKSettingsModal(
+            self,
+            on_save_callback=self._on_byok_settings_saved,
+            on_close_callback=_restore_sidebar_tab,
+        )
+
+    def _refresh_logs_display(self):
+        """Lee las últimas líneas de darius.log y las muestra en logs_textbox."""
+        if not hasattr(self, "logs_textbox") or self.logs_textbox is None:
+            return
+        log_file = Path("darius.log")
+        content = ""
+        if log_file.exists():
+            try:
+                with open(log_file, encoding="utf-8", errors="replace") as f:
+                    lines = f.readlines()
+                    content = "".join(lines[-60:])
+            except Exception as e:
+                content = f"Error leyendo darius.log: {e}"
+        else:
+            content = "Archivo darius.log en inicialización..."
+
+        self.logs_textbox.configure(state="normal")
+        self.logs_textbox.delete("1.0", "end")
+        self.logs_textbox.insert("1.0", content)
+        self.logs_textbox.see("end")
+        self.logs_textbox.configure(state="disabled")
 
     def _on_byok_settings_saved(self):
-        if hasattr(self, "llm_pill"):
+        if hasattr(self, "llm_pill") and self.llm_pill is not None:
             self.llm_pill.configure(text=self._llm_badge_text())
-        if hasattr(self, "tts_pill"):
+        if hasattr(self, "tts_pill") and self.tts_pill is not None:
             self.tts_pill.configure(text=self._tts_badge_text())
-        if hasattr(self, "tts_worker"):
-            self.tts_worker.engine = cfg.tts_engine
         prov_name = cfg.active_provider.upper()
         tts_name = cfg.tts_engine.upper()
         self.set_status(f"IA: {prov_name} • TTS: {tts_name}", "#38BDF8")
@@ -1215,19 +1369,35 @@ class DariusFinal(ctk.CTk):
         resolved_color = dot_colors.get(color, color)
 
         def _update():
-            if hasattr(self, "status_label"):
+            if hasattr(self, "status_label") and self.status_label is not None:
                 self.status_label.configure(text=text)
             if hasattr(self, "status_dot") and self.status_dot is not None:
                 self.status_dot.configure(text_color=resolved_color)
             if hasattr(self, "cyber_top_bar") and self.cyber_top_bar is not None:
                 self.cyber_top_bar.set_system_status(
                     system_status=text[:30],
-                    is_online=not self.is_muted,
+                    is_online=self._is_network_available(),
                     provider=cfg.active_provider.title(),
                     model=getattr(cfg, f"llm_{cfg.active_provider}_model", "Auto"),
                 )
 
         self.after(0, _update)
+
+    def _is_network_available(self) -> bool:
+        """Comprueba conectividad real de red mediante socket con caché de 5 segundos."""
+        now = time.time()
+        if getattr(self, "_cached_network_status", None) is not None:
+            last_check, status = self._cached_network_status  # type: ignore[misc]
+            if now - last_check < 5.0:
+                return status
+        try:
+            sock = socket.create_connection(("1.1.1.1", 53), timeout=1.0)
+            sock.close()
+            is_net = True
+        except Exception:
+            is_net = False
+        self._cached_network_status = (now, is_net)
+        return is_net
 
     # =========================================================================
     #  RENDER PIPELINE & ANIMACIÓN (60 FPS)
@@ -1270,7 +1440,7 @@ class DariusFinal(ctk.CTk):
 
     def animate_logic(self):
         """Compatibilidad retrospectiva con llamadas heredadas."""
-        pass
+        return None
 
     def _start_audio_level_monitor(self):
         def monitor():
@@ -1316,7 +1486,8 @@ class DariusFinal(ctk.CTk):
             self.set_status("SISTEMA LISTO", "#34D399")
 
     def reset_conversation(self):
-        self.conversation_history.clear()
+        with self._history_lock:
+            self.conversation_history.clear()
         with self._pending_lock:
             self._pending_action = None
         self.chat_display.configure(state="normal")
@@ -1446,8 +1617,12 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def start_system(self):
-        self.start_btn.configure(state="disabled", text="⚡ NÚCLEO ONLINE", fg_color="#1F2937", text_color="#34D399")
-        self.mute_btn.configure(state="normal")
+        if hasattr(self, "start_btn") and self.start_btn is not None:
+            self.start_btn.configure(
+                state="disabled", text="⚡ NÚCLEO ONLINE", fg_color="#1F2937", text_color="#34D399"
+            )
+        if hasattr(self, "mute_btn") and self.mute_btn is not None:
+            self.mute_btn.configure(state="normal")
         mode_desc = {
             LISTEN_MODE_PTT: f"Modo P.T.T. activo. Mantén presionado {LISTEN_KEY} para hablar.",
             LISTEN_MODE_NAME: f"Modo nombre activo. Dí {ASSISTANT_NAME} para activarme.",
@@ -1665,11 +1840,11 @@ class DariusFinal(ctk.CTk):
     # Regex para apagar — cubre: "apagate", "apaga el equipo", "apaga el pc",
     # "apaga la maquina", "apaga la computadora", "apagar el equipo"
     _RE_APAGAR = re.compile(
-        r"\b(apagate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b", re.IGNORECASE
+        r"\b(ap[áa]gate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|m[áa]quina|sistema))\b", re.IGNORECASE
     )
     # Regex para reiniciar — cubre: "reinicia el equipo", "reiniciar el pc", etc.
     _RE_REINICIAR = re.compile(
-        r"\b(reinicia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|maquina|sistema))\b", re.IGNORECASE
+        r"\b(rein[ií]cia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|m[áa]quina|sistema))\b", re.IGNORECASE
     )
     # Regex para _cmd_accion — SOLO palabras clave de sistema operativo
     # (ya NO incluye "cuanto", "cual es", "hay" que son genéricas)
@@ -1813,8 +1988,11 @@ class DariusFinal(ctk.CTk):
 
         with self._pending_lock:
             if self._pending_action is not None:
-                self._handle_confirmation(cmd)
-                return
+                if time.time() > self._pending_action.get("expires_at", float("inf")):
+                    self._pending_action = None
+                else:
+                    self._handle_confirmation(cmd)
+                    return
 
         for pattern, handler in self._CMD_PATTERNS:
             if pattern.search(cmd):
@@ -1905,7 +2083,7 @@ class DariusFinal(ctk.CTk):
 
         def run():
             time.sleep(2.0)
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             gui.human_type(text_to_type)
             self.talk("Texto escrito correctamente.")
@@ -1915,15 +2093,14 @@ class DariusFinal(ctk.CTk):
     def _cmd_human_click(self, cmd: str):
         is_right = bool(re.search(r"derecho", cmd, re.IGNORECASE))
         is_double = bool(re.search(r"doble", cmd, re.IGNORECASE))
-        clicks = 2 if is_double else 1
         button = "right" if is_right else "left"
         self.talk("Haciendo clic en dos segundos.")
 
         def run():
             time.sleep(2.0)
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
-            gui.human_click(button=button, clicks=clicks)
+            gui.human_click(button=button, double=is_double)
             self.talk("Clic ejecutado.")
 
         threading.Thread(target=run, daemon=True, name="human-click").start()
@@ -1937,11 +2114,11 @@ class DariusFinal(ctk.CTk):
         self.talk(f"Analizando el contenido de {url}.")
 
         def run():
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             res = gui.scrape_web_content(url)
-            if not res.get("ok"):
-                self.talk(f"Error al analizar la página: {res.get('error')}")
+            if not (res.get("success") or res.get("ok")):
+                self.talk(f"Error al analizar la página: {res.get('error', 'Fallo desconocido')}")
                 return
             title = res.get("title", "Página web")
             content = res.get("content", "")
@@ -2120,7 +2297,7 @@ class DariusFinal(ctk.CTk):
         volume_down()
         self.talk("Volumen disminuido.")
 
-    def _cmd_vol_mute(self, _):
+    def _cmd_vol_mute(self, _=None):
         volume_mute()
         self.talk("Audio silenciado.")
 
@@ -2133,19 +2310,23 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_detener(self, _):
         with contextlib.suppress(Exception):
-            from src.darius_ai.gui.human_gui import gui
+            from src.darius_ai.automation.human_input import gui
 
             gui.abort()
         if hasattr(self, "tts_worker"):
-            self.tts_worker.clear_queue()
-        with contextlib.suppress(Exception):
-            import sounddevice as sd
-
-            sd.stop()
+            self.tts_worker.interrupt()
         with self._pending_lock:
             self._pending_action = None
         self.add_to_chat("Darius", "Operación detenida y cola de voz silenciada.")
         self.set_status("DETENIDO", "#F87171")
+
+    def _check_confirmation_timeout(self):
+        """Limpia el estado y la cabecera si la acción destructiva expira sin confirmación."""
+        with self._pending_lock:
+            if self._pending_action and time.time() >= self._pending_action.get("expires_at", 0):
+                self._pending_action = None
+                self.set_status("CONFIRMACIÓN EXPIRADA", "#94A3B8")
+                self.after(2500, lambda: self.set_status("SISTEMA LISTO", "#34D399"))
 
     def _cmd_cerrar(self, _):
         self.talk(f"Cerrando protocolos. Hasta pronto, {USER_NAME}.")
@@ -2156,6 +2337,7 @@ class DariusFinal(ctk.CTk):
             self._pending_action = {
                 "desc": "Apagar el equipo en 10 segundos",
                 "confirm": True,
+                "expires_at": time.time() + 15.0,
                 "_fn": lambda: subprocess.run(  # noqa: S603
                     [os.environ["WINDIR"] + "\\System32\\shutdown.exe", "/s", "/t", "10"],
                     shell=False,
@@ -2164,12 +2346,14 @@ class DariusFinal(ctk.CTk):
             }
         self.talk("Estás a punto de apagar el equipo. Di confirmar para proceder o cancelar para abortar.")
         self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
+        self.after(15000, self._check_confirmation_timeout)
 
     def _cmd_reiniciar_pc(self, _):
         with self._pending_lock:
             self._pending_action = {
                 "desc": "Reiniciar el equipo en 10 segundos",
                 "confirm": True,
+                "expires_at": time.time() + 15.0,
                 "_fn": lambda: subprocess.run(  # noqa: S603
                     [os.environ["WINDIR"] + "\\System32\\shutdown.exe", "/r", "/t", "10"],
                     shell=False,
@@ -2178,6 +2362,7 @@ class DariusFinal(ctk.CTk):
             }
         self.talk("Estás a punto de reiniciar el equipo. Di confirmar para proceder o cancelar para abortar.")
         self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
+        self.after(15000, self._check_confirmation_timeout)
 
     def _cmd_accion(self, cmd: str):
         entry = wincmd_resolve_action(cmd)
@@ -2190,11 +2375,14 @@ class DariusFinal(ctk.CTk):
             return
         if entry.get("confirm", False):
             with self._pending_lock:
-                self._pending_action = entry
+                entry_copy = dict(entry)
+                entry_copy["expires_at"] = time.time() + 15.0
+                self._pending_action = entry_copy
             self.talk(
                 f"Estás a punto de ejecutar: {entry['desc']}. Di confirmar para proceder o cancelar para abortar."
             )
             self.set_status("⚠ ESPERANDO CONFIRMACIÓN", "#ffaa00")
+            self.after(15000, self._check_confirmation_timeout)
         else:
             self._execute_action(entry)
 
@@ -2206,6 +2394,10 @@ class DariusFinal(ctk.CTk):
                 self._pending_action = None
             if not entry:
                 self.talk("No hay ninguna acción pendiente de confirmación.")
+                return
+            if time.time() > entry.get("expires_at", float("inf")):
+                self.set_status("LISTO", "gray")
+                self.talk("La solicitud de confirmación ha expirado por seguridad.")
                 return
             self.set_status("LISTO", "gray")
             self.talk(f"Ejecutando: {entry['desc']}.")
@@ -2303,24 +2495,28 @@ class DariusFinal(ctk.CTk):
         """
         self._is_thinking = True
         self.set_status("⚡ PROCESANDO IA…", "#aa00ff")
-        self.conversation_history.append({"role": "user", "content": prompt})
         max_msgs = GEMINI_HISTORY_TURNS * 2
-        if len(self.conversation_history) > max_msgs:
-            self.conversation_history = self.conversation_history[-max_msgs:]
+        with self._history_lock:
+            self.conversation_history.append({"role": "user", "content": prompt})
+            if len(self.conversation_history) > max_msgs:
+                self.conversation_history = self.conversation_history[-max_msgs:]
+            history_snapshot = list(self.conversation_history[:-1])
 
         try:
-            answer_text, provider = get_ai_response(prompt, self.conversation_history[:-1])
+            answer_text, provider = get_ai_response(prompt, history_snapshot)
             if answer_text and answer_text.strip():
-                clean = re.sub(r"[*_`#>]", "", answer_text).strip()
-                self.conversation_history.append({"role": "model", "content": clean})
-                log.info(f"[IA] Respuesta via {provider} ({len(clean)} chars)")
-                self.talk(clean)
+                with self._history_lock:
+                    self.conversation_history.append({"role": "model", "content": answer_text})
+                log.info(f"[IA] Respuesta via {provider} ({len(answer_text)} chars)")
+                self.display_ai_response(answer_text)
             else:
                 self.talk("No obtuve respuesta del motor de IA.")
+
         except Exception as exc:
             log.error(f"[IA] Error inesperado: {exc}")
-            if self.conversation_history and self.conversation_history[-1]["role"] == "user":
-                self.conversation_history.pop()
+            with self._history_lock:
+                if self.conversation_history and self.conversation_history[-1]["role"] == "user":
+                    self.conversation_history.pop()
             self.talk("Ocurrió un error al consultar la IA. Comandos locales activos.")
         finally:
             self._is_thinking = False
@@ -2335,6 +2531,8 @@ class DariusFinal(ctk.CTk):
         self.running = False
         if hasattr(self, "_clap_detector"):
             self._clap_detector.stop()
+        if hasattr(self, "_scheduler"):
+            self._scheduler.stop()
         self.tts_worker.wait_until_done(timeout=5.0)
         self.tts_worker.stop()
         time.sleep(0.2)

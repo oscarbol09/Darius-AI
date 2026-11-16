@@ -25,11 +25,13 @@ import logging
 import threading
 import tkinter as tk
 from collections.abc import Callable
+from typing import Any
 
 import customtkinter as ctk
 
 from src.darius_ai.core.ai_client import PROVIDER_NAMES, resolve_provider_key, test_provider_connection
 from src.darius_ai.core.config_loader import cfg
+from src.darius_ai.gui import gui_theme as theme
 
 log = logging.getLogger("DARIUS.Settings")
 
@@ -134,17 +136,31 @@ class BYOKSettingsModal(ctk.CTkToplevel):
     Ventana modal de configuración para Proveedores de IA y Motores TTS.
     """
 
-    def __init__(self, master, on_save_callback: Callable[[], None] | None = None):
+    def __init__(
+        self,
+        master,
+        on_save_callback: Callable[[], None] | None = None,
+        on_close_callback: Callable[[], None] | None = None,
+    ):
         super().__init__(master)
         self.title("DARIUS AI — Configuración del Asistente")
-        self.geometry("620x780")
-        self.minsize(540, 720)
-        self.configure(fg_color="#090D16")
+
+        # Geometría responsiva para laptops de 768p y monitores escalados
+        try:
+            screen_h = self.winfo_screenheight()
+        except Exception:
+            screen_h = 768
+        target_h = min(660, max(480, int(screen_h * 0.85)))
+        self.geometry(f"620x{target_h}")
+        self.minsize(520, 480)
+        self.configure(fg_color=theme.BG_CANVAS)
         self.attributes("-topmost", True)
         self.grab_set()
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.bind("<Escape>", lambda _event: self._on_close())
 
         self.on_save_callback = on_save_callback
+        self.on_close_callback = on_close_callback
         self.selected_provider = cfg.active_provider or "gemini"
         self.selected_tts_engine = cfg.tts_engine or "sapi"
         if self.selected_tts_engine not in TTS_ENGINES:
@@ -163,7 +179,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
                 "base_url": "",
             },
             "antigravity": {
-                "key": cfg.llm_gemini_api_key or resolve_provider_key("gemini"),
+                "key": cfg.llm_antigravity_api_key or cfg.llm_gemini_api_key or resolve_provider_key("gemini"),
                 "model": cfg.llm_antigravity_model or "antigravity-core",
                 "base_url": "",
             },
@@ -200,7 +216,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         }
 
         # Almacén temporal de valores ElevenLabs
-        self._eleven_data = {
+        self._eleven_data: dict[str, Any] = {
             "api_key": cfg.elevenlabs_api_key,
             "voice_id": cfg.elevenlabs_voice_id or "21m00Tcm4TlvDq8ikWAM",
             "model_id": cfg.elevenlabs_model_id or "eleven_multilingual_v2",
@@ -213,21 +229,23 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
     def _build_ui(self):
         # ── 1. HEADER ────────────────────────────────────────────────────────
-        header_frame = ctk.CTkFrame(self, fg_color="#111827", corner_radius=12, border_width=1, border_color="#1E293B")
+        header_frame = ctk.CTkFrame(
+            self, fg_color=theme.BG_CARD, corner_radius=12, border_width=1, border_color=theme.BORDER_SUBTLE
+        )
         header_frame.pack(padx=16, pady=(16, 8), fill="x")
 
         ctk.CTkLabel(
             header_frame,
             text="⚙ AJUSTES Y CONFIGURACIÓN — DARIUS AI",
             font=("Segoe UI", 16, "bold"),
-            text_color="#38BDF8",
+            text_color=theme.ACCENT_PRIMARY,
         ).pack(anchor="w", padx=16, pady=(10, 2))
 
         ctk.CTkLabel(
             header_frame,
             text="Personaliza tus modelos de lenguaje (BYOK) y motores de síntesis de voz.",
             font=("Segoe UI", 10),
-            text_color="#94A3B8",
+            text_color=theme.TEXT_MUTED,
         ).pack(anchor="w", padx=16, pady=(0, 10))
 
         # ── 2. SEGMENTED BUTTON (TABS) ───────────────────────────────────────
@@ -238,11 +256,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             tab_frame,
             values=["🤖 MODELO DE IA (BYOK)", "🔊 VOZ Y SÍNTESIS (TTS)"],
             command=self._on_tab_changed,
-            selected_color="#38BDF8",
-            selected_hover_color="#0284C7",
-            unselected_color="#1F2937",
-            unselected_hover_color="#374151",
-            text_color="#F8FAFC",
+            selected_color=theme.ACCENT_PRIMARY,
+            selected_hover_color=theme.ACCENT_PRIMARY_HOVER,
+            unselected_color=theme.BG_CARD_INNER,
+            unselected_hover_color=theme.BORDER_CARD,
+            text_color=theme.TEXT_PRIMARY,
             font=("Segoe UI", 11, "bold"),
             height=34,
             corner_radius=8,
@@ -250,13 +268,46 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.tab_selector.set("🤖 MODELO DE IA (BYOK)")
         self.tab_selector.pack(fill="x")
 
-        # ── 3. CONTENEDOR TAB 1: MODELO IA (BYOK) ───────────────────────────
-        self.llm_container = ctk.CTkFrame(self, fg_color="transparent")
+        # ── 3. BOTONES INFERIORES COMPARTIDOS (FIJOS AL FONDO) ───────────────
+        bottom_row = ctk.CTkFrame(self, fg_color="transparent")
+        bottom_row.pack(side="bottom", padx=16, pady=(6, 16), fill="x")
+
+        self.save_btn = ctk.CTkButton(
+            bottom_row,
+            text="💾 GUARDAR Y APLICAR",
+            fg_color=theme.ACCENT_PRIMARY,
+            hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.BG_CANVAS,
+            font=("Segoe UI", 11, "bold"),
+            height=40,
+            corner_radius=8,
+            command=self._on_save,
+        )
+        self.save_btn.pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+        ctk.CTkButton(
+            bottom_row,
+            text="CERRAR",
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BORDER_CARD,
+            text_color=theme.TEXT_PRIMARY,
+            font=("Segoe UI", 11),
+            height=40,
+            corner_radius=8,
+            command=self._on_close,
+        ).pack(side="right", padx=(6, 0))
+
+        # ── 4. CONTENEDOR TAB 1: MODELO IA (BYOK) (Scrollable) ───────────────
+        self.llm_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
         self.llm_container.pack(padx=16, pady=0, fill="both", expand=True)
 
         # Card Selector Proveedor
         llm_selector_card = ctk.CTkFrame(
-            self.llm_container, fg_color="#111827", corner_radius=12, border_width=1, border_color="#1E293B"
+            self.llm_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         llm_selector_card.pack(fill="x", pady=(0, 8))
 
@@ -264,7 +315,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             llm_selector_card,
             text="PROVEEDOR DE INTELIGENCIA ARTIFICIAL",
             font=("Segoe UI", 9, "bold"),
-            text_color="#64748B",
+            text_color=theme.TEXT_MUTED,
         ).pack(anchor="w", padx=16, pady=(10, 4))
 
         provider_options = [f"{'⭐ ' if k == cfg.active_provider else ''}{v}" for k, v in PROVIDER_NAMES.items()]
@@ -277,13 +328,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             llm_selector_card,
             values=provider_options,
             command=self._on_provider_changed,
-            fg_color="#1F2937",
-            button_color="#38BDF8",
-            button_hover_color="#0284C7",
-            text_color="#F8FAFC",
-            dropdown_fg_color="#111827",
-            dropdown_text_color="#F8FAFC",
-            dropdown_hover_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
+            button_color=theme.ACCENT_PRIMARY,
+            button_hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.TEXT_PRIMARY,
+            dropdown_fg_color=theme.BG_CARD,
+            dropdown_text_color=theme.TEXT_PRIMARY,
+            dropdown_hover_color=theme.BG_CARD_INNER,
             font=("Segoe UI", 11, "bold"),
             height=36,
             corner_radius=8,
@@ -293,13 +344,17 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Formulario Dinámico LLM
         self.llm_form_card = ctk.CTkFrame(
-            self.llm_container, fg_color="#111827", corner_radius=12, border_width=1, border_color="#1E293B"
+            self.llm_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         self.llm_form_card.pack(fill="both", expand=True)
 
         # 1. API Key LLM
         self.llm_key_label = ctk.CTkLabel(
-            self.llm_form_card, text="CLAVE DE API (API KEY)", font=("Segoe UI", 9, "bold"), text_color="#64748B"
+            self.llm_form_card, text="CLAVE DE API (API KEY)", font=("Segoe UI", 9, "bold"), text_color=theme.TEXT_MUTED
         )
         self.llm_key_label.pack(anchor="w", padx=16, pady=(10, 2))
 
@@ -311,9 +366,9 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             placeholder_text="Introduce tu clave de API…",
             show="●",
             font=("Consolas", 11),
-            fg_color="#1F2937",
-            border_color="#374151",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            border_color=theme.BORDER_CARD,
+            text_color=theme.TEXT_PRIMARY,
             height=36,
             corner_radius=8,
         )
@@ -324,9 +379,9 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             text="👁",
             width=38,
             height=36,
-            fg_color="#1F2937",
-            hover_color="#374151",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BORDER_CARD,
+            text_color=theme.TEXT_PRIMARY,
             font=("Segoe UI", 13),
             corner_radius=8,
             command=self._toggle_show_llm_key,
@@ -338,22 +393,22 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.llm_form_card,
             text="URL BASE DEL SERVIDOR (ENDPOINT)",
             font=("Segoe UI", 9, "bold"),
-            text_color="#64748B",
+            text_color=theme.TEXT_MUTED,
         )
         self.llm_url_entry = ctk.CTkEntry(
             self.llm_form_card,
             placeholder_text="http://localhost:11434/v1",
             font=("Consolas", 11),
-            fg_color="#1F2937",
-            border_color="#374151",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            border_color=theme.BORDER_CARD,
+            text_color=theme.TEXT_PRIMARY,
             height=36,
             corner_radius=8,
         )
 
         # 3. Modelo LLM
         self.llm_model_label = ctk.CTkLabel(
-            self.llm_form_card, text="MODELO DE LENGUAJE", font=("Segoe UI", 9, "bold"), text_color="#64748B"
+            self.llm_form_card, text="MODELO DE LENGUAJE", font=("Segoe UI", 9, "bold"), text_color=theme.TEXT_MUTED
         )
         self.llm_model_label.pack(anchor="w", padx=16, pady=(4, 2))
 
@@ -361,13 +416,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.llm_form_card,
             values=["gemini-3.5-flash-lite"],
             font=("Consolas", 11),
-            fg_color="#1F2937",
-            border_color="#374151",
-            button_color="#38BDF8",
-            button_hover_color="#0284C7",
-            dropdown_fg_color="#111827",
-            dropdown_text_color="#F8FAFC",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            border_color=theme.BORDER_CARD,
+            button_color=theme.ACCENT_PRIMARY,
+            button_hover_color=theme.ACCENT_PRIMARY_HOVER,
+            dropdown_fg_color=theme.BG_CARD,
+            dropdown_text_color=theme.TEXT_PRIMARY,
+            text_color=theme.TEXT_PRIMARY,
             height=36,
             corner_radius=8,
         )
@@ -378,24 +433,26 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.llm_form_card,
             text="💡 Obtén tu clave en Google AI Studio (aistudio.google.com)",
             font=("Segoe UI", 9),
-            text_color="#94A3B8",
+            text_color=theme.TEXT_MUTED,
             wraplength=520,
             justify="left",
         )
         self.llm_hint_label.pack(anchor="w", padx=16, pady=(2, 6))
 
         # 5. Status Box LLM
-        self.llm_status_box = ctk.CTkFrame(self.llm_form_card, fg_color="#1F2937", corner_radius=8)
+        self.llm_status_box = ctk.CTkFrame(self.llm_form_card, fg_color=theme.BG_CARD_INNER, corner_radius=8)
         self.llm_status_box.pack(fill="x", padx=16, pady=(4, 8))
 
-        self.llm_status_icon = ctk.CTkLabel(self.llm_status_box, text="⚪", font=("Segoe UI", 12), text_color="#64748B")
+        self.llm_status_icon = ctk.CTkLabel(
+            self.llm_status_box, text="⚪", font=("Segoe UI", 12), text_color=theme.TEXT_MUTED
+        )
         self.llm_status_icon.pack(side="left", padx=(10, 4), pady=6)
 
         self.llm_status_msg = ctk.CTkLabel(
             self.llm_status_box,
             text="Haz clic en 'Probar Conexión' para verificar las credenciales.",
             font=("Segoe UI", 10),
-            text_color="#94A3B8",
+            text_color=theme.TEXT_MUTED,
             wraplength=460,
             justify="left",
         )
@@ -408,11 +465,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.llm_test_btn = ctk.CTkButton(
             llm_action_row,
             text="🧪 PROBAR CONEXIÓN",
-            fg_color="#1F2937",
-            hover_color="#374151",
-            border_color="#38BDF8",
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BORDER_CARD,
+            border_color=theme.ACCENT_PRIMARY,
             border_width=1,
-            text_color="#38BDF8",
+            text_color=theme.ACCENT_PRIMARY,
             font=("Segoe UI", 10, "bold"),
             height=34,
             corner_radius=8,
@@ -424,25 +481,32 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             llm_action_row,
             text="Establecer como Activo",
             font=("Segoe UI", 10, "bold"),
-            text_color="#F8FAFC",
-            progress_color="#38BDF8",
+            text_color=theme.TEXT_PRIMARY,
+            progress_color=theme.ACCENT_PRIMARY,
         )
         self.set_active_switch.pack(side="right")
         if self.selected_provider == cfg.active_provider:
             self.set_active_switch.select()
 
-        # ── 4. CONTENEDOR TAB 2: VOZ Y SÍNTESIS (TTS) ────────────────────────
-        self.tts_container = ctk.CTkFrame(self, fg_color="transparent")
+        # ── 4. CONTENEDOR TAB 2: VOZ Y SÍNTESIS (TTS) (Scrollable) ───────────
+        self.tts_container = ctk.CTkScrollableFrame(self, fg_color="transparent")
         # Oculto por defecto hasta pulsar la pestaña
 
         # Card Selector Motor TTS
         tts_selector_card = ctk.CTkFrame(
-            self.tts_container, fg_color="#111827", corner_radius=12, border_width=1, border_color="#1E293B"
+            self.tts_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         tts_selector_card.pack(fill="x", pady=(0, 8))
 
         ctk.CTkLabel(
-            tts_selector_card, text="MOTOR DE SÍNTESIS DE VOZ", font=("Segoe UI", 9, "bold"), text_color="#64748B"
+            tts_selector_card,
+            text="MOTOR DE SÍNTESIS DE VOZ",
+            font=("Segoe UI", 9, "bold"),
+            text_color=theme.TEXT_MUTED,
         ).pack(anchor="w", padx=16, pady=(10, 4))
 
         tts_options = list(TTS_ENGINES.values())
@@ -450,13 +514,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             tts_selector_card,
             values=tts_options,
             command=self._on_tts_engine_changed,
-            fg_color="#1F2937",
-            button_color="#38BDF8",
-            button_hover_color="#0284C7",
-            text_color="#F8FAFC",
-            dropdown_fg_color="#111827",
-            dropdown_text_color="#F8FAFC",
-            dropdown_hover_color="#1F2937",
+            fg_color=theme.BG_CARD_INNER,
+            button_color=theme.ACCENT_PRIMARY,
+            button_hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.TEXT_PRIMARY,
+            dropdown_fg_color=theme.BG_CARD,
+            dropdown_text_color=theme.TEXT_PRIMARY,
+            dropdown_hover_color=theme.BG_CARD_INNER,
             font=("Segoe UI", 11, "bold"),
             height=36,
             corner_radius=8,
@@ -468,13 +532,20 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Formulario Dinámico TTS
         self.tts_form_card = ctk.CTkFrame(
-            self.tts_container, fg_color="#111827", corner_radius=12, border_width=1, border_color="#1E293B"
+            self.tts_container,
+            fg_color=theme.BG_CARD,
+            corner_radius=12,
+            border_width=1,
+            border_color=theme.BORDER_SUBTLE,
         )
         self.tts_form_card.pack(fill="both", expand=True)
 
         # Campos ElevenLabs
         self.eleven_key_label = ctk.CTkLabel(
-            self.tts_form_card, text="CLAVE DE API ELEVENLABS", font=("Segoe UI", 9, "bold"), text_color="#64748B"
+            self.tts_form_card,
+            text="CLAVE DE API ELEVENLABS",
+            font=("Segoe UI", 9, "bold"),
+            text_color=theme.TEXT_MUTED,
         )
         self.eleven_key_label.pack(anchor="w", padx=16, pady=(10, 2))
 
@@ -486,9 +557,9 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             placeholder_text="Introduce tu ElevenLabs API Key…",
             show="●",
             font=("Consolas", 11),
-            fg_color="#1F2937",
-            border_color="#374151",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            border_color=theme.BORDER_CARD,
+            text_color=theme.TEXT_PRIMARY,
             height=36,
             corner_radius=8,
         )
@@ -499,9 +570,9 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             text="👁",
             width=38,
             height=36,
-            fg_color="#1F2937",
-            hover_color="#374151",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BORDER_CARD,
+            text_color=theme.TEXT_PRIMARY,
             font=("Segoe UI", 13),
             corner_radius=8,
             command=self._toggle_show_eleven_key,
@@ -510,7 +581,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Voice ID
         self.eleven_voice_label = ctk.CTkLabel(
-            self.tts_form_card, text="ID DE VOZ (VOICE ID)", font=("Segoe UI", 9, "bold"), text_color="#64748B"
+            self.tts_form_card, text="ID DE VOZ (VOICE ID)", font=("Segoe UI", 9, "bold"), text_color=theme.TEXT_MUTED
         )
         self.eleven_voice_label.pack(anchor="w", padx=16, pady=(4, 2))
 
@@ -518,13 +589,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.tts_form_card,
             values=ELEVENLABS_VOICE_PRESETS,
             font=("Consolas", 11),
-            fg_color="#1F2937",
-            border_color="#374151",
-            button_color="#38BDF8",
-            button_hover_color="#0284C7",
-            dropdown_fg_color="#111827",
-            dropdown_text_color="#F8FAFC",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            border_color=theme.BORDER_CARD,
+            button_color=theme.ACCENT_PRIMARY,
+            button_hover_color=theme.ACCENT_PRIMARY_HOVER,
+            dropdown_fg_color=theme.BG_CARD,
+            dropdown_text_color=theme.TEXT_PRIMARY,
+            text_color=theme.TEXT_PRIMARY,
             height=36,
             corner_radius=8,
         )
@@ -532,7 +603,10 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         # Modelo ElevenLabs
         self.eleven_model_label = ctk.CTkLabel(
-            self.tts_form_card, text="MODELO DE VOZ ELEVENLABS", font=("Segoe UI", 9, "bold"), text_color="#64748B"
+            self.tts_form_card,
+            text="MODELO DE VOZ ELEVENLABS",
+            font=("Segoe UI", 9, "bold"),
+            text_color=theme.TEXT_MUTED,
         )
         self.eleven_model_label.pack(anchor="w", padx=16, pady=(4, 2))
 
@@ -540,13 +614,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.tts_form_card,
             values=ELEVENLABS_MODEL_PRESETS,
             font=("Consolas", 11),
-            fg_color="#1F2937",
-            border_color="#374151",
-            button_color="#38BDF8",
-            button_hover_color="#0284C7",
-            dropdown_fg_color="#111827",
-            dropdown_text_color="#F8FAFC",
-            text_color="#F8FAFC",
+            fg_color=theme.BG_CARD_INNER,
+            border_color=theme.BORDER_CARD,
+            button_color=theme.ACCENT_PRIMARY,
+            button_hover_color=theme.ACCENT_PRIMARY_HOVER,
+            dropdown_fg_color=theme.BG_CARD,
+            dropdown_text_color=theme.TEXT_PRIMARY,
+            text_color=theme.TEXT_PRIMARY,
             height=36,
             corner_radius=8,
         )
@@ -557,8 +631,8 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.tts_form_card,
             text="Caché de audio en disco (Zero-Latency / Zero-Cost)",
             font=("Segoe UI", 10, "bold"),
-            text_color="#F8FAFC",
-            progress_color="#38BDF8",
+            text_color=theme.TEXT_PRIMARY,
+            progress_color=theme.ACCENT_PRIMARY,
         )
         self.eleven_cache_switch.pack(anchor="w", padx=16, pady=(4, 8))
         if self._eleven_data.get("cache_enabled", True):
@@ -569,24 +643,26 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.tts_form_card,
             text="💡 Consigue tu clave de ElevenLabs en elevenlabs.io para síntesis ultra-realista.",
             font=("Segoe UI", 9),
-            text_color="#94A3B8",
+            text_color=theme.TEXT_MUTED,
             wraplength=520,
             justify="left",
         )
         self.tts_hint_label.pack(anchor="w", padx=16, pady=(2, 6))
 
         # Status Box TTS
-        self.tts_status_box = ctk.CTkFrame(self.tts_form_card, fg_color="#1F2937", corner_radius=8)
+        self.tts_status_box = ctk.CTkFrame(self.tts_form_card, fg_color=theme.BG_CARD_INNER, corner_radius=8)
         self.tts_status_box.pack(fill="x", padx=16, pady=(4, 8))
 
-        self.tts_status_icon = ctk.CTkLabel(self.tts_status_box, text="⚪", font=("Segoe UI", 12), text_color="#64748B")
+        self.tts_status_icon = ctk.CTkLabel(
+            self.tts_status_box, text="⚪", font=("Segoe UI", 12), text_color=theme.TEXT_MUTED
+        )
         self.tts_status_icon.pack(side="left", padx=(10, 4), pady=6)
 
         self.tts_status_msg = ctk.CTkLabel(
             self.tts_status_box,
             text="Listo para probar síntesis de voz.",
             font=("Segoe UI", 10),
-            text_color="#94A3B8",
+            text_color=theme.TEXT_MUTED,
             wraplength=460,
             justify="left",
         )
@@ -599,11 +675,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.tts_test_btn = ctk.CTkButton(
             tts_action_row,
             text="🔊 PROBAR VOZ",
-            fg_color="#1F2937",
-            hover_color="#374151",
-            border_color="#38BDF8",
+            fg_color=theme.BG_CARD_INNER,
+            hover_color=theme.BORDER_CARD,
+            border_color=theme.ACCENT_PRIMARY,
             border_width=1,
-            text_color="#38BDF8",
+            text_color=theme.ACCENT_PRIMARY,
             font=("Segoe UI", 10, "bold"),
             height=34,
             corner_radius=8,
@@ -611,39 +687,12 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         )
         self.tts_test_btn.pack(side="left")
 
-        # ── 5. BOTONES INFERIORES COMPARTIDOS ────────────────────────────────
-        bottom_row = ctk.CTkFrame(self, fg_color="transparent")
-        bottom_row.pack(padx=16, pady=(6, 16), fill="x")
-
-        self.save_btn = ctk.CTkButton(
-            bottom_row,
-            text="💾 GUARDAR Y APLICAR",
-            fg_color="#38BDF8",
-            hover_color="#0284C7",
-            text_color="#090D16",
-            font=("Segoe UI", 11, "bold"),
-            height=40,
-            corner_radius=8,
-            command=self._on_save,
-        )
-        self.save_btn.pack(side="left", fill="x", expand=True, padx=(0, 6))
-
-        ctk.CTkButton(
-            bottom_row,
-            text="CERRAR",
-            fg_color="#1F2937",
-            hover_color="#374151",
-            text_color="#F8FAFC",
-            font=("Segoe UI", 11),
-            height=40,
-            corner_radius=8,
-            command=self._on_close,
-        ).pack(side="right", padx=(6, 0))
-
-    def _on_close(self):
+    def _on_close(self, event=None):
         with contextlib.suppress(Exception):
             self.grab_release()
         self.destroy()
+        if self.on_close_callback:
+            self.on_close_callback()
 
     # =========================================================================
     #  MANEJO DE PESTAÑAS (TABS)
@@ -709,9 +758,10 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self.llm_hint_label.configure(text=hints.get(provider, ""))
 
         # Reset status box
-        self.llm_status_icon.configure(text="⚪", text_color="#64748B")
+        self.llm_status_icon.configure(text="⚪", text_color=theme.TEXT_MUTED)
         self.llm_status_msg.configure(
-            text=f"Listo para probar credenciales con {PROVIDER_NAMES.get(provider, provider)}.", text_color="#94A3B8"
+            text=f"Listo para probar credenciales con {PROVIDER_NAMES.get(provider, provider)}.",
+            text_color=theme.TEXT_MUTED,
         )
 
         # Switch activo
@@ -742,8 +792,8 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         base_url = data.get("base_url", "")
 
         self.llm_test_btn.configure(state="disabled", text="⏳ PROBANDO…")
-        self.llm_status_icon.configure(text="🟡", text_color="#FBBF24")
-        self.llm_status_msg.configure(text="Enviando solicitud de prueba…", text_color="#FBBF24")
+        self.llm_status_icon.configure(text="🟡", text_color=theme.ACCENT_AMBER)
+        self.llm_status_msg.configure(text="Enviando solicitud de prueba…", text_color=theme.ACCENT_AMBER)
 
         def run_test():
             success, msg, latency = test_provider_connection(
@@ -757,13 +807,14 @@ class BYOKSettingsModal(ctk.CTkToplevel):
                 self._is_testing_llm = False
                 self.llm_test_btn.configure(state="normal", text="🧪 PROBAR CONEXIÓN")
                 if success:
-                    self.llm_status_icon.configure(text="🟢", text_color="#34D399")
+                    self.llm_status_icon.configure(text="🟢", text_color=theme.ACCENT_EMERALD)
                     self.llm_status_msg.configure(
-                        text=f"¡Conexión Exitosa! Respuesta recibida en {latency:.0f} ms.", text_color="#34D399"
+                        text=f"¡Conexión Exitosa! Respuesta recibida en {latency:.0f} ms.",
+                        text_color=theme.ACCENT_EMERALD,
                     )
                 else:
-                    self.llm_status_icon.configure(text="🔴", text_color="#F87171")
-                    self.llm_status_msg.configure(text=f"Fallo de conexión: {msg}", text_color="#F87171")
+                    self.llm_status_icon.configure(text="🔴", text_color=theme.ACCENT_ROSE)
+                    self.llm_status_msg.configure(text=f"Fallo de conexión: {msg}", text_color=theme.ACCENT_ROSE)
 
             self.after(0, update_ui)
 
@@ -791,10 +842,10 @@ class BYOKSettingsModal(ctk.CTkToplevel):
     def _load_tts_fields(self):
         # API Key
         self.eleven_key_entry.delete(0, "end")
-        self.eleven_key_entry.insert(0, self._eleven_data.get("api_key", ""))
+        self.eleven_key_entry.insert(0, str(self._eleven_data.get("api_key", "")))
 
         # Voice ID
-        saved_voice = self._eleven_data.get("voice_id", "21m00Tcm4TlvDq8ikWAM")
+        saved_voice = str(self._eleven_data.get("voice_id", "21m00Tcm4TlvDq8ikWAM"))
         matched = False
         for preset in ELEVENLABS_VOICE_PRESETS:
             if preset.startswith(saved_voice):
@@ -805,7 +856,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
             self.eleven_voice_combo.set(saved_voice)
 
         # Model ID
-        self.eleven_model_combo.set(self._eleven_data.get("model_id", "eleven_multilingual_v2"))
+        self.eleven_model_combo.set(str(self._eleven_data.get("model_id", "eleven_multilingual_v2")))
 
         # Actualizar visibilidad según motor
         self._update_tts_visibility()
@@ -860,13 +911,13 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         self._save_current_tts_fields()
 
         engine_key = self.selected_tts_engine
-        api_key = self._eleven_data["api_key"]
-        voice_id = self._eleven_data["voice_id"]
-        model_id = self._eleven_data["model_id"]
+        api_key = str(self._eleven_data["api_key"])
+        voice_id = str(self._eleven_data["voice_id"])
+        model_id = str(self._eleven_data["model_id"])
 
         self.tts_test_btn.configure(state="disabled", text="⏳ PROBANDO VOZ…")
-        self.tts_status_icon.configure(text="🟡", text_color="#FBBF24")
-        self.tts_status_msg.configure(text="Sintetizando audio de prueba…", text_color="#FBBF24")
+        self.tts_status_icon.configure(text="🟡", text_color=theme.ACCENT_AMBER)
+        self.tts_status_msg.configure(text="Sintetizando audio de prueba…", text_color=theme.ACCENT_AMBER)
 
         def run_tts_test():
             import time
@@ -882,20 +933,20 @@ class BYOKSettingsModal(ctk.CTkToplevel):
                         raise ValueError("No has introducido tu clave de API de ElevenLabs.")
                     from src.darius_ai.audio.elevenlabs_tts_engine import ElevenLabsTTS
 
-                    engine = ElevenLabsTTS(
+                    el_tts = ElevenLabsTTS(
                         api_key=api_key,
                         voice_id=voice_id,
                         model_id=model_id,
                         cache_enabled=False,
                     )
-                    success = engine.speak(test_phrase)
+                    success = el_tts.speak(test_phrase)
                     if not success:
                         msg = "Fallo en la llamada a ElevenLabs (revisa tu saldo y API Key)."
                 elif engine_key == "edge":
                     from src.darius_ai.audio.edge_tts_engine import EdgeTTS
 
-                    engine = EdgeTTS()
-                    success = engine.speak(test_phrase)
+                    edge_tts = EdgeTTS()
+                    success = edge_tts.speak(test_phrase)
                     if not success:
                         msg = "Fallo en Edge-TTS (verifica tu conexión a internet)."
                 else:  # sapi
@@ -919,13 +970,14 @@ class BYOKSettingsModal(ctk.CTkToplevel):
                 self._is_testing_tts = False
                 self.tts_test_btn.configure(state="normal", text="🔊 PROBAR VOZ")
                 if success:
-                    self.tts_status_icon.configure(text="🟢", text_color="#34D399")
+                    self.tts_status_icon.configure(text="🟢", text_color=theme.ACCENT_EMERALD)
                     self.tts_status_msg.configure(
-                        text=f"¡Voz reproducida exitosamente! Latencia: {latency_ms} ms.", text_color="#34D399"
+                        text=f"¡Voz reproducida exitosamente! Latencia: {latency_ms} ms.",
+                        text_color=theme.ACCENT_EMERALD,
                     )
                 else:
-                    self.tts_status_icon.configure(text="🔴", text_color="#F87171")
-                    self.tts_status_msg.configure(text=f"Error en prueba de voz: {msg}", text_color="#F87171")
+                    self.tts_status_icon.configure(text="🔴", text_color=theme.ACCENT_ROSE)
+                    self.tts_status_msg.configure(text=f"Error en prueba de voz: {msg}", text_color=theme.ACCENT_ROSE)
 
             self.after(0, update_ui)
 
@@ -946,6 +998,11 @@ class BYOKSettingsModal(ctk.CTkToplevel):
                 cfg.set(data["key"], "llm", "gemini_api_key")
                 cfg.set(data["model"], "llm", "gemini_model")
                 cfg.set(data["model"], "gemini", "model")
+            elif p == "antigravity":
+                cfg.set(data["key"], "llm", "antigravity_api_key")
+                cfg.set(data["model"], "llm", "antigravity_model")
+                cfg.set(data["key"], "antigravity", "api_key")
+                cfg.set(data["model"], "antigravity", "model")
             elif p == "openai":
                 cfg.set(data["key"], "llm", "openai_api_key")
                 cfg.set(data["model"], "llm", "openai_model")
@@ -979,8 +1036,8 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         log.info("[Settings] Ajustes de LLM y TTS guardados en config.json.")
 
-        self.save_btn.configure(text="✔ GUARDADO CON ÉXITO", fg_color="#34D399")
-        self.after(1200, lambda: self.save_btn.configure(text="💾 GUARDAR Y APLICAR", fg_color="#38BDF8"))
+        self.save_btn.configure(text="✔ GUARDADO CON ÉXITO", fg_color=theme.ACCENT_EMERALD)
+        self.after(1200, lambda: self.save_btn.configure(text="💾 GUARDAR Y APLICAR", fg_color=theme.ACCENT_PRIMARY))
 
         if self.on_save_callback:
             self.on_save_callback()

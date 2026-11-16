@@ -260,7 +260,6 @@ class CyberTopBar(ctk.CTkFrame):
         self.lbl_system_badge = self.lbl_status_pill
         self.lbl_status_badge = self.lbl_status_pill
 
-
     # =========================================================================
     #  MÉTODOS PÚBLICOS DE ACTUALIZACIÓN
     # =========================================================================
@@ -308,7 +307,6 @@ class CyberTopBar(ctk.CTkFrame):
 
         self._refresh_status_pill()
 
-
     def _refresh_status_pill(self) -> None:
         """Regenera el texto del pill central con el estado consolidado."""
         pill_text = format_status_badge(
@@ -324,6 +322,7 @@ class CyberTopBar(ctk.CTkFrame):
     # =========================================================================
     def _schedule_clock(self) -> None:
         """Programa el refresco automático del reloj cada segundo."""
+
         def _tick() -> None:
             self.update_clock()
             self._clock_timer_id = self.after(1000, _tick)

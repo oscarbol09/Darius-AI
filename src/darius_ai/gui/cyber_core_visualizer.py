@@ -264,9 +264,13 @@ class CyberCoreVisualizer(ctk.CTkFrame):
         if norm_state not in STATE_COLORS:
             norm_state = self.DEFAULT_STATE
 
+        if norm_state == self.current_state and getattr(self, "_state_applied", False):
+            return
+
         self.current_state = norm_state
         self.current_color = STATE_COLORS[norm_state]
         self.omega_1, self.omega_2 = STATE_SPEEDS[norm_state]
+        self._state_applied = True
 
         if hasattr(self, "canvas") and self.canvas is not None:
             color = self.current_color
