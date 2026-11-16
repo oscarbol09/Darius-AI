@@ -5,12 +5,18 @@ title = "Darius AI Gitleaks Configuration"
 useDefault = true
 
 [allowlist]
-description = "Permitir fixtures sinteticas de pruebas unitarias y commits historicos de prueba"
+description = "Permitir plantilla .env.example, tokens sinteticos de test y commits historicos auditados"
 paths = [
-  '''tests/.*''',
-  '''src/darius_ai/core/self_test\.py''',
-  '''src/darius_ai/system/windows_commands\.py''',
   '''\.env\.example'''
+]
+regexes = [
+  '''sk-test[\w-]*''',
+  '''gsk[_-](?:test|valid|invalid)[\w-]*''',
+  '''AIzaSyA{20,}''',
+  '''api03-1234567890abcdef1234''',
+  '''v1-1234567890abcdef123456''',
+  '''1234567890abcdef1234567890abcdef''',
+  '''MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC3'''
 ]
 commits = [
   "324a6b2d925f3ad6af0c695cca10512e3bc89b3d",

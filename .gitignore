@@ -29,6 +29,7 @@ dist/
 dist-installer/
 *.build/
 *.dist/
+*.egg-info/
 *.spec
 nuitka-crash-report.xml
 
@@ -59,7 +60,20 @@ supabase/migrations/
 # =========================
 # Cobertura y temporales
 # =========================
-.coverage
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+coverage*.xml
+htmlcov/
 *.db
 *.db-wal
 *.db-shm
+
+# =========================
+# Datos de usuario locales y configuración
+# =========================
+.darius_data/
+config.json
+**/config.json
+!config.template.json
+
