@@ -97,6 +97,7 @@ extraPaths = ["."]
 
 [tool.mypy]
 python_version = "3.11"
+platform = "win32"
 ignore_missing_imports = true
 warn_unused_ignores = false
 check_untyped_defs = true
