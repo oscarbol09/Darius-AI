@@ -24,6 +24,7 @@ from typing import Any, Final
 
 import customtkinter as ctk
 
+from src.darius_ai.core.i18n import TRANSLATIONS
 from src.darius_ai.gui import gui_theme as theme
 
 log = logging.getLogger("darius.voice_capsule")
@@ -186,7 +187,7 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
             command=self.toggle_mic,
         )
         self.mic_button.place(relx=0.5, rely=0.5, anchor="center")
-        QuickTooltip(self.mic_button, "Activar/Desactivar Micrófono [Voz]")
+        self._mic_tooltip = QuickTooltip(self.mic_button, "Activar/Desactivar Micrófono [Voz]")
 
         # 2. Indicador visual de forma de onda / RMS
         self.waveform_canvas = ctk.CTkCanvas(
@@ -394,6 +395,15 @@ class FloatingVoiceCapsule(ctk.CTkFrame):
     def get_prompt_text(self) -> str:
         """Obtiene el texto actual del campo de entrada."""
         return self.entry.get()
+
+    def set_language(self, lang: str) -> None:
+        """Update capsule input placeholder and tooltips dynamically for the active language."""
+        target = "en" if str(lang).strip().lower().startswith("en") else "es"
+        catalog = TRANSLATIONS.get(target, TRANSLATIONS["en"])
+        with contextlib.suppress(Exception):
+            self.entry.configure(placeholder_text=catalog.get("capsule.placeholder", "Type a command..."))
+        if hasattr(self, "_mic_tooltip"):
+            self._mic_tooltip.text = catalog.get("capsule.tooltip_mic", self._mic_tooltip.text)
 
     def clear_prompt(self) -> None:
         """Limpia el campo de entrada."""

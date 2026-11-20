@@ -40,12 +40,24 @@ WINDOWS_COMMANDS: dict[str, dict] = {
             "internet y red",
             "red wifi",
             "configuracion wifi",
+            "network settings",
+            "network options",
+            "internet settings",
+            "network and internet",
         ],
         "desc": "Configuración de Red e Internet",
     },
     "wifi": {
         "cmd": "ms-settings:network-wifi",
-        "aliases": ["configuracion wifi", "ajustes wifi", "redes wifi", "conectar wifi"],
+        "aliases": [
+            "configuracion wifi",
+            "ajustes wifi",
+            "redes wifi",
+            "conectar wifi",
+            "wifi settings",
+            "wireless settings",
+            "wi-fi settings",
+        ],
         "desc": "Configuración WiFi",
     },
     "vpn": {
@@ -123,6 +135,9 @@ WINDOWS_COMMANDS: dict[str, dict] = {
             "resolucion de pantalla",
             "brillo de pantalla",
             "configurar monitor",
+            "display settings",
+            "screen settings",
+            "screen resolution",
         ],
         "desc": "Configuración de pantalla",
     },
@@ -135,6 +150,9 @@ WINDOWS_COMMANDS: dict[str, dict] = {
             "dispositivos de audio",
             "salida de audio",
             "entrada de audio",
+            "sound settings",
+            "audio settings",
+            "volume settings",
         ],
         "desc": "Configuración de sonido",
     },
@@ -150,12 +168,26 @@ WINDOWS_COMMANDS: dict[str, dict] = {
     },
     "energia": {
         "cmd": "ms-settings:powersleep",
-        "aliases": ["configuracion de energia", "plan de energia", "ahorro de bateria", "opciones de energia"],
+        "aliases": [
+            "configuracion de energia",
+            "plan de energia",
+            "ahorro de bateria",
+            "opciones de energia",
+            "power options",
+            "power settings",
+            "sleep settings",
+        ],
         "desc": "Energía y suspensión",
     },
     "almacenamiento": {
         "cmd": "ms-settings:storagesense",
-        "aliases": ["configuracion de almacenamiento", "sensor de almacenamiento", "storage sense"],
+        "aliases": [
+            "configuracion de almacenamiento",
+            "sensor de almacenamiento",
+            "storage sense",
+            "storage settings",
+            "disk storage",
+        ],
         "desc": "Almacenamiento",
     },
     "informacion del sistema": {
@@ -234,7 +266,14 @@ WINDOWS_COMMANDS: dict[str, dict] = {
     },
     "bluetooth": {
         "cmd": "ms-settings:bluetooth",
-        "aliases": ["configuracion bluetooth", "activar bluetooth", "dispositivos bluetooth", "emparejar bluetooth"],
+        "aliases": [
+            "configuracion bluetooth",
+            "activar bluetooth",
+            "dispositivos bluetooth",
+            "emparejar bluetooth",
+            "bluetooth settings",
+            "bluetooth devices",
+        ],
         "desc": "Bluetooth y otros dispositivos",
     },
     "impresoras": {
@@ -270,18 +309,21 @@ WINDOWS_COMMANDS: dict[str, dict] = {
             "buscar actualizaciones windows",
             "actualizaciones de windows",
             "instalar actualizaciones windows",
+            "windows updates",
+            "check windows update",
         ],
         "desc": "Windows Update",
     },
     "panel de control": {
         "cmd": "control",
-        "aliases": ["panel del sistema windows", "control panel"],
+        "aliases": ["panel del sistema windows", "control panel", "open control panel"],
         "desc": "Panel de Control",
     },
     "administrador de dispositivos": {
         "cmd": "devmgmt.msc",
         "aliases": [
             "device manager",
+            "open device manager",
             "gestor de dispositivos",
             "controladores windows",
             "drivers windows",
@@ -323,7 +365,7 @@ WINDOWS_COMMANDS: dict[str, dict] = {
     },
     "administrador de tareas": {
         "cmd": "taskmgr",
-        "aliases": ["task manager", "procesos del sistema windows", "uso de cpu windows"],
+        "aliases": ["task manager", "open task manager", "procesos del sistema windows", "uso de cpu windows"],
         "desc": "Administrador de tareas",
     },
     "monitor de rendimiento": {
@@ -373,7 +415,7 @@ WINDOWS_COMMANDS: dict[str, dict] = {
     },
     "explorador de archivos": {
         "cmd": "explorer",
-        "aliases": ["explorador windows", "mis archivos", "file explorer"],
+        "aliases": ["explorador windows", "mis archivos", "file explorer", "open file explorer"],
         "desc": "Explorador de archivos",
     },
     "descargas": {
@@ -427,12 +469,12 @@ WINDOWS_COMMANDS: dict[str, dict] = {
     },
     "calculadora": {
         "cmd": "calc",
-        "aliases": ["abrir calculadora windows", "calculator windows"],
+        "aliases": ["abrir calculadora windows", "calculator windows", "calculator", "calc", "open calculator"],
         "desc": "Calculadora",
     },
     "bloc de notas": {
         "cmd": "notepad",
-        "aliases": ["notepad windows", "editor de texto simple windows"],
+        "aliases": ["notepad windows", "editor de texto simple windows", "notepad", "open notepad", "text editor"],
         "desc": "Bloc de notas",
     },
     "paint": {"cmd": "mspaint", "aliases": ["microsoft paint", "ms paint windows"], "desc": "Paint"},

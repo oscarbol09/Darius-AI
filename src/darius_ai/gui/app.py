@@ -982,6 +982,29 @@ class DariusFinal(ctk.CTk):
         self.telemetry_bar.grid(row=2, column=0, sticky="ew", padx=8, pady=(0, 4))
         self.current_page = "dashboard"
 
+        from src.darius_ai.core.i18n import get_i18n
+
+        self._apply_ui_language(cfg.language)
+        get_i18n().register_listener(lambda lang: self.after(0, self._apply_ui_language, lang))
+
+    def _apply_ui_language(self, lang: str) -> None:
+        """Synchronize all Cybernetic Bento HUD widgets with the active i18n locale."""
+        from src.darius_ai.core.i18n import TRANSLATIONS
+
+        target = "en" if str(lang).strip().lower().startswith("en") else "es"
+        catalog = TRANSLATIONS.get(target, TRANSLATIONS["en"])
+        with contextlib.suppress(Exception):
+            self.title(catalog.get("gui.window_title", "DARIUS AI v8.5"))
+        for widget in (
+            getattr(self, "cyber_top_bar", None),
+            getattr(self, "sidebar", None),
+            getattr(self, "bento_dashboard", None),
+            getattr(self, "voice_capsule", None),
+        ):
+            if widget is not None and hasattr(widget, "set_language"):
+                with contextlib.suppress(Exception):
+                    widget.set_language(target)
+
     def setup_shortcuts(self):
         """Configura atajos de teclado globales en la ventana para ergonomía y accesibilidad."""
         # 1. Navegación por pestañas del sidebar (Ctrl+1 a Ctrl+6)
@@ -1178,7 +1201,7 @@ class DariusFinal(ctk.CTk):
                 audio = self.listener.listen(source, timeout=6.0, phrase_time_limit=12.0)
             self.is_listening = False
             self.set_status("PROCESANDO…", "#FFAA00")
-            text = self.listener.recognize_google(audio, language="es-ES").lower()
+            text = self.listener.recognize_google(audio, language=self._stt_language).lower()
             log.info(f"[VoiceCapsule] Reconocido directo: '{text}'")
             self.add_to_chat(USER_NAME, text)
             self._append_chat_file(USER_NAME.upper(), text)
@@ -1716,7 +1739,7 @@ class DariusFinal(ctk.CTk):
         try:
             with sr.AudioFile(wav_buffer) as source:
                 audio = self.listener.record(source)
-            text = self.listener.recognize_google(audio, language="es-ES").lower()
+            text = self.listener.recognize_google(audio, language=self._stt_language).lower()
             log.info(f"[PTT] Reconocido: '{text}'")
             self.add_to_chat(USER_NAME, text)
             self._append_chat_file(USER_NAME.upper(), text)
@@ -1771,6 +1794,11 @@ class DariusFinal(ctk.CTk):
     #  RECONOCIMIENTO DE VOZ
     # =========================================================================
 
+    @property
+    def _stt_language(self) -> str:
+        """Resolve the BCP-47 speech recognition locale from active config language."""
+        return "es-ES" if getattr(cfg, "language", "en") == "es" else "en-US"
+
     def listen_and_process(self):
         try:
             mic_kwargs = {"device_index": self._mic_device_index} if self._mic_device_index is not None else {}
@@ -1785,7 +1813,7 @@ class DariusFinal(ctk.CTk):
                 if self.tts_worker.is_speaking.is_set():
                     return
                 self.set_status("PROCESANDO…", "#ffaa00")
-                text = self.listener.recognize_google(audio, language="es-ES").lower()
+                text = self.listener.recognize_google(audio, language=self._stt_language).lower()
                 log.info(f"Reconocido: '{text}'")
                 self.process_recognized_text(text)
         except sr.WaitTimeoutError:
@@ -1840,11 +1868,15 @@ class DariusFinal(ctk.CTk):
     # Regex para apagar — cubre: "apagate", "apaga el equipo", "apaga el pc",
     # "apaga la maquina", "apaga la computadora", "apagar el equipo"
     _RE_APAGAR = re.compile(
-        r"\b(ap[áa]gate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|m[áa]quina|sistema))\b", re.IGNORECASE
+        r"\b(ap[áa]gate|apagar?\s+(el\s+)?(equipo|pc|computador[a]?|m[áa]quina|sistema)|"
+        r"shut\s*down(\s+(the\s+)?(pc|computer|system|machine))?|turn\s+off\s+(the\s+)?(pc|computer))\b",
+        re.IGNORECASE,
     )
-    # Regex para reiniciar — cubre: "reinicia el equipo", "reiniciar el pc", etc.
+    # Regex para reiniciar — cubre: "reinicia el equipo", "reiniciar el pc", "restart pc", etc.
     _RE_REINICIAR = re.compile(
-        r"\b(rein[ií]cia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|m[áa]quina|sistema))\b", re.IGNORECASE
+        r"\b(rein[ií]cia[r]?\s+(el\s+)?(equipo|pc|computador[a]?|m[áa]quina|sistema)|"
+        r"(?:restart|reboot)\s+(?:the\s+)?(?:pc|computer|system|machine))\b",
+        re.IGNORECASE,
     )
     # Regex para _cmd_accion — SOLO palabras clave de sistema operativo
     # (ya NO incluye "cuanto", "cual es", "hay" que son genéricas)
@@ -1863,87 +1895,143 @@ class DariusFinal(ctk.CTk):
         r"probar\s+internet|ping\s+google|hay\s+internet|"
         r"tiempo\s+encendido|uptime|"
         r"resumen\s+(del\s+)?sistema|info\s+(del\s+)?sistema|"
-        r"buscar\s+actualizaciones)\b",
+        r"buscar\s+actualizaciones|"
+        r"check\s+(?:my\s+)?(?:ip|dns|ram|cpu|disk|space|version|serial|model|processes|connections|services|firewall)|"
+        r"empty\s+(?:recycle\s+)?bin|diagnose\s+network|repair\s+network|renew\s+ip|reset\s+network|"
+        r"lock\s+(?:screen|pc|computer|session)|sleep\s+(?:pc|computer)|hibernate\s+(?:pc|computer)|"
+        r"sign\s+out|log\s+out|test\s+internet|system\s+(?:summary|info)|check\s+for\s+updates)\b",
         re.IGNORECASE,
     )
 
-    _RE_DIARIO = re.compile(r"\b(anota|escribe|guarda)\s+(en\s+mi\s+)?(diario|bit[aá]cora)\b", re.IGNORECASE)
-    _RE_MEMORIA = re.compile(r"\b(recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian)\b", re.IGNORECASE)
+    _RE_DIARIO = re.compile(
+        r"\b(?:(?:anota|escribe|guarda)\s+(?:en\s+mi\s+)?(?:diario|bit[aá]cora)|"
+        r"(?:write|note|log|save)\s+(?:in\s+(?:my\s+)?)?(?:diary|journal|daily\s+note))\b",
+        re.IGNORECASE,
+    )
+    _RE_MEMORIA = re.compile(
+        r"\b(?:recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian|"
+        r"remember|memorize|save\s+to\s+(?:memory|obsidian))\b",
+        re.IGNORECASE,
+    )
     _RE_BUSCAR_NOTAS = re.compile(
-        r"\b(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\b", re.IGNORECASE
+        r"\b(?:(?:busca|buscar|consulta)\s+en\s+(?:mis\s+notas|mi\s+diario|obsidian)|"
+        r"(?:search|look\s+up|query)\s+(?:in\s+)?(?:my\s+notes|my\s+diary|my\s+journal|obsidian))\b",
+        re.IGNORECASE,
     )
     _RE_HORA = re.compile(
-        r"\b(qu[eé]\s+horas?(\s+(es|son|tienes|marca))?|hora\s+actual|hora\s+exacta|dime\s+la\s+hora|la\s+hora|tienes\s+la\s+hora)\b",
+        r"\b(?:qu[eé]\s+horas?(?:\s+(?:es|son|tienes|marca))?|hora\s+actual|hora\s+exacta|"
+        r"dime\s+la\s+hora|la\s+hora|tienes\s+la\s+hora|"
+        r"what\s+time\s+is\s+it|current\s+time|tell\s+me\s+the\s+time|what(?:'s|\s+is)\s+the\s+time)\b",
         re.IGNORECASE,
     )
     _RE_FECHA = re.compile(
-        r"\b(qu[eé]\s+fecha(\s+(es|tenemos|hoy))?|qu[eé]\s+d[ií]a(\s+(es(\s+hoy)?|tenemos))?|fecha\s+de\s+hoy|d[ií]a\s+de\s+hoy|a\s+qu[eé]\s+estamos(\s+hoy)?)\b",
+        r"\b(?:qu[eé]\s+fecha(?:\s+(?:es|tenemos|hoy))?|qu[eé]\s+d[ií]a(?:\s+(?:es(?:\s+hoy)?|tenemos))?|"
+        r"fecha\s+de\s+hoy|d[ií]a\s+de\s+hoy|a\s+qu[eé]\s+estamos(?:\s+hoy)?|"
+        r"what\s+date\s+is\s+it|what(?:'s|\s+is)\s+today(?:'s)?\s+date|today(?:'s)?\s+date|what\s+day\s+is\s+(?:it|today))\b",
         re.IGNORECASE,
     )
 
     # Regex para Workspaces y Protocolo Darius
     _RE_DARIUS_PROTOCOL = re.compile(
-        r"\b(inicia[r]?|ejecuta[r]?|activa[r]?)?\s*(protocolo\s+darius|protocolo|modo\s+bienvenida|rutina\s+de\s+bienvenida|bienvenida\s+darius)\b",
+        r"\b(?:(?:inicia[r]?|ejecuta[r]?|activa[r]?|start|run|launch)\s+)?(?:protocolo\s+darius|protocolo|"
+        r"modo\s+bienvenida|rutina\s+de\s+bienvenida|bienvenida\s+darius|darius\s+protocol|welcome\s+(?:protocol|routine))\b",
         re.IGNORECASE,
     )
     _RE_WORKSPACE_DEV = re.compile(
-        r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+desarrollo|modo\s+dev|modo\s+programaci[oó]n|entorno\s+de\s+desarrollo)\b",
+        r"\b(?:(?:inicia[r]?|activa[r]?|start|enable|activate)\s+)?(?:modo\s+desarrollo|modo\s+dev|"
+        r"modo\s+programaci[oó]n|entorno\s+de\s+desarrollo|dev\s+mode|development\s+mode|coding\s+mode)\b",
         re.IGNORECASE,
     )
     _RE_WORKSPACE_TRADING = re.compile(
-        r"\b(inicia[r]?|activa[r]?)?\s*(modo\s+trading|modo\s+mercados|modo\s+finanzas|pantalla\s+trading)\b",
+        r"\b(?:(?:inicia[r]?|activa[r]?|start|enable|activate)\s+)?(?:modo\s+trading|modo\s+mercados|"
+        r"modo\s+finanzas|pantalla\s+trading|trading\s+mode|finance\s+mode)\b",
         re.IGNORECASE,
     )
     _RE_CURSOR = re.compile(
-        r"\b(enfoca[r]?\s+cursor|cursor\s+pantalla\s+completa|maximizar\s+cursor|abrir\s+cursor)\b", re.IGNORECASE
+        r"\b(enfoca[r]?\s+cursor|cursor\s+pantalla\s+completa|maximizar\s+cursor|abrir\s+cursor|"
+        r"focus\s+cursor|maximize\s+cursor|open\s+cursor)\b",
+        re.IGNORECASE,
     )
     _RE_MONITORES = re.compile(
-        r"\b(ver\s+monitores|cu[aá]ntos\s+monitores|pantallas\s+conectadas|info\s+monitores)\b", re.IGNORECASE
+        r"\b(ver\s+monitores|cu[aá]ntos\s+monitores|pantallas\s+conectadas|info\s+monitores|"
+        r"show\s+monitors|how\s+many\s+monitors|connected\s+(?:monitors|displays)|display\s+info)\b",
+        re.IGNORECASE,
     )
     _RE_DETENER = re.compile(
-        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar|cancela[r]?|alto|basta|para\s+ya|para\s+ahora|det[eé]n(te)?|stop)\b",
+        r"\b(c[aá]llate|silencio|detente|detener(se)?|parar|cancela[r]?|alto|basta|para\s+ya|para\s+ahora|"
+        r"det[eé]n(te)?|stop|be\s+quiet|silence|cancel|halt|shut\s+up)\b",
         re.IGNORECASE,
     )
     _RE_DNS = re.compile(
-        r"\b(limpia[r]?|borra[r]?|vacia[r]?|flashe?a[r]?|resetea[r]?)\s+(el\s+|la\s+)?(cach[eé]\s+)?dns(\s+(del?\s+)?(sistema|internet|pc|red))?\b",
+        r"\b(?:(?:limpia[r]?|borra[r]?|vacia[r]?|flashe?a[r]?|resetea[r]?)\s+(?:el\s+|la\s+)?(?:cach[eé]\s+)?dns"
+        r"(?:\s+(?:del?\s+)?(?:sistema|internet|pc|red))?|(?:flush|clear|reset|clean)\s+(?:the\s+)?dns(?:\s+cache)?)\b",
         re.IGNORECASE,
     )
     _RE_GH_PRS = re.compile(
-        r"\b(ver|consultar|mostrar|lista[r]?)\s+(los\s+)?(prs?|pull\s+requests?)(\s+(de\s+)?github)?\b", re.IGNORECASE
+        r"\b(?:(?:ver|consultar|mostrar|lista[r]?)\s+(?:los\s+)?(?:prs?|pull\s+requests?)(?:\s+(?:de\s+)?github)?|"
+        r"(?:show|list|view|check)\s+(?:the\s+)?(?:prs?|pull\s+requests?)(?:\s+(?:on|in)\s+github)?)\b",
+        re.IGNORECASE,
     )
     _RE_GIT_STATUS = re.compile(
-        r"\b(ver\s+|consultar\s+|mostrar\s+)?(estado\s+de\s+git|git\s+status|cambios\s+en\s+git|c[oó]mo\s+est[aá]\s+el\s+repo(sitorio)?)\b",
+        r"\b(?:(?:ver\s+|consultar\s+|mostrar\s+)?(?:estado\s+de\s+git|git\s+status|cambios\s+en\s+git|"
+        r"c[oó]mo\s+est[aá]\s+el\s+repo(?:sitorio)?)|(?:show\s+|check\s+)?(?:git\s+changes|repo(?:sitory)?\s+status))\b",
         re.IGNORECASE,
     )
     _RE_TOP_PROCESSES = re.compile(
-        r"\b(qu[eé]\s+(app[s]?\s+|proceso[s]?\s+)?consume[n]?\s+m[aá]s\s+ram|procesos\s+pesados|procesos\s+que\s+m[aá]s\s+consumen(\s+ram)?|top\s+procesos|quien\s+consume\s+m[aá]s\s+(memoria|ram))\b",
+        r"\b(?:qu[eé]\s+(?:app[s]?\s+|proceso[s]?\s+)?consume[n]?\s+m[aá]s\s+ram|procesos\s+pesados|"
+        r"procesos\s+que\s+m[aá]s\s+consumen(?:\s+ram)?|top\s+procesos|quien\s+consume\s+m[aá]s\s+(?:memoria|ram)|"
+        r"top\s+processes|highest\s+(?:ram|memory)\s+processes|what\s+is\s+using\s+the\s+most\s+(?:ram|memory)|"
+        r"heavy\s+processes)\b",
         re.IGNORECASE,
     )
-    _RE_HUMAN_TYPE = re.compile(r"\b(escribe|teclea|digita|escribe\s+por\s+m[ií])\s+(.+)$", re.IGNORECASE)
+    _RE_HUMAN_TYPE = re.compile(
+        r"\b(?:escribe(?:\s+por\s+m[ií])?|teclea|digita|type(?:\s+for\s+me)?|write\s+for\s+me)\s+(.+)$",
+        re.IGNORECASE,
+    )
     _RE_HUMAN_CLICK = re.compile(
-        r"\b(haz\s+clic|da\s+clic|clic\s+izquierdo|clic\s+derecho|doble\s+clic|mover\s+mouse)\b", re.IGNORECASE
+        r"\b(haz\s+clic|da\s+clic|clic\s+izquierdo|clic\s+derecho|doble\s+clic|mover\s+mouse|"
+        r"click|left\s+click|right\s+click|double\s+click|move\s+mouse)\b",
+        re.IGNORECASE,
     )
     _RE_SCRAPE_WEB = re.compile(
-        r"\b(extrae|scrapp?ea|analiza|lee|resume)\s+(la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url)?\s*(https?://\S+)\b",
+        r"\b(?:extrae|scrapp?ea|analiza|lee|resume|scrape|extract|analyze|read|summarize)\s+"
+        r"(?:(?:la\s+p[aá]gina|el\s+sitio|la\s+web|de\s+la\s+url|the\s+page|the\s+site|the\s+web|from\s+(?:the\s+)?url)\s+)?"
+        r"(https?://\S+)",
         re.IGNORECASE,
     )
     _RE_VISION_SCREEN = re.compile(
-        r"\b(qu[eé]\s+hay\s+en\s+(mi\s+)?pantalla|analiza\s+(mi\s+)?pantalla|lee\s+(la\s+)?pantalla|analiza\s+(este\s+)?error\s+(en\s+pantalla)?|mira\s+(la\s+)?pantalla|qu[eé]\s+estoy\s+viendo|captura\s+(de\s+)?pantalla)\b",
+        r"\b(?:qu[eé]\s+hay\s+en\s+(?:mi\s+)?pantalla|analiza\s+(?:mi\s+)?pantalla|lee\s+(?:la\s+)?pantalla|"
+        r"analiza\s+(?:este\s+)?error\s+(?:en\s+pantalla)?|mira\s+(?:la\s+)?pantalla|qu[eé]\s+estoy\s+viendo|"
+        r"captura\s+(?:de\s+)?pantalla|what(?:'s|\s+is)\s+on\s+(?:my\s+)?screen|"
+        r"analyze\s+(?:my\s+|the\s+)?screen|read\s+(?:my\s+|the\s+)?screen|look\s+at\s+(?:my\s+|the\s+)?screen|"
+        r"take\s+(?:a\s+)?screenshot)\b",
         re.IGNORECASE,
     )
     _RE_DEEP_RESEARCH = re.compile(
-        r"\b(investiga\s+(a\s+fondo|profundamente|exhaustivamente|sobre)?|investigaci[oó]n\s+profunda\s+(sobre|de)?|haz\s+una\s+investigaci[oó]n\s+(sobre|de)?)\s+(.+)$",
+        r"\b(?:investiga(?:\s+(?:a\s+fondo|profundamente|exhaustivamente|sobre))?|"
+        r"investigaci[oó]n\s+profunda(?:\s+(?:sobre|de))?|haz\s+una\s+investigaci[oó]n(?:\s+(?:sobre|de))?|"
+        r"deep\s+research(?:\s+(?:on|about))?|investigate\s+(?:deeply|thoroughly)(?:\s+(?:on|about))?|"
+        r"research\s+deeply(?:\s+(?:on|about))?)\s+(.+)$",
         re.IGNORECASE,
     )
     _RE_PLANNER_GOAL = re.compile(
-        r"\b(planifica|crea\s+un\s+plan\s+para|ejecuta\s+el\s+plan|plan\s+de\s+acci[oó]n\s+para)\s+(.+)$", re.IGNORECASE
+        r"\b(?:planifica|crea\s+un\s+plan\s+para|ejecuta\s+el\s+plan|plan\s+de\s+acci[oó]n\s+para|"
+        r"create\s+a\s+plan\s+(?:for|to)|execute\s+(?:the\s+)?plan\s+for|action\s+plan\s+for|plan\s+to)\s+(.+)$",
+        re.IGNORECASE,
     )
 
     _CMD_PATTERNS = [
         (_RE_DETENER, "_cmd_detener"),
         (_RE_HORA, "_cmd_hora"),
         (_RE_FECHA, "_cmd_fecha"),
-        (re.compile(r"\b(nueva conversación|olvida todo|resetea la memoria)\b"), "_cmd_reset"),
+        (
+            re.compile(
+                r"\b(nueva conversaci[oó]n|olvida todo|resetea la memoria|"
+                r"new conversation|forget everything|reset memory|clear chat)\b",
+                re.IGNORECASE,
+            ),
+            "_cmd_reset",
+        ),
         (_RE_VISION_SCREEN, "_cmd_screen_vision"),
         (_RE_DEEP_RESEARCH, "_cmd_deep_research"),
         (_RE_PLANNER_GOAL, "_cmd_agent_planner"),
@@ -1959,14 +2047,46 @@ class DariusFinal(ctk.CTk):
         (_RE_WORKSPACE_TRADING, "_cmd_workspace_trading"),
         (_RE_CURSOR, "_cmd_focus_cursor"),
         (_RE_MONITORES, "_cmd_ver_monitores"),
-        (re.compile(r"\b(reproduce|pon|ponme|coloca|escuchar|música)\b"), "_cmd_youtube"),
-        (re.compile(r"\b(busca|buscar|googlea)\b"), "_cmd_buscar"),
-        (re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra)\b"), "_cmd_abrir"),
-        (re.compile(r"\bsubir\s+volumen\b"), "_cmd_vol_up"),
-        (re.compile(r"\bbajar\s+volumen\b"), "_cmd_vol_down"),
-        (re.compile(r"\bsilenciar\b"), "_cmd_vol_mute"),
-        (re.compile(r"\b(cómo estás|estado del sistema|status)\b"), "_cmd_estado"),
-        (re.compile(r"\b(adiós|adios|descansa|apágate|cerrar darius)\b"), "_cmd_cerrar"),
+        (
+            re.compile(
+                r"\b(reproduce|pon|ponme|coloca|escuchar|m[uú]sica|play|listen\s+to|play\s+music)\b", re.IGNORECASE
+            ),
+            "_cmd_youtube",
+        ),
+        (re.compile(r"\b(busca|buscar|googlea|search|google|look\s+up)\b", re.IGNORECASE), "_cmd_buscar"),
+        (
+            re.compile(r"\b(abre|abrir|lanza|ejecuta|inicia|muestra|open|launch|start|run)\b", re.IGNORECASE),
+            "_cmd_abrir",
+        ),
+        (
+            re.compile(
+                r"\b(subir\s+volumen|volume\s+up|increase\s+volume|turn\s+up\s+(?:the\s+)?volume)\b",
+                re.IGNORECASE,
+            ),
+            "_cmd_vol_up",
+        ),
+        (
+            re.compile(
+                r"\b(bajar\s+volumen|volume\s+down|decrease\s+volume|turn\s+down\s+(?:the\s+)?volume)\b",
+                re.IGNORECASE,
+            ),
+            "_cmd_vol_down",
+        ),
+        (re.compile(r"\b(silenciar|mute(?:\s+volume)?|unmute)\b", re.IGNORECASE), "_cmd_vol_mute"),
+        (
+            re.compile(
+                r"\b(c[oó]mo\s+est[aá]s|estado\s+del\s+sistema|status|system\s+status|how\s+are\s+you)\b", re.IGNORECASE
+            ),
+            "_cmd_estado",
+        ),
+        (
+            re.compile(
+                r"\b(adi[oó]s|adios|descansa|ap[aá]gate|cerrar\s+darius|"
+                r"goodbye|bye|go\s+to\s+sleep|shut\s+down\s+darius|close\s+darius)\b",
+                re.IGNORECASE,
+            ),
+            "_cmd_cerrar",
+        ),
         # Comandos de Memoria y Notas en Obsidian
         (_RE_DIARIO, "_cmd_diario"),
         (_RE_MEMORIA, "_cmd_memoria"),
@@ -2003,13 +2123,30 @@ class DariusFinal(ctk.CTk):
 
     # ── Handlers ──────────────────────────────────────────────────────────────
 
-    def _cmd_hora(self, _):
+    @staticmethod
+    def _is_english_cmd(cmd: str) -> bool:
+        """Detect explicit English command phrasing while preserving Spanish phrasing."""
+        text = str(cmd or "")
+        has_es = bool(re.search(r"\b(qu[eé]|hora|dime|tienes|fecha|d[ií]a|hoy|estamos)\b", text, re.IGNORECASE))
+        if has_es:
+            return False
+        if re.search(r"\b(what|time|current|tell|today|date|day)\b", text, re.IGNORECASE):
+            return True
+        return getattr(cfg, "language", "en") == "en"
+
+    def _cmd_hora(self, cmd: str = ""):
         now = datetime.datetime.now()
+        if self._is_english_cmd(cmd):
+            self.talk(f"It is {now.strftime('%I:%M %p')}.")
+            return
         hora_12 = now.strftime("%I:%M %p").lower().replace("am", "a. m.").replace("pm", "p. m.")
         self.talk(f"Son las {hora_12}.")
 
-    def _cmd_fecha(self, _):
+    def _cmd_fecha(self, cmd: str = ""):
         now = datetime.datetime.now()
+        if self._is_english_cmd(cmd):
+            self.talk(f"Today is {now.strftime('%A, %B %d, %Y')}.")
+            return
         dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
         meses = [
             "enero",
@@ -2075,7 +2212,7 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_human_type(self, cmd: str):
         m = self._RE_HUMAN_TYPE.search(cmd)
-        text_to_type = m.group(2).strip() if m else ""
+        text_to_type = m.groups()[-1].strip() if m else ""
         if not text_to_type:
             self.talk("¿Qué texto deseas que escriba?")
             return
@@ -2091,8 +2228,8 @@ class DariusFinal(ctk.CTk):
         threading.Thread(target=run, daemon=True, name="human-type").start()
 
     def _cmd_human_click(self, cmd: str):
-        is_right = bool(re.search(r"derecho", cmd, re.IGNORECASE))
-        is_double = bool(re.search(r"doble", cmd, re.IGNORECASE))
+        is_right = bool(re.search(r"derecho|right", cmd, re.IGNORECASE))
+        is_double = bool(re.search(r"doble|double", cmd, re.IGNORECASE))
         button = "right" if is_right else "left"
         self.talk("Haciendo clic en dos segundos.")
 
@@ -2107,7 +2244,7 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_scrape_web(self, cmd: str):
         m = self._RE_SCRAPE_WEB.search(cmd)
-        url = m.group(3).strip() if m else ""
+        url = m.groups()[-1].strip() if m else ""
         if not url:
             self.talk("Por favor proporciona una URL válida para analizar.")
             return
@@ -2137,8 +2274,8 @@ class DariusFinal(ctk.CTk):
         def run():
             from src.darius_ai.core.screen_vision import vision_engine
 
-            is_error = bool(re.search(r"\berror|fallo|excepci[oó]n|falla\b", cmd, re.IGNORECASE))
-            is_ocr = bool(re.search(r"\blee|texto|documento|c[oó]digo\b", cmd, re.IGNORECASE))
+            is_error = bool(re.search(r"\b(error|fallo|excepci[oó]n|falla|exception|crash)\b", cmd, re.IGNORECASE))
+            is_ocr = bool(re.search(r"\b(lee|texto|documento|c[oó]digo|read|text|document|code)\b", cmd, re.IGNORECASE))
 
             if is_error:
                 analysis = vision_engine.analyze_screen_error(monitor_index=1)
@@ -2155,7 +2292,7 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_deep_research(self, cmd: str):
         m = self._RE_DEEP_RESEARCH.search(cmd)
-        topic = m.group(4).strip() if m else cmd
+        topic = m.groups()[-1].strip() if m else cmd
         self.set_status("🔬 INVESTIGANDO A FONDO…", "#A855F7")
 
         def run():
@@ -2173,7 +2310,7 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_agent_planner(self, cmd: str):
         m = self._RE_PLANNER_GOAL.search(cmd)
-        goal = m.group(2).strip() if m else cmd
+        goal = m.groups()[-1].strip() if m else cmd
 
         def run():
             from src.darius_ai.core.agent_planner import agent_planner
@@ -2229,7 +2366,11 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_diario(self, cmd: str):
         entry = re.sub(
-            r"^.*(anota|escribe|guarda)\s+(en\s+mi\s+)?(diario|bit[aá]cora)\s*(que|:)?\s*", "", cmd, flags=re.IGNORECASE
+            r"^.*(?:(?:anota|escribe|guarda)\s+(?:en\s+mi\s+)?(?:diario|bit[aá]cora)|"
+            r"(?:write|note|log|save)\s+(?:in\s+(?:my\s+)?)?(?:diary|journal|daily\s+note))\s*(?:que|that|:)?\s*",
+            "",
+            cmd,
+            flags=re.IGNORECASE,
         ).strip()
         if entry:
             brain.append_daily_note(entry)
@@ -2239,7 +2380,8 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_memoria(self, cmd: str):
         note = re.sub(
-            r"^.*(recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian)\s*(que|:)?\s*",
+            r"^.*(?:recuerda|memoriza|guarda\s+en\s+memoria|guarda\s+en\s+obsidian|"
+            r"remember|memorize|save\s+to\s+(?:memory|obsidian))\s*(?:que|that|:)?\s*",
             "",
             cmd,
             flags=re.IGNORECASE,
@@ -2253,7 +2395,8 @@ class DariusFinal(ctk.CTk):
 
     def _cmd_buscar_notas(self, cmd: str):
         query = re.sub(
-            r"^.*(busca|buscar|consulta)\s+en\s+(mis\s+notas|mi\s+diario|obsidian)\s*(que|:)?\s*",
+            r"^.*(?:(?:busca|buscar|consulta)\s+en\s+(?:mis\s+notas|mi\s+diario|obsidian)|"
+            r"(?:search|look\s+up|query)\s+(?:in\s+)?(?:my\s+notes|my\s+diary|my\s+journal|obsidian))\s*(?:for|que|:)?\s*",
             "",
             cmd,
             flags=re.IGNORECASE,
@@ -2269,7 +2412,12 @@ class DariusFinal(ctk.CTk):
             self.talk("¿Qué tema deseas buscar en tus notas?")
 
     def _cmd_youtube(self, cmd):
-        song = re.sub(r"^.*(reproduce|ponme|coloca|pon|escuchar|música)\s*", "", cmd, flags=re.IGNORECASE).strip()
+        song = re.sub(
+            r"^.*(?:reproduce|ponme|coloca|pon|escuchar|m[uú]sica|listen\s+to|play\s+music|play)\s*",
+            "",
+            cmd,
+            flags=re.IGNORECASE,
+        ).strip()
         if song:
             self.talk(f"Buscando {song}, un momento.")
             threading.Thread(target=self.play_on_youtube, args=(song,), daemon=True, name="yt").start()
@@ -2277,8 +2425,15 @@ class DariusFinal(ctk.CTk):
             self.talk("¿Qué canción quieres que reproduzca?")
 
     def _cmd_buscar(self, cmd):
-        term = re.sub(r"^.*(busca|buscar|googlea)\s*", "", cmd, flags=re.IGNORECASE).strip()
-        term = re.sub(r"\ben\s+internet\b", "", term).strip()
+        term = re.sub(
+            r"^.*(?:busca|buscar|googlea|search(?:\s+for)?|google|look\s+up)\s*",
+            "",
+            cmd,
+            flags=re.IGNORECASE,
+        ).strip()
+        term = re.sub(
+            r"\b(?:en\s+internet|on\s+(?:google|the\s+web|internet))\b", "", term, flags=re.IGNORECASE
+        ).strip()
         if term:
             webbrowser.open(f"https://www.google.com/search?q={urllib.parse.quote(term)}")
             self.talk(f"Buscando {term} en Google.")
@@ -2286,7 +2441,12 @@ class DariusFinal(ctk.CTk):
             self.talk("¿Qué quieres que busque?")
 
     def _cmd_abrir(self, cmd):
-        app_name = re.sub(r"^.*(abre|abrir|lanza|ejecuta|inicia|muestra)\s*", "", cmd, flags=re.IGNORECASE).strip()
+        app_name = re.sub(
+            r"^.*(?:abre|abrir|lanza|ejecuta|inicia|muestra|open|launch|start|run)\s*",
+            "",
+            cmd,
+            flags=re.IGNORECASE,
+        ).strip()
         self._open_app(app_name)
 
     def _cmd_vol_up(self, _):
@@ -2388,7 +2548,25 @@ class DariusFinal(ctk.CTk):
 
     def _handle_confirmation(self, text: str):
         t = text.lower().strip()
-        if any(w in t for w in ["confirmar", "confirma", "sí", "si", "adelante", "procede", "hazlo", "ok", "correcto"]):
+        if any(
+            w in t
+            for w in [
+                "confirmar",
+                "confirma",
+                "confirm",
+                "sí",
+                "si",
+                "yes",
+                "adelante",
+                "procede",
+                "proceed",
+                "go ahead",
+                "hazlo",
+                "do it",
+                "ok",
+                "correcto",
+            ]
+        ):
             with self._pending_lock:
                 entry = self._pending_action
                 self._pending_action = None
@@ -2405,7 +2583,9 @@ class DariusFinal(ctk.CTk):
                 threading.Thread(target=entry["_fn"], daemon=True, name="action-direct").start()
             else:
                 self._execute_action(entry)
-        elif any(w in t for w in ["cancelar", "cancela", "no", "abortar", "detener"]):
+        elif any(
+            w in t for w in ["cancelar", "cancela", "cancel", "no", "abortar", "abort", "detener", "stop", "never mind"]
+        ):
             with self._pending_lock:
                 entry = self._pending_action
                 self._pending_action = None

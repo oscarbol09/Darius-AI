@@ -31,6 +31,7 @@ import customtkinter as ctk
 
 from src.darius_ai.core.ai_client import PROVIDER_NAMES, resolve_provider_key, test_provider_connection
 from src.darius_ai.core.config_loader import cfg
+from src.darius_ai.core.i18n import t
 from src.darius_ai.gui import gui_theme as theme
 
 log = logging.getLogger("DARIUS.Settings")
@@ -234,19 +235,45 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         )
         header_frame.pack(padx=16, pady=(16, 8), fill="x")
 
-        ctk.CTkLabel(
+        self.header_title_lbl = ctk.CTkLabel(
             header_frame,
-            text="⚙ AJUSTES Y CONFIGURACIÓN — DARIUS AI",
+            text=t("settings.title"),
             font=("Segoe UI", 16, "bold"),
             text_color=theme.ACCENT_PRIMARY,
-        ).pack(anchor="w", padx=16, pady=(10, 2))
+        )
+        self.header_title_lbl.pack(anchor="w", padx=16, pady=(10, 2))
 
-        ctk.CTkLabel(
+        self.header_sub_lbl = ctk.CTkLabel(
             header_frame,
-            text="Personaliza tus modelos de lenguaje (BYOK) y motores de síntesis de voz.",
+            text=t("settings.subtitle"),
             font=("Segoe UI", 10),
             text_color=theme.TEXT_MUTED,
-        ).pack(anchor="w", padx=16, pady=(0, 10))
+        )
+        self.header_sub_lbl.pack(anchor="w", padx=16, pady=(0, 6))
+
+        lang_row = ctk.CTkFrame(header_frame, fg_color="transparent")
+        lang_row.pack(fill="x", padx=16, pady=(0, 10))
+
+        ctk.CTkLabel(
+            lang_row,
+            text=t("settings.language_label"),
+            font=("Segoe UI", 10, "bold"),
+            text_color=theme.TEXT_SECONDARY,
+        ).pack(side="left", padx=(0, 10))
+
+        self.language_menu = ctk.CTkOptionMenu(
+            lang_row,
+            values=["English (en)", "Español (es)"],
+            width=160,
+            height=28,
+            fg_color=theme.BG_CARD_INNER,
+            button_color=theme.ACCENT_PRIMARY,
+            button_hover_color=theme.ACCENT_PRIMARY_HOVER,
+            text_color=theme.TEXT_PRIMARY,
+            font=("Segoe UI", 10, "bold"),
+        )
+        self.language_menu.set("Español (es)" if cfg.language == "es" else "English (en)")
+        self.language_menu.pack(side="left")
 
         # ── 2. SEGMENTED BUTTON (TABS) ───────────────────────────────────────
         tab_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -274,7 +301,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         self.save_btn = ctk.CTkButton(
             bottom_row,
-            text="💾 GUARDAR Y APLICAR",
+            text=t("settings.save_btn"),
             fg_color=theme.ACCENT_PRIMARY,
             hover_color=theme.ACCENT_PRIMARY_HOVER,
             text_color=theme.BG_CANVAS,
@@ -287,7 +314,7 @@ class BYOKSettingsModal(ctk.CTkToplevel):
 
         ctk.CTkButton(
             bottom_row,
-            text="CERRAR",
+            text=t("settings.close_btn"),
             fg_color=theme.BG_CARD_INNER,
             hover_color=theme.BORDER_CARD,
             text_color=theme.TEXT_PRIMARY,
@@ -1034,10 +1061,15 @@ class BYOKSettingsModal(ctk.CTkToplevel):
         cfg.set(self._eleven_data["model_id"], "elevenlabs", "model_id")
         cfg.set(bool(self._eleven_data["cache_enabled"]), "elevenlabs", "cache_enabled")
 
-        log.info("[Settings] Ajustes de LLM y TTS guardados en config.json.")
+        # 3. Persistir idioma (i18n)
+        if hasattr(self, "language_menu"):
+            chosen_lang = str(self.language_menu.get() or "en").lower()
+            cfg.set_language("es" if "es" in chosen_lang else "en")
 
-        self.save_btn.configure(text="✔ GUARDADO CON ÉXITO", fg_color=theme.ACCENT_EMERALD)
-        self.after(1200, lambda: self.save_btn.configure(text="💾 GUARDAR Y APLICAR", fg_color=theme.ACCENT_PRIMARY))
+        log.info("[Settings] Ajustes de LLM, TTS e idioma guardados en config.json.")
+
+        self.save_btn.configure(text=t("settings.saved_btn"), fg_color=theme.ACCENT_EMERALD)
+        self.after(1200, lambda: self.save_btn.configure(text=t("settings.save_btn"), fg_color=theme.ACCENT_PRIMARY))
 
         if self.on_save_callback:
             self.on_save_callback()
