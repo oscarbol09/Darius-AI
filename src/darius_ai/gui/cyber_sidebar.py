@@ -22,6 +22,7 @@ from typing import Any, Final
 
 import customtkinter as ctk
 
+from src.darius_ai.core.i18n import TRANSLATIONS
 from src.darius_ai.gui import gui_theme as theme
 
 log = logging.getLogger("darius.cyber_sidebar")
@@ -154,6 +155,19 @@ class CyberSidebar(ctk.CTkFrame):
             wraplength=self.sidebar_width - 36,
         )
         self.quote_label.pack(fill="x", padx=8, pady=(4, 10))
+
+    def set_language(self, lang: str) -> None:
+        """Update navigation labels and quote text dynamically for the target language."""
+        target = "en" if str(lang).strip().lower().startswith("en") else "es"
+        catalog = TRANSLATIONS.get(target, TRANSLATIONS["en"])
+        for item in NAV_ITEMS:
+            tab_id = item["id"]
+            btn = self.nav_buttons.get(tab_id)
+            if btn is not None:
+                label = catalog.get(f"sidebar.{tab_id}", item["label"])
+                btn.configure(text=f"  {item['icon']}  {label}")
+        if hasattr(self, "quote_label"):
+            self.quote_label.configure(text=catalog.get("sidebar.quote", DEFAULT_INSPIRATIONAL_QUOTE))
 
     def select_tab(self, tab_id: str, dispatch_callback: bool = True) -> None:
         """

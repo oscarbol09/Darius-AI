@@ -117,11 +117,11 @@ class TTSWorker:
             return False
 
     def _speak_edge_tts(self, text: str) -> bool:
-        """Intenta sintetizar con Edge-TTS."""
+        """Synthesize speech with Edge-TTS using the active UI language default voice."""
         try:
             from src.darius_ai.audio.edge_tts_engine import EdgeTTS
 
-            tts = EdgeTTS()
+            tts = EdgeTTS(voice=EdgeTTS.get_default_voice(getattr(cfg, "language", "en")))
             tts.speak(text)
             return True
         except Exception as exc:

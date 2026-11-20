@@ -76,13 +76,30 @@ class EdgeTTS:
         volume (int): Volumen (0-100, default 100)
     """
 
-    # Voces recomendadas para español:
+    # Recommended neural voices (Spanish & English):
     VOICES = {
         "es-MX-DaliaNeural": "Dalia (Mexicana) - Neural",
         "es-ES-AlvaroNeural": "Alvaro (Español) - Neural",
         "es-ES-ElviraNeural": "Elvira (Española) - Neural",
         "es-CO-GonzaloNeural": "Gonzalo (Colombiano) - Neural",
+        "en-US-JennyNeural": "Jenny (US) - Neural",
+        "en-US-GuyNeural": "Guy (US) - Neural",
+        "en-GB-RyanNeural": "Ryan (UK Butler) - Neural",
+        "en-GB-SoniaNeural": "Sonia (UK) - Neural",
     }
+
+    @classmethod
+    def get_default_voice(cls, language: str | None = None) -> str:
+        """Return the default neural voice matching the configured ISO-639-1 language."""
+        lang = language
+        if lang is None:
+            try:
+                from src.darius_ai.core.config_loader import cfg
+
+                lang = cfg.language
+            except Exception:
+                lang = "en"
+        return "en-GB-RyanNeural" if str(lang).strip().lower().startswith("en") else "es-MX-DaliaNeural"
 
     def __init__(self, voice: str = "es-MX-DaliaNeural", rate: int = 50, volume: int = 100):
         self.voice = voice

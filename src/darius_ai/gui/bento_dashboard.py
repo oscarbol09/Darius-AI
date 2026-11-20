@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 import customtkinter as ctk
 
+from src.darius_ai.core.i18n import TRANSLATIONS
 from src.darius_ai.gui import gui_theme as theme
 from src.darius_ai.gui.cyber_core_visualizer import (
     CORE_AMBER,
@@ -260,7 +261,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
         lp_body = self.launchpad_card.body_frame
         lp_body.grid_columnconfigure((0, 1), weight=1)
 
-        self._create_tactical_btn(
+        self.btn_protocol = self._create_tactical_btn(
             lp_body,
             row=0,
             col=0,
@@ -269,7 +270,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             command=self._on_launch_protocol,
             accent=CORE_CYAN,
         )
-        self._create_tactical_btn(
+        self.btn_dev = self._create_tactical_btn(
             lp_body,
             row=0,
             col=1,
@@ -278,7 +279,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             command=self._on_launch_dev,
             accent=CORE_EMERALD,
         )
-        self._create_tactical_btn(
+        self.btn_trading = self._create_tactical_btn(
             lp_body,
             row=1,
             col=0,
@@ -287,7 +288,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             command=self._on_launch_trading,
             accent=CORE_AMBER,
         )
-        self._create_tactical_btn(
+        self.btn_cursor = self._create_tactical_btn(
             lp_body,
             row=1,
             col=1,
@@ -296,7 +297,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             command=self._on_focus_cursor,
             accent="#A855F7",
         )
-        self._create_tactical_btn(
+        self.btn_wol = self._create_tactical_btn(
             lp_body,
             row=2,
             col=0,
@@ -305,7 +306,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             command=self._on_wake_on_lan,
             accent="#38BDF8",
         )
-        self._create_tactical_btn(
+        self.btn_silence = self._create_tactical_btn(
             lp_body,
             row=2,
             col=1,
@@ -340,7 +341,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
         )
 
         # Botón de briefing vocal de telemetría situacional
-        ctk.CTkButton(
+        self.btn_briefing = ctk.CTkButton(
             sit_body,
             text="INFORME VOCAL SITUACIONAL 🎙",
             font=theme.FONT_CAPTION_BOLD,
@@ -352,7 +353,8 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             border_color=theme.BORDER_SUBTLE,
             corner_radius=theme.RADIUS_SM,
             command=self._on_request_situational_briefing,
-        ).pack(fill="x", pady=(10, 0))
+        )
+        self.btn_briefing.pack(fill="x", pady=(10, 0))
 
         # ── 5. MÓDULOS PRINCIPALES (Fila 2, Columnas 0-1) ────────────────────
         self.modules_card = BentoCard(
@@ -600,7 +602,7 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
         desc: str,
         command: Callable[[], None],
         accent: str,
-    ) -> None:
+    ) -> ctk.CTkButton:
         """Crea un botón táctico estilizado en el launchpad."""
         frame = ctk.CTkFrame(
             parent,
@@ -631,6 +633,21 @@ class BentoDashboardView(ctk.CTkScrollableFrame):
             text_color=theme.TEXT_MUTED,
             anchor="w",
         ).pack(fill="x", padx=10, pady=(0, 6))
+        return btn
+
+    def set_language(self, lang: str) -> None:
+        """Update tactical dashboard button labels dynamically for the active language."""
+        target = "en" if str(lang).strip().lower().startswith("en") else "es"
+        catalog = TRANSLATIONS.get(target, TRANSLATIONS["en"])
+        with contextlib.suppress(Exception):
+            self.core_status_lbl.configure(text=catalog.get("bento.nominal_standby", "SYSTEM NOMINAL • STANDBY"))
+            self.btn_protocol.configure(text=catalog.get("bento.darius_protocol", "🚀 Darius Protocol"))
+            self.btn_dev.configure(text=catalog.get("bento.dev_mode", "💻 Dev Mode"))
+            self.btn_trading.configure(text=catalog.get("bento.trading_mode", "📈 Trading Mode"))
+            self.btn_cursor.configure(text=catalog.get("bento.focus_cursor", "🎯 Focus Cursor"))
+            self.btn_wol.configure(text=catalog.get("bento.wol", "🌐 Wake-on-LAN"))
+            self.btn_silence.configure(text=catalog.get("bento.tactical_silence", "🛑 Tactical Silence"))
+            self.btn_briefing.configure(text=catalog.get("bento.situational_briefing", "SITUATIONAL VOICE BRIEFING 🎙"))
 
     # =========================================================================
     #  ACTUALIZACIONES DE DATOS EN TIEMPO REAL

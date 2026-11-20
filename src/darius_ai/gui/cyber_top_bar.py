@@ -19,9 +19,10 @@ from typing import Any, Final
 
 import customtkinter as ctk
 
+from src.darius_ai.core.i18n import TRANSLATIONS
 from src.darius_ai.gui import gui_theme as theme
 
-# Meses abreviados en español para reloj táctico
+# Meses abreviados en español e inglés para reloj táctico
 SPANISH_MONTHS: Final[dict[int, str]] = {
     1: "Ene",
     2: "Feb",
@@ -37,6 +38,21 @@ SPANISH_MONTHS: Final[dict[int, str]] = {
     12: "Dic",
 }
 
+ENGLISH_MONTHS: Final[dict[int, str]] = {
+    1: "Jan",
+    2: "Feb",
+    3: "Mar",
+    4: "Apr",
+    5: "May",
+    6: "Jun",
+    7: "Jul",
+    8: "Aug",
+    9: "Sep",
+    10: "Oct",
+    11: "Nov",
+    12: "Dec",
+}
+
 
 # =============================================================================
 #  LÓGICA PURA Y FORMATEADORES HEADLESS
@@ -46,21 +62,30 @@ def format_status_badge(
     is_online: bool = True,
     provider: str = "Google",
     model: str = "Gemini 2.5 Flash",
+    language: str = "es",
 ) -> str:
     """Genera la cadena formateada del badge de telemetría de estado central."""
+    lang = "en" if str(language).strip().lower().startswith("en") else "es"
+    if lang == "en":
+        status_val = "Nominal" if system_status == "Operativo" else system_status
+        net_str = "Connected" if is_online else "Disconnected"
+        model_str = model if model else (provider if provider else "Autonomous")
+        return f"System: {status_val} | Net: {net_str} | AI: {model_str}"
+
     net_str = "Conectado" if is_online else "Desconectado"
     model_str = model if model else (provider if provider else "Autónomo")
     return f"Sistema: {system_status} | Red: {net_str} | IA: {model_str}"
 
 
-def format_clock_string(dt: datetime | None = None) -> tuple[str, str]:
+def format_clock_string(dt: datetime | None = None, language: str = "es") -> tuple[str, str]:
     """Formatea la hora y fecha en formato militar táctico (HH:MM, DD MMM YYYY).
 
     Retorna:
         tuple[str, str]: (time_str, date_str), ej: ("14:30", "14 Oct 2026").
     """
     now = dt if dt is not None else datetime.now()
-    month_name = SPANISH_MONTHS.get(now.month, now.strftime("%b"))
+    months = ENGLISH_MONTHS if str(language).strip().lower().startswith("en") else SPANISH_MONTHS
+    month_name = months.get(now.month, now.strftime("%b"))
     time_str = now.strftime("%H:%M")
     date_str = f"{now.day:02d} {month_name} {now.year}"
     return time_str, date_str
@@ -80,6 +105,7 @@ class CyberTopBar(ctk.CTkFrame):
         on_close: Callable[[], None] | None = None,
         provider: str = "Google",
         model: str = "Gemini 2.5 Flash",
+        language: str = "es",
         **kwargs: Any,
     ) -> None:
         bg_bar = kwargs.pop("fg_color", theme.BG_HEADER)
@@ -99,6 +125,7 @@ class CyberTopBar(ctk.CTkFrame):
         self.on_close = on_close
 
         # Estado del sistema y telemetría
+        self._language = "en" if str(language).strip().lower().startswith("en") else "es"
         self._system_status = "Operativo"
         self._is_online = True
         self._provider = provider
@@ -106,7 +133,10 @@ class CyberTopBar(ctk.CTkFrame):
         self._clock_timer_id: str | None = None
 
         self._build_ui()
-        self.update_clock()
+        if self._language != "es":
+            self.set_language(self._language)
+        else:
+            self.update_clock()
         self._schedule_clock()
 
     def _build_ui(self) -> None:
@@ -265,9 +295,35 @@ class CyberTopBar(ctk.CTkFrame):
     # =========================================================================
     def update_clock(self, dt: datetime | None = None) -> None:
         """Actualiza la hora y fecha mostrada en la sección del reloj."""
-        time_str, date_str = format_clock_string(dt)
+        time_str, date_str = format_clock_string(dt, language=getattr(self, "_language", "es"))
         self.lbl_clock_time.configure(text=time_str)
         self.lbl_clock_date.configure(text=date_str)
+
+    def set_language(self, lang: str) -> None:
+        """Update top bar labels dynamically when the active UI language changes."""
+        target = "en" if str(lang).strip().lower().startswith("en") else "es"
+        self._language = target
+        catalog = TRANSLATIONS.get(target, TRANSLATIONS["en"])
+        self.lbl_brand_caption.configure(text=catalog.get("topbar.caption", "YOUR WINDOWS COPILOT"))
+        self._refresh_user_status_label()
+        self._refresh_status_pill()
+        self.update_clock()
+
+    def _refresh_user_status_label(self) -> None:
+        """Update the user availability badge matching the current language and connectivity."""
+        target = getattr(self, "_language", "es")
+        catalog = TRANSLATIONS.get(target, TRANSLATIONS["en"])
+        if self._is_online:
+            self.lbl_user_status.configure(
+                text=catalog.get("topbar.user_online", "Darius ● En línea"),
+                text_color=theme.ACCENT_EMERALD,
+            )
+        else:
+            offline_txt = "Darius ○ Disconnected" if target == "en" else "Darius ○ Desconectado"
+            self.lbl_user_status.configure(
+                text=offline_txt,
+                text_color=theme.ACCENT_ROSE,
+            )
 
     def set_provider_info(self, provider_name: str, model_name: str) -> None:
         """Actualiza la información del proveedor y modelo IA activo en el badge."""
@@ -293,18 +349,7 @@ class CyberTopBar(ctk.CTkFrame):
         if model is not None:
             self._model = str(model)
 
-        # Actualizar color del indicador de usuario según la red
-        if is_online:
-            self.lbl_user_status.configure(
-                text="Darius ● En línea",
-                text_color=theme.ACCENT_EMERALD,
-            )
-        else:
-            self.lbl_user_status.configure(
-                text="Darius ○ Desconectado",
-                text_color=theme.ACCENT_ROSE,
-            )
-
+        self._refresh_user_status_label()
         self._refresh_status_pill()
 
     def _refresh_status_pill(self) -> None:
@@ -314,6 +359,7 @@ class CyberTopBar(ctk.CTkFrame):
             is_online=self._is_online,
             provider=self._provider,
             model=self._model,
+            language=getattr(self, "_language", "es"),
         )
         self.lbl_status_pill.configure(text=pill_text)
 

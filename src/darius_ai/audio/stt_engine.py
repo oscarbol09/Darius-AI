@@ -29,15 +29,28 @@ log = logging.getLogger("DARIUS.STT")
 
 class STTEngine:
     """
-    Motor de reconocimiento de voz intercambiable.
+    Interchangeable Speech-to-Text engine supporting English and Spanish locales.
 
-    Atributos:
+    Attributes:
         backend (str): "google" | "vosk" | "whisper"
+        language (str): BCP-47 locale (e.g., "en-US", "es-ES")
     """
 
-    def __init__(self, backend: str = "google", model_path: str | None = None):
+    @staticmethod
+    def resolve_locale(lang: str) -> str:
+        """Normalize a short ISO-639-1 code or locale string into a BCP-47 STT locale."""
+        clean = lang.strip()
+        lower = clean.lower()
+        if lower == "en":
+            return "en-US"
+        if lower == "es":
+            return "es-ES"
+        return clean or "es-ES"
+
+    def __init__(self, backend: str = "google", model_path: str | None = None, language: str = "es-ES"):
         self.backend = backend
         self.model_path = model_path
+        self.language = self.resolve_locale(language)
         self._audio_queue: queue.Queue = queue.Queue()
         self._running = False
 
@@ -61,7 +74,7 @@ class STTEngine:
             with sr.Microphone() as source:
                 r.adjust_for_ambient_noise(source, duration=0.5)
                 audio = r.listen(source, timeout=timeout, phrase_time_limit=10)
-            return r.recognize_google(audio, language="es-ES")
+            return r.recognize_google(audio, language=self.language)
         except sr.WaitTimeoutError:
             return None
         except sr.UnknownValueError:
