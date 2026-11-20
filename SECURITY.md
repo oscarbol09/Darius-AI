@@ -1,29 +1,37 @@
-# Política de Seguridad
+<p align="center">
+  🇺🇸 <b>English</b> &nbsp;|&nbsp; 🇪🇸 <a href="SECURITY.es.md"><b>Español</b></a>
+</p>
 
-## Versiones Compatibles
+# Security Policy
 
-| Versión | Estado de Soporte |
+## Supported Versions
+
+| Version | Support Status |
 | :--- | :--- |
-| **8.x** | ✅ Desarrollo activo y soporte de seguridad |
-| **7.x** | ⚠️ Mantenimiento crítico y parches de seguridad |
-| **< 7.0** | ❌ Sin soporte |
+| **8.5.x** | ✅ Active development and security patches |
+| **7.x** | ⚠️ Critical security fixes only |
+| **< 7.0** | ❌ End of life / unsupported |
 
 ---
 
-## Reporte de Vulnerabilidades
+## Reporting a Vulnerability
 
-Darius AI es un asistente de escritorio de ejecución local para Windows. Si descubres alguna vulnerabilidad en el código, en el tratamiento de credenciales o en las dependencias:
+Darius AI is a local-first Windows desktop assistant. If you discover a vulnerability in sandboxing, credential storage, subprocess dispatch, or dependencies:
 
-1. Por favor, **no publiques detalles sensibles en issues públicos**.
-2. Abre un reporte de seguridad privado en GitHub o contacta directamente al mantenedor del repositorio.
-3. Se revisará el informe para emitir una corrección a la brevedad.
+1. **Please do not disclose exploit details in public GitHub issues.**
+2. Open a private GitHub Security Advisory on the repository or contact `@Oscarbol09` directly.
+3. Maintainers will triage the report and issue a patch promptly.
 
 ---
 
-## Medidas y Buenas Prácticas de Seguridad Implementadas
+## Implemented Security Controls
 
-- **Gestión Segura de Credenciales BYOK:** Las claves de API se almacenan localmente en `config.json` o en variables de entorno `.env` (ambos excluidos en `.gitignore`). En la interfaz gráfica (`byok_settings.py`), las claves permanecen enmascaradas con caracteres ocultos (`●`) y solo se revelan mediante interacción explícita del usuario.
-- **Arquitectura Local-First y Privacidad:** Las notas del diario, las memorias permanentes y las configuraciones residen íntegramente en disco local (bóveda de Obsidian y archivos de configuración locales), sin telemetría ni transmisión de datos a servidores no solicitados.
-- **Prevención de Inyección de Comandos:** Todas las invocaciones al sistema operativo (`windows_commands.py`) se ejecutan con `shell=False` utilizando listas de argumentos validadas y rutas completas a utilidades del sistema (`%SystemRoot%\System32`).
-- **Aislamiento de Procesos:** Bloqueo por Mutex Win32 nativo para impedir la ejecución concurrente de múltiples instancias que puedan colisionar en el uso de hardware de audio o archivos de estado.
-- **Auditoría Automatizada en CI:** Cada cambio en el repositorio es auditado automáticamente mediante escaneo estático de secretos (**Gitleaks**) y análisis de vulnerabilidades en dependencias (**pip-audit**).
+- **DPAPI-Protected BYOK Credentials (`config_loader.py`):** Sensitive API keys (`gemini_api_key`, `openai_api_key`, `openrouter_api_key`, `nvidia_api_key`, `groq_api_key`, `elevenlabs_api_key`, `antigravity_api_key`) are encrypted at rest on Windows using native **DPAPI (`CryptProtectData` / `CryptUnprotectData`)** bound to the active Windows user profile (`dpapi:` prefix in `%APPDATA%\DariusAI\config.json` / `.darius_data/config.json`). In `byok_settings.py`, keys stay masked unless explicitly revealed by user interaction.
+- **Local-First Obsidian Vault:** Daily notes, persistent memories, and configuration stay on local disk with zero telemetry or unauthorized background uploads.
+- **Command Injection Defense (`windows_commands.py`):** All OS subcommands execute with `shell=False`, validated argument vectors, and explicit `%SystemRoot%\System32` binary paths.
+- **Anti-SSRF & Prompt Injection Guard (`security_guard.py`):**
+  - Blocks loopback, link-local, RFC 1918 private subnets, cloud metadata endpoints (`169.254.169.254`), and disguised IP encodings (hex/octal/IPv6-mapped IPv4).
+  - Multi-tier `InjectionScanner` and context-aware `CredentialStripper` sanitize untrusted web content and console output without corrupting legitimate MD5 hashes or UUIDs.
+- **AST-Validated Code Sandbox (`safe_code_interpreter.py`):** Parses code statically before execution, forbids private/dunder attributes, unsafe builtins, and dunder introspection inside `str.format()` strings, and enforces hard timeouts.
+- **Process Isolation:** Native Win32 named Mutex prevents concurrent instances from racing on audio hardware or configuration files.
+- **Automated CI Audits:** Every push and PR runs static secret scanning (**Gitleaks**) and Python dependency vulnerability scanning (**pip-audit**).

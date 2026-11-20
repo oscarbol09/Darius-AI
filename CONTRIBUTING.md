@@ -1,18 +1,22 @@
-# Contribución a Darius AI
+<p align="center">
+  🇺🇸 <b>English</b> &nbsp;|&nbsp; 🇪🇸 <a href="CONTRIBUTING.es.md"><b>Español</b></a>
+</p>
 
-Guía para colaborar en el desarrollo y mantenimiento de Darius AI.
+# Contributing to Darius AI
 
----
-
-## Requisitos del Entorno
-
-- **Sistema Operativo:** Windows 10 (compilación 19041+) o Windows 11.
-- **Python:** 3.11 o 3.12.
-- **Git**
+Thank you for your interest in contributing to **Darius AI**. This guide covers environment setup, testing gates, and the engineering standards enforced across the repository.
 
 ---
 
-## Configuración del Entorno de Desarrollo
+## Environment Requirements
+
+- **Operating System:** Windows 10 (build 19041+) or Windows 11.
+- **Python:** 3.11 or 3.12 (3.12 recommended).
+- **Git** and **uv** or `pip`.
+
+---
+
+## Development Setup
 
 ```powershell
 git clone https://github.com/oscarbol09/Darius-AI.git
@@ -27,25 +31,32 @@ pip install -r requirements-dev.txt
 
 ---
 
-## Pruebas y Validación de Código
+## Testing & Verification Gates
 
-Antes de enviar un Pull Request o realizar un commit, asegúrate de que todas las pruebas pasen localmente y que el formateador no detecte inconsistencias:
+Before opening a Pull Request or committing changes, ensure every automated gate passes locally:
 
 ```powershell
-# Ejecutar suite de pruebas unitarias e integración (sin llamadas reales a APIs externas)
+# Run the full hermetic unit & integration suite (no live network/API calls)
 pytest tests/ -v -m "not live"
 
-# Validar calidad y reglas de estilo con Ruff (debe retornar 0 errores)
+# Enforce code quality & lint rules with Ruff (must exit with 0 errors)
 ruff check .
+ruff format --check .
+
+# Enforce strict static typing against the win32 runtime target
+mypy src/
 ```
+
+New features or bug fixes must maintain at least **80% line coverage** (`--cov=src/darius_ai --cov-fail-under=80`) and must include regression tests using mocks/fixtures so CI remains offline-safe and deterministic.
 
 ---
 
-## Estándares de Ingeniería y Arquitectura
+## Engineering & Architecture Standards
 
-- **Seguridad en Subprocesos:** Prohibido el uso de `shell=True` en `subprocess`. Todas las invocaciones a utilidades del sistema deben pasar listas de argumentos validadas (`src/darius_ai/system/windows_commands.py`).
-- **Rendimiento Gráfico en GUI:** En el visualizador de audio o componentes de dibujo en Canvas, no uses `canvas.delete("all")` dentro de bucles de animación continua. Actualiza las coordenadas atómicamente con `canvas.coords()` para evitar parpadeos y pausas de recolección de basura.
-- **Motor BYOK y Red:** Al añadir o modificar proveedores de IA en `src/darius_ai/core/ai_client.py`, utiliza interfaces compatibles con la API estándar de OpenAI basadas en `urllib` para mantener la base de dependencias ligera y portátil.
-- **Manejo Estructurado de Errores:** Captura excepciones específicas y registra los diagnósticos con `log.warning` o `log.error`. No silencies errores con bloques `except: pass` vacíos.
-- **Anotaciones de Tipo:** Incluye *type hints* en todas las funciones y métodos nuevos.
-- **Convención de Commits:** Utiliza [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`) explicando el **porqué** del cambio en el cuerpo del mensaje.
+- **Zero `shell=True` Subprocesses:** Never pass `shell=True` to `subprocess`. Route OS commands through validated argument lists and explicit `%SystemRoot%\System32` paths (`src/darius_ai/system/windows_commands.py`).
+- **60 FPS Canvas Hygiene:** In `CyberCoreVisualizer`, `FloatingVoiceCapsule`, and `ContextMeshVisualizer`, never call `canvas.delete("all")` inside animation loops. Pre-allocate items and update geometry with `canvas.coords()` to prevent Tcl memory churn and visual flicker.
+- **Dual-Language i18n (EN / ES):** All new UI strings, system statuses, voice prompts, and command aliases must register keys in both `"en"` and `"es"` dictionaries inside `src/darius_ai/core/i18n.py` and keep English as the default fallback.
+- **BYOK HTTP Architecture:** When extending LLM providers in `src/darius_ai/core/ai_client.py`, prefer lightweight OpenAI-compatible REST transport via `urllib` to keep runtime dependencies portable.
+- **Structured Error Handling:** Catch explicit exceptions and log diagnostic context via `log.warning` or `log.error`. Never suppress failures silently with bare `except: pass`.
+- **Static Type Annotations:** Add PEP 484 / `from __future__ import annotations` type hints to all new functions and classes.
+- **Commit Convention:** Use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `ci:`, `chore:`) explaining **why** the change was made in the commit body.
