@@ -423,7 +423,10 @@ def test_planner_execute_step_extended_routes(tmp_path):
     store_mock.get_pending_actions.return_value = [SimpleNamespace(id="a1", action_type="cmd", description="run")]
     with patch("src.darius_ai.core.approval_store.ApprovalStore", return_value=store_mock):
         assert "[a1]" in planner.execute_step("approval_status", {"action": "pending"})[1]
-        assert "resuelta" in planner.execute_step("approval_status", {"action": "resolve", "id": "a1"})[1]
+        ok_res, out_res = planner.execute_step("approval_status", {"action": "resolve", "id": "a1"})
+        assert ok_res is False
+        assert "confirmación humana" in out_res
+        store_mock.resolve_action.assert_not_called()
 
     media_mock = MagicMock()
     for meth in ("next_track", "prev_track", "stop", "volume_up", "volume_down", "toggle_mute", "set_volume_percent"):
@@ -445,4 +448,10 @@ def test_planner_execute_step_extended_routes(tmp_path):
         "src.darius_ai.core.darius_lockdown.DariusLockdownEngine.trigger_emergency_lockdown",
         return_value=(True, "Locked"),
     ):
-        assert planner.execute_step("darius_lockdown", {"level": "lockdown"}) == (True, "Locked")
+        # Without approval, lockdown must be gated by ApprovalStore
+        ok_lk, out_lk = planner.execute_step("darius_lockdown", {"level": "lockdown"})
+        assert ok_lk is False and "[APPROVAL REQUIRED]" in out_lk
+        # When approved via consume_approved_action, lockdown executes
+        store_mock.consume_approved_action.return_value = True
+        with patch("src.darius_ai.core.approval_store.ApprovalStore", return_value=store_mock):
+            assert planner.execute_step("darius_lockdown", {"level": "lockdown"}) == (True, "Locked")

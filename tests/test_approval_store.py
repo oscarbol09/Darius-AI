@@ -101,3 +101,30 @@ def test_resolve_pending_action(temp_store):
     temp_store.resolve_action(action.id, Decision.APPROVE)
     pending = temp_store.get_pending_actions()
     assert len(pending) == 0
+
+
+def test_parse_approval_response_negation_and_substring_safety():
+    """W2-02: Verifica que 'si' dentro de palabras o precedido de negación nunca apruebe."""
+    assert parse_approval_response("no, cancelar sesion")[1] == Decision.DENY
+    assert parse_approval_response("no, es imposible")[1] == Decision.DENY
+    assert parse_approval_response("no aprobar act-101") == ("act-101", Decision.DENY)
+    assert parse_approval_response("do not approve act-202") == ("act-202", Decision.DENY)
+    assert parse_approval_response("siempre denegar act-303") == ("act-303", Decision.ALWAYS_DENY)
+    assert parse_approval_response("never approve act-404") == ("act-404", Decision.DENY)
+    # Palabra con 'si' como subcadena pero sin decisión afirmativa ni negativa
+    assert parse_approval_response("revisar sistema ahora")[1] is None
+
+
+def test_consume_approved_action_one_shot_high_tier(temp_store):
+    """W2-02: Verifica que una acción HIGH aprobada pueda consumirse exactamente una vez."""
+    action = temp_store.propose_action(
+        action_type="execute_powershell",
+        description="Eliminar carpeta temporal",
+        payload={"tool": "execute_powershell", "args": "Remove-Item C:\\temp"},
+        tier=RiskTier.HIGH,
+    )
+    assert temp_store.consume_approved_action(action.permission_key) is False
+    temp_store.resolve_action(action.id, Decision.APPROVE)
+    assert temp_store.consume_approved_action(action.permission_key) is True
+    # Segunda vez ya fue consumida ('executed')
+    assert temp_store.consume_approved_action(action.permission_key) is False

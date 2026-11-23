@@ -385,6 +385,26 @@ class AgentPlannerEngine:
                 cmd = p.get("command", "")
                 entry = resolve_action(cmd)
                 if entry:
+                    if entry.get("confirm", False):
+                        from src.darius_ai.core.approval_store import ApprovalStore, Decision, RiskTier
+
+                        store = ApprovalStore()
+                        payload = {"command": cmd, "desc": entry.get("desc", cmd)}
+                        perm_key = f"windows_action:{json.dumps(payload, sort_keys=True)}"
+                        if store.check_permission(
+                            perm_key, tier=RiskTier.HIGH
+                        ) != Decision.ALWAYS_APPROVE and not store.consume_approved_action(perm_key):
+                            act_obj = store.propose_action(
+                                action_type="windows_action",
+                                description=f"Ejecutar comando de sistema: {entry.get('desc', cmd)}",
+                                payload=payload,
+                                tier=RiskTier.HIGH,
+                            )
+                            return (
+                                False,
+                                f"[APPROVAL REQUIRED] Acción destructiva '{entry.get('desc', cmd)}' "
+                                f"bloqueada. Requiere confirmación humana (ID: {act_obj.id}).",
+                            )
                     ok, out = run_action(entry)
                     return ok, out or f"Acción '{cmd}' completada."
                 return False, f"Comando de sistema no reconocido: {cmd}"
@@ -446,7 +466,7 @@ class AgentPlannerEngine:
                 return False, f"Habilidad '{skill_name}' no encontrada."
 
             elif t == "approval_status":
-                from src.darius_ai.core.approval_store import ApprovalStore, Decision
+                from src.darius_ai.core.approval_store import ApprovalStore
 
                 store = ApprovalStore()
                 act = p.get("action", "pending")
@@ -457,10 +477,11 @@ class AgentPlannerEngine:
                     items = [f"[{a.id}] {a.action_type}: {a.description}" for a in pending]
                     return True, "Acciones pendientes:\n" + "\n".join(items)
                 elif act == "resolve":
-                    aid = p.get("id", "")
-                    dec = p.get("decision", "approve")
-                    store.resolve_action(aid, Decision.APPROVE if dec == "approve" else Decision.DENY)
-                    return True, f"Acción '{aid}' resuelta como {dec}."
+                    return (
+                        False,
+                        "La resolución de aprobaciones requiere confirmación humana directa "
+                        "y no puede ser invocada por el planificador autónomo.",
+                    )
 
             elif t == "media_control":
                 from src.darius_ai.system.media_controller import media_controller
@@ -533,6 +554,25 @@ class AgentPlannerEngine:
                 lockdown_engine = get_darius_lockdown_engine()
                 level = p.get("level", "silence")
                 if level == "lockdown":
+                    from src.darius_ai.core.approval_store import ApprovalStore, Decision, RiskTier
+
+                    store = ApprovalStore()
+                    payload = {"level": "lockdown"}
+                    perm_key = f"darius_lockdown:{json.dumps(payload, sort_keys=True)}"
+                    if store.check_permission(
+                        perm_key, tier=RiskTier.HIGH
+                    ) != Decision.ALWAYS_APPROVE and not store.consume_approved_action(perm_key):
+                        act_obj = store.propose_action(
+                            action_type="darius_lockdown",
+                            description="Activar protocolo de bloqueo táctico de emergencia",
+                            payload=payload,
+                            tier=RiskTier.HIGH,
+                        )
+                        return (
+                            False,
+                            "[APPROVAL REQUIRED] El bloqueo de estación requiere "
+                            f"confirmación humana (ID: {act_obj.id}).",
+                        )
                     return lockdown_engine.trigger_emergency_lockdown(lock_workstation=True)
                 return lockdown_engine.trigger_tactical_silence()
 
