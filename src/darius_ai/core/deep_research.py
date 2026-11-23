@@ -75,7 +75,8 @@ def _search_duckduckgo(query: str, max_results: int = 5) -> list[dict[str, str]]
 
                 if title_tag:
                     title = title_tag.get_text(strip=True)
-                    raw_href = title_tag.get("href", "")
+                    raw_attr = title_tag.get("href", "")
+                    raw_href = raw_attr if isinstance(raw_attr, str) else ""
                     # Extraer URL real de DuckDuckGo uddg redirect
                     if "uddg=" in raw_href:
                         parsed = urllib.parse.parse_qs(urllib.parse.urlparse(raw_href).query)
@@ -104,14 +105,23 @@ def _search_duckduckgo(query: str, max_results: int = 5) -> list[dict[str, str]]
 
 
 def _fetch_page_content(url: str, timeout: int = 8) -> str:
-    """Descarga y extrae el texto principal de una página web."""
+    """Descarga y extrae el texto principal de una página web tras validación Anti-SSRF."""
+    from src.darius_ai.automation.human_input import SafeRedirectHandler
+    from src.darius_ai.core.security_guard import AntiSSRFValidator
+
+    safe, reason = AntiSSRFValidator.is_safe_url(url, allow_dns_lookup=False)
+    if not safe:
+        log.warning(f"[DeepResearch] URL bloqueada por Anti-SSRF ({url}): {reason}")
+        return ""
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     }
+    opener = urllib.request.build_opener(SafeRedirectHandler)
     req = urllib.request.Request(url, headers=headers)  # noqa: S310
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310
-            raw_html = resp.read().decode("utf-8", errors="ignore")
+        with opener.open(req, timeout=timeout) as resp:  # noqa: S310
+            raw_html = resp.read(512 * 1024).decode("utf-8", errors="ignore")
             return _clean_html_text(raw_html)
     except Exception as e:
         log.debug(f"[DeepResearch] No se pudo leer {url}: {e}")
@@ -133,7 +143,7 @@ class DeepResearchPipeline:
             f'Ejemplo: {{"queries": ["query 1", "query 2"]}}'
         )
         try:
-            raw, _ = get_ai_response(prompt)
+            raw, _ = get_ai_response(prompt, enable_tools=False)
             match = re.search(r"\{[\s\S]*\}", raw)
             if match:
                 data = json.loads(match.group(0))
@@ -216,7 +226,7 @@ class DeepResearchPipeline:
         )
 
         try:
-            report_body, provider = get_ai_response(synthesis_prompt)
+            report_body, provider = get_ai_response(synthesis_prompt, enable_tools=False)
         except Exception as e:
             report_body = f"Error al sintetizar el informe con IA: {e}"
             provider = "error"
