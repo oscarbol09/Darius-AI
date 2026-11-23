@@ -257,3 +257,30 @@ class TestGeminiLiveEngineUnit:
             assert len(errors) == 1
 
         asyncio.run(_run())
+
+    def test_w2_05_playback_buffer_cap_and_send_client_content_and_aexit(self):
+        """W2-05: Verifica que playback_buffer tenga maxlen=256, send_client_content funcione y __aexit__ se invoque."""
+        engine = GeminiLiveEngine(api_key="mock_key")
+        assert engine.playback_buffer.maxlen == 256
+        for i in range(300):
+            engine._handle_incoming_audio_chunk(bytes([i % 256]))
+        assert len(engine.playback_buffer) == 256
+
+        async def _run_sdk_v2():
+            engine._set_state(LiveSessionState.CONNECTED)
+            fake_session = MagicMock()
+            fake_session.send_client_content = AsyncMock()
+            fake_session.close = AsyncMock()
+            fake_ctx = MagicMock()
+            fake_ctx.__aexit__ = AsyncMock()
+            engine._active_session = fake_session
+            engine._session_ctx = fake_ctx
+
+            ok = await engine.send_text_prompt_async("Hola SDK 2.x", end_of_turn=True)
+            assert ok is True
+            fake_session.send_client_content.assert_awaited_once()
+
+            await engine.stop_async()
+            fake_ctx.__aexit__.assert_awaited_once()
+
+        asyncio.run(_run_sdk_v2())

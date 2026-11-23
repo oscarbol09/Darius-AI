@@ -90,8 +90,8 @@ def test_run_action_python_workspace_and_core_commands(monkeypatch, tmp_path):
 
     mock_sfx = MagicMock()
     mock_live = MagicMock()
-    mock_live.start_async = MagicMock(return_value=_async_noop())
-    mock_live.stop_async = MagicMock(return_value=_async_noop())
+    mock_live.start_live_session.return_value = (True, "OK")
+    mock_live.stop_live_session.return_value = (True, "OK")
 
     mock_ag = MagicMock()
     mock_ag.is_available.return_value = True

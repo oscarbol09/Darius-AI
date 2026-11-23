@@ -36,6 +36,7 @@ def app_stub():
     app.after = MagicMock()
     app.kill_process = MagicMock()
     app.find_app = MagicMock(return_value="")
+    app.tk = MagicMock()
     return app
 
 
@@ -310,3 +311,43 @@ def test_app_human_click_scrape_web_vol_mute_and_project_roots(app_stub, tmp_pat
         config_loader.cfg._data["project_roots"] = [str(tmp_path)]
     ctx = ai_client._get_local_project_context("revisa custom_repo por favor")
     assert "DemoRepo" in ctx
+
+
+def test_w2_01_w2_02_w2_06_confirmation_negation_and_disable_tools_and_idempotent_start(app_stub):
+    """W2-01, W2-02, W2-06: Verifica negaciones en confirmación, enable_tools=False y start_system."""
+    import time
+
+    from src.darius_ai.core import ai_client
+
+    # W2-02: "no, cancelar sesion" o "no, imposible" debe cancelar, NUNCA ejecutar
+    executed = []
+    app_stub._pending_action = {
+        "desc": "Apagar equipo",
+        "expires_at": time.time() + 15.0,
+        "_fn": lambda: executed.append(True),
+    }
+    app_stub._handle_confirmation("no, cancelar sesion")
+    assert executed == []
+    assert app_stub._pending_action is None
+    assert "cancelada" in app_stub.talk.call_args[0][0].lower()
+
+    # W2-01: _resolve_agentic_tool_loop con enable_tools=False neutraliza etiquetas [ACTION: ...] sin ejecutar
+    with patch("src.darius_ai.core.agentic_bridge.bridge.parse_and_execute_tool") as mock_exec:
+        clean_text, prov = ai_client._resolve_agentic_tool_loop(
+            "Resumen listo [ACTION: execute_powershell(calc.exe)]",
+            "Gemini",
+            MagicMock(),
+            "Resume web",
+            enable_tools=False,
+        )
+        mock_exec.assert_not_called()
+        assert "[ACTION:" not in clean_text
+        assert prov == "Gemini"
+
+    # W2-06: start_system es idempotente y no lanza hilos duplicados
+    app_stub._voice_loop_started = False
+    with patch("src.darius_ai.gui.app.threading.Thread") as mock_thread:
+        app_stub.start_system()
+        first_count = mock_thread.call_count
+        app_stub.start_system()
+        assert mock_thread.call_count == first_count

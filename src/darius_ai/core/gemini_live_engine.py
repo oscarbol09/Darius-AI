@@ -62,9 +62,10 @@ class GeminiLiveEngine:
     on_state_changed: Callable[[LiveSessionState], None] | None = None
     on_error: Callable[[str], None] | None = None
 
-    playback_buffer: collections.deque = field(default_factory=collections.deque)
+    playback_buffer: collections.deque = field(default_factory=lambda: collections.deque(maxlen=256))
     _state: LiveSessionState = LiveSessionState.DISCONNECTED
     _active_session: Any = None
+    _session_ctx: Any = None
     _receive_task: asyncio.Task | None = None
     _loop: asyncio.AbstractEventLoop | None = None
     _lock: threading.Lock = field(default_factory=threading.Lock)
@@ -164,8 +165,17 @@ class GeminiLiveEngine:
         if not self.is_active() or self._active_session is None:
             return False
         try:
+            if hasattr(self._active_session, "send_client_content"):
+                await self._active_session.send_client_content(
+                    turns={"role": "user", "parts": [{"text": text}]},
+                    turn_complete=end_of_turn,
+                )
+                return True
             if hasattr(self._active_session, "send"):
-                await self._active_session.send(text=text, end_of_turn=end_of_turn)
+                try:
+                    await self._active_session.send(input=text, end_of_turn=end_of_turn)
+                except TypeError:
+                    await self._active_session.send(text=text, end_of_turn=end_of_turn)
                 return True
         except Exception as exc:
             log.warning(f"[GeminiLive] Error enviando prompt de texto: {exc}")
@@ -206,6 +216,7 @@ class GeminiLiveEngine:
 
             # Establecer sesión mediante el context manager asíncrono
             session_ctx = client.aio.live.connect(model=self.model, config=connect_config)
+            self._session_ctx = session_ctx
             self._active_session = await session_ctx.__aenter__()
             self._set_state(LiveSessionState.CONNECTED)
             log.info(f"[GeminiLive] Conectado exitosamente en vivo con modelo '{self.model}' (Voz: {self.voice_name})")
@@ -214,6 +225,11 @@ class GeminiLiveEngine:
             self._receive_task = asyncio.create_task(self._receive_loop())
             return True
         except Exception as exc:
+            if self._session_ctx is not None and hasattr(self._session_ctx, "__aexit__"):
+                with contextlib.suppress(Exception):
+                    await self._session_ctx.__aexit__(type(exc), exc, exc.__traceback__)
+            self._session_ctx = None
+            self._active_session = None
             self._set_state(LiveSessionState.ERROR)
             err_msg = f"Fallo al conectar con Gemini Live: {exc}"
             log.error(f"[GeminiLive] {err_msg}")
@@ -222,33 +238,43 @@ class GeminiLiveEngine:
             return False
 
     async def _receive_loop(self) -> None:
-        """Bucle continuo para consumir las respuestas generadas por Gemini Live."""
+        """Bucle continuo multi-turno para consumir las respuestas generadas por Gemini Live."""
         try:
-            session = self._active_session
-            if not session:
-                return
+            while self.is_active() and not (self._stop_event and self._stop_event.is_set()):
+                session = self._active_session
+                if not session:
+                    break
 
-            async for response in session.receive():
-                server_content = getattr(response, "server_content", None)
-                if not server_content:
-                    continue
+                received_any = False
+                turn_completed = False
+                async for response in session.receive():
+                    received_any = True
+                    server_content = getattr(response, "server_content", None)
+                    if not server_content:
+                        continue
 
-                # Manejo de interrupción del servidor (barge-in reportado por Gemini)
-                if getattr(server_content, "interrupted", False):
-                    self.handle_barge_in()
+                    if getattr(server_content, "turn_complete", False) is True:
+                        turn_completed = True
 
-                model_turn = getattr(server_content, "model_turn", None)
-                if model_turn:
-                    for part in getattr(model_turn, "parts", []):
-                        # Chunk de audio devuelto (PCM 24kHz)
-                        inline_data = getattr(part, "inline_data", None)
-                        if inline_data and getattr(inline_data, "data", None):
-                            self._handle_incoming_audio_chunk(inline_data.data)
+                    # Manejo de interrupción del servidor (barge-in reportado por Gemini)
+                    if getattr(server_content, "interrupted", False):
+                        self.handle_barge_in()
 
-                        # Texto o transcripción
-                        text_val = getattr(part, "text", None)
-                        if text_val:
-                            self._handle_incoming_text_chunk(text_val)
+                    model_turn = getattr(server_content, "model_turn", None)
+                    if model_turn:
+                        for part in getattr(model_turn, "parts", []):
+                            # Chunk de audio devuelto (PCM 24kHz)
+                            inline_data = getattr(part, "inline_data", None)
+                            if inline_data and getattr(inline_data, "data", None):
+                                self._handle_incoming_audio_chunk(inline_data.data)
+
+                            # Texto o transcripción
+                            text_val = getattr(part, "text", None)
+                            if text_val:
+                                self._handle_incoming_text_chunk(text_val)
+
+                if not received_any or not turn_completed:
+                    break
 
         except asyncio.CancelledError:
             pass
@@ -266,6 +292,13 @@ class GeminiLiveEngine:
             self._receive_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._receive_task
+        self._receive_task = None
+
+        session_ctx = self._session_ctx
+        self._session_ctx = None
+        if session_ctx is not None and hasattr(session_ctx, "__aexit__"):
+            with contextlib.suppress(Exception):
+                await session_ctx.__aexit__(None, None, None)
 
         if self._active_session:
             try:
@@ -309,6 +342,8 @@ class GeminiLiveEngine:
 
         if self.is_running:
             return True, "Conexión en vivo con Gemini Live iniciada."
+        if self._stop_event is not None:
+            self._stop_event.set()
         return False, "Tiempo de espera agotado al conectar con Gemini Live."
 
     def stop_live_session(self) -> tuple[bool, str]:
@@ -322,6 +357,9 @@ class GeminiLiveEngine:
                 future.result(timeout=1.5)
             except Exception as exc:
                 log.debug(f"[GeminiLive] Timeout o error al detener stop_async: {exc}")
+
+        if self._worker_thread is not None and self._worker_thread.is_alive():
+            self._worker_thread.join(timeout=1.5)
 
         self._set_state(LiveSessionState.DISCONNECTED)
         return True, "Sesión Gemini Live finalizada."
@@ -353,6 +391,7 @@ class GeminiLiveEngine:
             log.error(f"[GeminiLive] Error en bucle asíncrono de Gemini Live: {exc}")
         finally:
             try:
+                self._loop.run_until_complete(self.stop_async())
                 pending = [t for t in asyncio.all_tasks(self._loop) if not t.done()]
                 for task in pending:
                     task.cancel()
