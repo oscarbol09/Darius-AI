@@ -226,7 +226,8 @@ class WebSearchEngine:
                 if not link_elem:
                     continue
 
-                raw_href = link_elem.get("href", "")
+                raw_attr = link_elem.get("href", "")
+                raw_href = raw_attr if isinstance(raw_attr, str) else ""
                 if not raw_href or raw_href.startswith("#"):
                     continue
 
