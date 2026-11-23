@@ -65,13 +65,30 @@ _RESERVED_DOS_NAMES = {
 
 def _sanitize_filename(name: str) -> str:
     """Convierte un texto arbitrario en un nombre de archivo seguro para Windows."""
-    clean = re.sub(r'[\\/*?:"<>|]', "", name).strip()
+    clean = re.sub(r'[\\/*?:"<>|\x00-\x1f]', "", name or "").strip()
     clean = re.sub(r"\s+", " ", clean).strip(". ")
+    clean = re.sub(r"\.{2,}", "_", clean).strip(". ")
     if not clean:
         return "nota_sin_titulo"
-    if clean.upper() in _RESERVED_DOS_NAMES:
+    base_stem = clean.split(".")[0].upper()
+    if clean.upper() in _RESERVED_DOS_NAMES or base_stem in _RESERVED_DOS_NAMES:
         clean = f"_{clean}"
     return clean[:80]
+
+
+def _resolve_safe_vault_subdir(vault: Path, raw_folder: str, fallback: str) -> Path:
+    """
+    Resuelve un subdirectorio dentro de la bóveda garantizando que no escape de `vault`
+    mediante path traversal (`..`) ni rutas absolutas.
+    """
+    vault_root = vault.resolve()
+    candidate_rel = re.sub(r"^[a-zA-Z]:", "", (raw_folder or "").strip()).lstrip("/\\")
+    if not candidate_rel:
+        candidate_rel = fallback
+    resolved = (vault_root / candidate_rel).resolve()
+    if not resolved.is_relative_to(vault_root):
+        raise ValueError(f"Vault path traversal blocked: '{raw_folder}' escapes '{vault_root}'")
+    return resolved
 
 
 class ObsidianBrain:
@@ -132,7 +149,7 @@ class ObsidianBrain:
         Guarda una memoria o nota permanente en la carpeta de memorias de Obsidian.
         """
         vault = self.vault_path
-        folder = vault / cfg.obsidian_memories_folder
+        folder = _resolve_safe_vault_subdir(vault, cfg.obsidian_memories_folder, "Darius/Memorias")
         folder.mkdir(parents=True, exist_ok=True)
 
         filename = f"{_sanitize_filename(title)}.md"
@@ -218,7 +235,7 @@ class ObsidianBrain:
         Agrega una entrada con marca de tiempo a la nota diaria de hoy (YYYY-MM-DD.md).
         """
         vault = self.vault_path
-        folder = vault / cfg.obsidian_daily_notes_folder
+        folder = _resolve_safe_vault_subdir(vault, cfg.obsidian_daily_notes_folder, "Diario")
         folder.mkdir(parents=True, exist_ok=True)
 
         today = datetime.date.today()
@@ -342,7 +359,10 @@ class ObsidianBrain:
     def list_recent_memories(self, limit: int = 5) -> list[dict]:
         """Devuelve las últimas memorias modificadas en la carpeta de memorias."""
         vault = self.vault_path
-        folder = vault / cfg.obsidian_memories_folder
+        try:
+            folder = _resolve_safe_vault_subdir(vault, cfg.obsidian_memories_folder, "Darius/Memorias")
+        except ValueError:
+            return []
         if not folder.exists():
             return []
 

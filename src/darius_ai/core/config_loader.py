@@ -73,6 +73,7 @@ _DEFAULTS: dict = {
         "active_provider": "gemini",
         "gemini_api_key": "",
         "gemini_model": "gemini-3.5-flash-lite",
+        "antigravity_api_key": "",
         "antigravity_model": "antigravity-core",
         "openai_api_key": "",
         "openai_model": "gpt-4o-mini",
@@ -88,6 +89,10 @@ _DEFAULTS: dict = {
         "custom_api_key": "",
         "custom_model": "local-model",
         "fallback_enabled": True,
+    },
+    "antigravity": {
+        "api_key": "",
+        "model": "antigravity-core",
     },
     "tts": {
         "engine": "sapi",
@@ -136,6 +141,7 @@ _DEFAULTS: dict = {
     "name_similarity_cutoff": 0.60,
     "min_words_without_name": 99,
     "project_roots": [],
+    "exa_api_key": "",
 }
 
 
@@ -484,6 +490,7 @@ _SCHEMA: dict = {
     "assistant": {
         "name": str,
         "user_name": str,
+        "language": str,
     },
     "gemini": {
         "model": str,
@@ -495,6 +502,7 @@ _SCHEMA: dict = {
         "active_provider": str,
         "gemini_api_key": str,
         "gemini_model": str,
+        "antigravity_api_key": str,
         "antigravity_model": str,
         "openai_api_key": str,
         "openai_model": str,
@@ -510,6 +518,10 @@ _SCHEMA: dict = {
         "custom_api_key": str,
         "custom_model": str,
         "fallback_enabled": bool,
+    },
+    "antigravity": {
+        "api_key": str,
+        "model": str,
     },
     "tts": {
         "engine": str,
@@ -558,6 +570,7 @@ _SCHEMA: dict = {
     "name_similarity_cutoff": (int, float),
     "min_words_without_name": int,
     "project_roots": list,
+    "exa_api_key": str,
 }
 
 

@@ -147,6 +147,23 @@ class TestTargetDossierEngine:
         assert "Ada Lovelace" in speech
         assert "Pioneer of computing." in speech
 
+    def test_save_to_obsidian_blocks_category_and_name_traversal(self, engine, tmp_path):
+        """Verifica que category y target_name maliciosos no escapen de Darius/Dossiers/."""
+        from types import SimpleNamespace
+
+        fake_brain = SimpleNamespace(vault_path=str(tmp_path))
+        malicious = TargetDossier(
+            target_name="../../../Startup/pwn",
+            category="../../../../AppData/Roaming",
+            summary="Intento de path traversal.",
+        )
+        rel_path = engine.save_to_obsidian(malicious, vault_brain=fake_brain)
+        assert ".." not in rel_path
+        assert rel_path.startswith("Darius/Dossiers/Topic/")
+        saved_file = tmp_path / rel_path
+        assert saved_file.exists()
+        assert saved_file.resolve().is_relative_to(tmp_path.resolve())
+
 
 class TestSingletonDossierEngine:
     def test_get_dossier_engine_returns_singleton(self):
