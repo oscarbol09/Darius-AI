@@ -2,7 +2,7 @@
 tests/test_face_biometrics.py — Pruebas unitarias para Darius Face Biometrics & Sentry Authentication
 ====================================================================================================
 Verifica el motor biométrico facial de Darius AI.
-Cumple con el protocolo ECC TDD: Red-Green-Refactor.
+Metodología TDD: Red-Green-Refactor.
 """
 
 from __future__ import annotations
@@ -446,3 +446,25 @@ class TestFaceBiometricsEdgeCasesAndCoverage:
             # Probar cuando cascade falla
             res = engine.verify_live_user(timeout_seconds=0.1)
             assert res.verified is False or res.status in ("CHALLENGE_REQUIRED", "VERIFIED")
+
+    def test_verify_face_frame_accepts_numpy_ndarray_without_truth_value_crash(self):
+        """Verifica que pasar un np.ndarray real a verify_face_frame no lance ValueError de verdad ambigua."""
+        import numpy as np
+
+        engine = FaceBiometricsEngine(user_name="Óscar")
+        engine._is_available = True
+        engine._is_trained = True
+        mock_rec = MagicMock()
+        mock_rec.predict.return_value = (1, 30.0)
+        engine._recognizer = mock_rec
+        engine._label_map = {1: "Óscar"}
+
+        roi = np.zeros((64, 64), dtype=np.uint8)
+        res = engine.verify_face_frame(roi)
+        assert res.verified is True
+        assert res.status == "VERIFIED"
+
+        empty_roi = np.zeros((0, 0), dtype=np.uint8)
+        res_empty = engine.verify_face_frame(empty_roi)
+        assert res_empty.verified is False
+        assert res_empty.status == "INVALID_FRAME"

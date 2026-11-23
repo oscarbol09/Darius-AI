@@ -216,3 +216,25 @@ def test_win32_window_manipulation_helpers_mocked():
     with patch("sys.platform", "linux"):
         assert get_process_main_hwnd("Cursor.exe") is None
         assert bring_window_to_foreground(123) is False
+
+
+def test_configure_win32_apis_64bit_and_same_thread_skip_attach():
+    """Verifica argtypes/restype de 64 bits y que tid_fg == tid_tgt no llame AttachThreadInput."""
+    from src.darius_ai.system.workspace_manager import _configure_win32_apis, bring_window_to_foreground
+
+    mock_user32 = MagicMock()
+    mock_kernel32 = MagicMock()
+    _configure_win32_apis(mock_user32, mock_kernel32)
+    assert mock_user32.GetWindow.argtypes is not None
+    assert mock_kernel32.OpenProcess.restype is not None
+
+    # Mismo thread ID (tid_fg == tid_tgt == 42) no debe llamar AttachThreadInput
+    mock_user32.GetForegroundWindow.return_value = 0x100000001
+    mock_user32.GetWindowThreadProcessId.side_effect = [42, 42]
+    with (
+        patch("sys.platform", "win32"),
+        patch("ctypes.windll", create=True) as mock_windll,
+    ):
+        mock_windll.user32 = mock_user32
+        assert bring_window_to_foreground(0x100000002) is True
+        mock_user32.AttachThreadInput.assert_not_called()

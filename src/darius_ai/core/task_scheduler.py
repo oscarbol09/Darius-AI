@@ -57,6 +57,112 @@ def _now_iso() -> str:
     return _now_utc().isoformat()
 
 
+def _parse_cron_field(field_str: str, min_val: int, max_val: int) -> set[int]:
+    """Parsea un campo estándar de cron (*, */n, a-b, a,b,c) al conjunto de valores enteros válidos."""
+    values: set[int] = set()
+    for part in field_str.strip().split(","):
+        p = part.strip()
+        if not p:
+            continue
+        step = 1
+        if "/" in p:
+            base, step_str = p.split("/", 1)
+            step = max(1, int(step_str))
+        else:
+            base = p
+
+        if base == "*":
+            start, end = min_val, max_val
+        elif "-" in base:
+            s_str, e_str = base.split("-", 1)
+            start, end = int(s_str), int(e_str)
+        else:
+            val = int(base)
+            if val == 7 and max_val == 6:  # Sunday alias in day-of-week
+                val = 0
+            start = end = val
+
+        for v in range(max(min_val, start), min(max_val, end) + 1, step):
+            values.add(v)
+
+    if not values:
+        raise ValueError(f"Invalid cron field: '{field_str}'")
+    return values
+
+
+def _compute_next_cron_run(expr: str, after: datetime) -> datetime:
+    """
+    Calcula la siguiente marca de tiempo UTC para una expresión cron de 5 campos:
+    'minuto hora día_mes mes día_semana' (0=domingo o 7=domingo en cron estándar).
+    Si la expresión es inválida, retorna `after + timedelta(hours=1)`.
+    """
+    fields = (expr or "").strip().split()
+    if len(fields) != 5:
+        return after + timedelta(hours=1)
+
+    try:
+        minutes = _parse_cron_field(fields[0], 0, 59)
+        hours = _parse_cron_field(fields[1], 0, 23)
+        doms = _parse_cron_field(fields[2], 1, 31)
+        months = _parse_cron_field(fields[3], 1, 12)
+        dows = _parse_cron_field(fields[4], 0, 6)
+    except Exception:
+        return after + timedelta(hours=1)
+
+    candidate = (after + timedelta(minutes=1)).replace(second=0, microsecond=0)
+    # Búsqueda hacia adelante minuto a minuto hasta 366 días (pero saltando meses/días/horas que no coinciden)
+    max_time = after + timedelta(days=366)
+    while candidate <= max_time:
+        if candidate.month not in months:
+            if candidate.month == 12:
+                candidate = candidate.replace(year=candidate.year + 1, month=1, day=1, hour=0, minute=0)
+            else:
+                candidate = candidate.replace(month=candidate.month + 1, day=1, hour=0, minute=0)
+            continue
+
+        # Python weekday(): Monday=0..Sunday=6 -> Cron: Sunday=0, Monday=1..Saturday=6
+        cron_dow = (candidate.weekday() + 1) % 7
+        if candidate.day not in doms or cron_dow not in dows:
+            candidate = (candidate + timedelta(days=1)).replace(hour=0, minute=0)
+            continue
+
+        if candidate.hour not in hours:
+            candidate = (candidate + timedelta(hours=1)).replace(minute=0)
+            continue
+
+        if candidate.minute not in minutes:
+            candidate += timedelta(minutes=1)
+            continue
+
+        return candidate
+
+    return after + timedelta(hours=1)
+
+
+def _normalize_once_timestamp(schedule_value: str, now: datetime) -> str:
+    """Normaliza cualquier cadena ISO-8601 a UTC con sufijo '+00:00' para comparación SQLite consistente."""
+    raw = (schedule_value or "").strip()
+    if not raw:
+        return (now + timedelta(minutes=5)).isoformat()
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        dt = dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
+        return dt.isoformat()
+    except ValueError:
+        return (now + timedelta(minutes=5)).isoformat()
+
+
+def _parse_safe_interval_seconds(schedule_value: str) -> float:
+    """Parsea segundos de intervalo asegurando un mínimo de 1.0s (60.0s por defecto si es inválido o <= 0)."""
+    try:
+        val = float(schedule_value)
+        if val <= 0.0:
+            return 60.0
+        return max(1.0, val)
+    except (ValueError, TypeError):
+        return 60.0
+
+
 class TaskScheduler:
     """
     Motor autónomo de programación de tareas con persistencia en SQLite.
@@ -82,7 +188,6 @@ class TaskScheduler:
     @contextmanager
     def _connection(self) -> Generator[sqlite3.Connection, None, None]:
         conn = sqlite3.connect(str(self.db_path), timeout=10.0)
-        conn.execute("PRAGMA journal_mode = WAL")
         try:
             yield conn
             conn.commit()
@@ -91,6 +196,7 @@ class TaskScheduler:
 
     def _init_db(self) -> None:
         with self._connection() as conn:
+            conn.execute("PRAGMA journal_mode = WAL")
             conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS scheduled_tasks (
@@ -117,15 +223,12 @@ class TaskScheduler:
     def _compute_initial_next_run(self, schedule_type: ScheduleType, schedule_value: str) -> str:
         now = _now_utc()
         if schedule_type == ScheduleType.ONCE:
-            return schedule_value
+            return _normalize_once_timestamp(schedule_value, now)
         elif schedule_type == ScheduleType.INTERVAL:
-            try:
-                seconds = float(schedule_value)
-                return (now + timedelta(seconds=seconds)).isoformat()
-            except ValueError:
-                return (now + timedelta(minutes=5)).isoformat()
-        else:  # CRON o aproximación
-            return (now + timedelta(hours=1)).isoformat()
+            seconds = _parse_safe_interval_seconds(schedule_value)
+            return (now + timedelta(seconds=seconds)).isoformat()
+        else:  # CRON
+            return _compute_next_cron_run(schedule_value, now).isoformat()
 
     def schedule_task(
         self,
@@ -251,18 +354,14 @@ class TaskScheduler:
                     (now_str, task_id),
                 )
             elif st_type == ScheduleType.INTERVAL:
-                try:
-                    secs = float(st_val)
-                    next_run = (_now_utc() + timedelta(seconds=secs)).isoformat()
-                except ValueError:
-                    next_run = (_now_utc() + timedelta(minutes=5)).isoformat()
-
+                secs = _parse_safe_interval_seconds(st_val)
+                next_run = (_now_utc() + timedelta(seconds=secs)).isoformat()
                 conn.execute(
                     "UPDATE scheduled_tasks SET last_run = ?, next_run = ? WHERE id = ?",
                     (now_str, next_run, task_id),
                 )
             else:
-                next_run = (_now_utc() + timedelta(hours=1)).isoformat()
+                next_run = _compute_next_cron_run(st_val, _now_utc()).isoformat()
                 conn.execute(
                     "UPDATE scheduled_tasks SET last_run = ?, next_run = ? WHERE id = ?",
                     (now_str, next_run, task_id),

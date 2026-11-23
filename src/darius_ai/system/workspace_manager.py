@@ -10,6 +10,7 @@ Control nativo del espacio de trabajo en Windows para Darius AI:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import shutil
@@ -21,6 +22,7 @@ import urllib.parse
 import webbrowser
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger("DARIUS.Workspace")
 
@@ -36,6 +38,62 @@ _SW_SHOWMAXIMIZED = 3
 _HWND_TOP = 0
 _KEYEVENTF_KEYUP = 0x0002
 _VK_F11 = 0x7A
+
+
+def _configure_win32_apis(user32: Any, kernel32: Any = None) -> None:
+    """
+    Configura argtypes y restype explícitos de 64 bits (HWND, HANDLE, LPARAM, DWORD)
+    en funciones de user32 y kernel32 para evitar truncamiento de punteros de 64 bits
+    a c_int de 32 bits en Python x64.
+    """
+    with contextlib.suppress(Exception):
+        import ctypes
+        from ctypes import wintypes
+
+        if user32 is not None:
+            user32.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+            user32.GetWindow.restype = wintypes.HWND
+            user32.GetWindowLongW.argtypes = [wintypes.HWND, ctypes.c_int]
+            user32.GetWindowLongW.restype = wintypes.LONG
+            user32.IsWindowVisible.argtypes = [wintypes.HWND]
+            user32.IsWindowVisible.restype = wintypes.BOOL
+            user32.IsIconic.argtypes = [wintypes.HWND]
+            user32.IsIconic.restype = wintypes.BOOL
+            user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+            user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+            user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+            user32.GetWindowRect.restype = wintypes.BOOL
+            user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+            user32.ShowWindow.restype = wintypes.BOOL
+            user32.GetForegroundWindow.argtypes = []
+            user32.GetForegroundWindow.restype = wintypes.HWND
+            user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+            user32.SetForegroundWindow.restype = wintypes.BOOL
+            user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+            user32.AttachThreadInput.restype = wintypes.BOOL
+            user32.SetWindowPos.argtypes = [
+                wintypes.HWND,
+                wintypes.HWND,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                ctypes.c_int,
+                wintypes.UINT,
+            ]
+            user32.SetWindowPos.restype = wintypes.BOOL
+
+        if kernel32 is not None:
+            kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+            kernel32.OpenProcess.restype = wintypes.HANDLE
+            kernel32.QueryFullProcessImageNameW.argtypes = [
+                wintypes.HANDLE,
+                wintypes.DWORD,
+                wintypes.LPWSTR,
+                ctypes.POINTER(wintypes.DWORD),
+            ]
+            kernel32.QueryFullProcessImageNameW.restype = wintypes.BOOL
+            kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+            kernel32.CloseHandle.restype = wintypes.BOOL
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,6 +223,7 @@ def get_process_main_hwnd(target_exe_name: str) -> int | None:
 
         user32 = ctypes.windll.user32
         kernel32 = ctypes.windll.kernel32
+        _configure_win32_apis(user32, kernel32)
 
         target_name = target_exe_name.lower()
         candidates: list[tuple[int, int]] = []
@@ -218,24 +277,28 @@ def get_process_main_hwnd(target_exe_name: str) -> int | None:
 
 
 def bring_window_to_foreground(hwnd: int) -> bool:
-    """Restaura y trae al frente una ventana usando AttachThreadInput."""
+    """Restaura y trae al frente una ventana usando AttachThreadInput con firma de 64 bits segura."""
     if sys.platform != "win32" or not hwnd:
         return False
     try:
         import ctypes
 
         user32 = ctypes.windll.user32
+        _configure_win32_apis(user32)
         user32.ShowWindow(hwnd, _SW_RESTORE)
 
         fg = user32.GetForegroundWindow()
         tid_tgt = user32.GetWindowThreadProcessId(hwnd, None)
         tid_fg = user32.GetWindowThreadProcessId(fg, None) if fg else 0
 
-        if tid_fg and tid_tgt:
-            user32.AttachThreadInput(tid_fg, tid_tgt, True)
-        user32.SetForegroundWindow(hwnd)
-        if tid_fg and tid_tgt:
-            user32.AttachThreadInput(tid_fg, tid_tgt, False)
+        should_attach = bool(tid_fg and tid_tgt and tid_fg != tid_tgt)
+        try:
+            if should_attach:
+                user32.AttachThreadInput(tid_fg, tid_tgt, True)
+            user32.SetForegroundWindow(hwnd)
+        finally:
+            if should_attach:
+                user32.AttachThreadInput(tid_fg, tid_tgt, False)
         return True
     except Exception as e:  # noqa: BLE001
         log.warning(f"Error dando foco a ventana {hwnd}: {e}")
@@ -272,6 +335,7 @@ def snap_window_to_monitor(
 
         ml, mt, mr, mb = get_monitor_bounds(monitor_index)
         user32 = ctypes.windll.user32
+        _configure_win32_apis(user32)
         flags = 0x0040 | 0x0020  # SWP_SHOWWINDOW | SWP_FRAMECHANGED
 
         user32.ShowWindow(hwnd, _SW_RESTORE)

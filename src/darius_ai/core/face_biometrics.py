@@ -194,7 +194,11 @@ class FaceBiometricsEngine:
                 status="ENGINE_UNAVAILABLE",
             )
 
-        if gray_frame_roi is None or gray_frame_roi == "":
+        if (
+            gray_frame_roi is None
+            or (isinstance(gray_frame_roi, str) and not gray_frame_roi)
+            or getattr(gray_frame_roi, "size", 1) == 0
+        ):
             return BiometricResult(
                 verified=False,
                 confidence=0.0,
@@ -271,6 +275,9 @@ class FaceBiometricsEngine:
         try:
             cap = cv2.VideoCapture(camera_index)
             if cap is None or not cap.isOpened():
+                if cap is not None:
+                    with contextlib.suppress(Exception):
+                        cap.release()
                 return BiometricResult(
                     verified=False,
                     confidence=0.0,
@@ -279,6 +286,9 @@ class FaceBiometricsEngine:
                     status="CAMERA_UNAVAILABLE",
                 )
         except Exception as e:
+            if cap is not None:
+                with contextlib.suppress(Exception):
+                    cap.release()
             log.debug(f"[Biometrics] Error abriendo cámara {camera_index}: {e}")
             return BiometricResult(
                 verified=False,
@@ -288,24 +298,24 @@ class FaceBiometricsEngine:
                 status="CAMERA_UNAVAILABLE",
             )
 
-        # Cargar clasificador de rostros en cascada
-        face_cascade = None
         try:
-            cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-            face_cascade = cv2.CascadeClassifier(cascade_path)
-        except Exception as e:
-            log.debug(f"[Biometrics] No se pudo instanciar CascadeClassifier: {e}")
+            # Cargar clasificador de rostros en cascada
+            face_cascade = None
+            try:
+                cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+                face_cascade = cv2.CascadeClassifier(cascade_path)
+            except Exception as e:
+                log.debug(f"[Biometrics] No se pudo instanciar CascadeClassifier: {e}")
 
-        start_time = time.time()
-        fallback_result = BiometricResult(
-            verified=False,
-            confidence=0.0,
-            user_name="desconocido",
-            distance=999.0,
-            status="CHALLENGE_REQUIRED",
-        )
+            start_time = time.time()
+            fallback_result = BiometricResult(
+                verified=False,
+                confidence=0.0,
+                user_name="desconocido",
+                distance=999.0,
+                status="CHALLENGE_REQUIRED",
+            )
 
-        try:
             while (time.time() - start_time) < timeout_seconds:
                 ret, frame = cap.read()
                 if not ret or frame is None:
@@ -335,16 +345,16 @@ class FaceBiometricsEngine:
 
                 time.sleep(0.04)
 
+            # Tier 2: Timeout o rostro no verificado
+            return fallback_result
         finally:
             if cap is not None:
                 with contextlib.suppress(Exception):
                     cap.release()
 
-        # Tier 2: Timeout o rostro no verificado
-        return fallback_result
-
-    def get_biometric_greeting(self, result: BiometricResult) -> str:
-        """Genera el saludo táctico vocal de J.A.R.V.I.S. según el resultado biométrico."""
+    @staticmethod
+    def format_greeting(result: BiometricResult) -> str:
+        """Genera el saludo táctico vocal de Darius AI según el resultado biométrico sin instanciar OpenCV."""
         if result.verified:
             return f"Identidad biométrica confirmada: {result.user_name}. Protocolos de mando autorizados."
         elif result.status == "CHALLENGE_REQUIRED":
@@ -357,11 +367,14 @@ class FaceBiometricsEngine:
         else:
             return f"Estado de autenticación biométrica: {result.status}. Acceso restringido."
 
+    def get_biometric_greeting(self, result: BiometricResult) -> str:
+        """Genera el saludo táctico vocal de J.A.R.V.I.S. según el resultado biométrico."""
+        return self.format_greeting(result)
+
 
 def get_biometric_greeting(result: BiometricResult) -> str:
-    """Función de conveniencia para generar el saludo vocal de Darius AI."""
-    engine = FaceBiometricsEngine()
-    return engine.get_biometric_greeting(result)
+    """Función de conveniencia para generar el saludo vocal de Darius AI sin instanciar LBPH."""
+    return FaceBiometricsEngine.format_greeting(result)
 
 
 _GLOBAL_BIOMETRICS_ENGINE: FaceBiometricsEngine | None = None
