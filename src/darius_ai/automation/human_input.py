@@ -380,9 +380,21 @@ class HumanGUIAutomator:
         Descarga y limpia el contenido legible de una página web en segundo plano
         sin dependencias externas.
         """
+        from src.darius_ai.core.security_guard import AntiSSRFValidator
+
         clean_url = url.strip()
         if not clean_url.startswith(("http://", "https://")):
             clean_url = f"https://{clean_url}"
+
+        safe, reason = AntiSSRFValidator.is_safe_url(clean_url, allow_dns_lookup=False)
+        if not safe:
+            return {
+                "success": False,
+                "url": clean_url,
+                "title": "",
+                "content": "",
+                "error": f"SSRF blocked: {reason}",
+            }
 
         headers = {
             "User-Agent": (

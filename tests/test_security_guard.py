@@ -502,3 +502,24 @@ def test_injection_scanner_empty_text():
     assert scanner.is_safe("") is True
     assert InjectionScanner.scan("") == []
     assert InjectionScanner.is_safe("") is True
+
+
+def test_w2_03_ssrf_trailing_dot_cgnat_nat64_6to4_teredo():
+    """W2-03: Verify FQDN trailing-dot bypass, CGNAT, NAT64, 6to4, and Teredo IPv6 tunnels are blocked."""
+    # FQDN trailing dot bypasses
+    assert is_safe_url("http://localhost./admin")[0] is False
+    assert is_safe_url("http://metadata.google.internal./computeMetadata/v1/")[0] is False
+    assert is_safe_url("http://127.0.0.1.nip.io./")[0] is False
+
+    # Carrier-Grade NAT (100.64.0.0/10), Benchmarking (198.18.0.0/15), Class E (240.0.0.0/4)
+    assert is_private_ip("100.64.0.1") is True
+    assert is_private_ip("100.100.100.200") is True
+    assert is_private_ip("198.18.0.1") is True
+    assert is_private_ip("240.0.0.1") is True
+    assert is_safe_url("http://100.64.0.1/")[0] is False
+
+    # NAT64 (64:ff9b::/96), 6to4 (2002::/16), Teredo (2001::/32)
+    assert is_private_ip("64:ff9b::127.0.0.1") is True
+    assert is_private_ip("2002:7f00:0001::") is True
+    assert is_private_ip("2001:0000:4136:e378:8000:63bf:f5ff:fdd2") is True
+    assert is_safe_url("http://[64:ff9b::169.254.169.254]/")[0] is False

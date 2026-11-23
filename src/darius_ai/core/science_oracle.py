@@ -155,12 +155,22 @@ class ScienceOracle:
 
     def get_entity_summary(self, query: str, lang: str = "es") -> tuple[bool, str]:
         """Consulta la API REST de Wikipedia y devuelve un extracto conciso (<2 oraciones) para TTS."""
+        from src.darius_ai.core.security_guard import AntiSSRFValidator
+
         term = query.strip()
         if not term:
             return False, f"La consulta enciclopédica no contiene un término válido, {self.user_name}."
 
+        clean_lang = str(lang or "es").strip().lower()
+        if not re.fullmatch(r"[a-z]{2,3}(?:-[a-z]{2,4})?", clean_lang):
+            return False, f"El código de idioma solicitado no es válido, {self.user_name}."
+
         clean_term = term.replace(" ", "_")
-        url = self.API_URL_TEMPLATE.format(lang=lang, query=quote(clean_term, safe=""))
+        url = self.API_URL_TEMPLATE.format(lang=clean_lang, query=quote(clean_term, safe=""))
+        safe, reason = AntiSSRFValidator.is_safe_url(url, allow_dns_lookup=False)
+        if not safe:
+            logger.warning("URL enciclopédica bloqueada por Anti-SSRF (%s): %s", url, reason)
+            return False, f"La dirección de consulta fue rechazada por políticas de seguridad, {self.user_name}."
         headers = {"User-Agent": self.USER_AGENT, "Accept": "application/json"}
 
         try:

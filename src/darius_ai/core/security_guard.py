@@ -47,30 +47,55 @@ _LOOPBACK_SUFFIXES: tuple[str, ...] = (
 _BLOCKED_CIDRS: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = [
     ipaddress.ip_network("0.0.0.0/8"),
     ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("100.64.0.0/10"),
     ipaddress.ip_network("127.0.0.0/8"),
-    ipaddress.ip_network("172.16.0.0/12"),
-    ipaddress.ip_network("192.168.0.0/16"),
     ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.0.0.0/24"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("198.18.0.0/15"),
     ipaddress.ip_network("224.0.0.0/4"),
+    ipaddress.ip_network("240.0.0.0/4"),
     ipaddress.ip_network("255.255.255.255/32"),
     ipaddress.ip_network("::/128"),
     ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("64:ff9b::/96"),
+    ipaddress.ip_network("2001::/32"),
+    ipaddress.ip_network("2002::/16"),
     ipaddress.ip_network("fc00::/7"),
     ipaddress.ip_network("fe80::/10"),
     ipaddress.ip_network("ff00::/8"),
 ]
 
 
+_NAT64_NET = ipaddress.IPv6Network("64:ff9b::/96")
+_6TO4_NET = ipaddress.IPv6Network("2002::/16")
+_TEREDO_NET = ipaddress.IPv6Network("2001::/32")
+
+
 def _extract_embedded_ipv4(addr: ipaddress.IPv6Address) -> ipaddress.IPv4Address | None:
-    """Extract embedded IPv4 address from mapped or compatible IPv6 addresses."""
+    """Extract embedded IPv4 address from mapped, compatible, NAT64, 6to4, or Teredo IPv6 addresses."""
     mapped = addr.ipv4_mapped
     if mapped is not None:
         return mapped
 
-    # IPv4-compatible (RFC 4291 §2.5.5.1): first 96 bits zero, embedded in last 32 bits.
     packed = addr.packed
+    # IPv4-compatible (RFC 4291 §2.5.5.1): first 96 bits zero, embedded in last 32 bits.
     if packed[:12] == b"\x00" * 12 and addr != ipaddress.IPv6Address("::") and addr != ipaddress.IPv6Address("::1"):
         return ipaddress.IPv4Address(packed[12:])
+
+    # NAT64 Well-Known Prefix (64:ff9b::/96): embedded IPv4 in last 32 bits.
+    if addr in _NAT64_NET:
+        return ipaddress.IPv4Address(packed[12:16])
+
+    # 6to4 (2002::/16): embedded IPv4 in bits 16..48 (bytes 2..6).
+    if addr in _6TO4_NET:
+        return ipaddress.IPv4Address(packed[2:6])
+
+    # Teredo (2001::/32): obfuscated client IPv4 in last 32 bits (XOR 0xFF).
+    if addr in _TEREDO_NET:
+        return ipaddress.IPv4Address(bytes(b ^ 0xFF for b in packed[12:16]))
+
     return None
 
 
@@ -118,7 +143,9 @@ def is_safe_url(url: str, allow_dns_lookup: bool = False) -> tuple[bool, str]:
     if not hostname:
         return False, "Invalid URL: missing hostname"
 
-    norm_host = hostname.strip().lower()
+    norm_host = hostname.strip().rstrip(".").lower()
+    if not norm_host:
+        return False, "Invalid URL: empty hostname after normalization"
 
     if norm_host in _LOOPBACK_DOMAINS or any(norm_host.endswith(s) for s in _LOOPBACK_SUFFIXES):
         return False, f"Blocked host: '{hostname}' (localhost loopback prohibited)"
