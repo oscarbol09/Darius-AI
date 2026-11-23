@@ -103,7 +103,7 @@ class HighPerfWaveVisualizer(ctk.CTkFrame):
         elif state == "MUTED":
             y1 = cy + 0.5 * np.sin(1.0 * x + p * 0.2)
             y2 = cy + 0.3 * np.cos(1.0 * x + p * 0.2)
-            y3 = cy + np.zeros_like(x)
+            y3 = cy + np.zeros_like(x, dtype=np.float64)
             self.canvas.itemconfig(self.line_primary, fill=theme.TEXT_MUTED)
             self.canvas.itemconfig(self.line_secondary, fill=theme.BORDER_SUBTLE)
             self.canvas.itemconfig(self.line_tertiary, fill=theme.BG_SIDEBAR)

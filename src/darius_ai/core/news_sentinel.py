@@ -482,7 +482,8 @@ class NewsSentinel:
                 if not title_elem:
                     continue
 
-                raw_href = title_elem.get("href", "")
+                raw_attr = title_elem.get("href", "")
+                raw_href = raw_attr if isinstance(raw_attr, str) else ""
                 final_url = ""
                 uddg_match = _UDDG_RE.search(raw_href)
                 if uddg_match:
