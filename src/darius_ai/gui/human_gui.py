@@ -1,7 +1,7 @@
 """
 human_gui.py — Módulo proxy para compatibilidad hacia atrás.
 ===========================================================
-NOTA DE ARQUITECTURA (ECC):
+NOTA DE ARQUITECTURA:
 La automatización de bajo nivel de ratón, teclado y curvas de Bézier
 ha sido trasladada a su dominio arquitectónico canónico:
     `src.darius_ai.automation.human_input`

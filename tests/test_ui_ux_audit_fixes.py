@@ -1,7 +1,7 @@
 """
 test_ui_ux_audit_fixes.py — Pruebas Automatizadas TDD para Correcciones de Auditoría UI/UX
 ==========================================================================================
-Protocolo ECC: Red-Green-Refactor.
+Metodología TDD: Red-Green-Refactor.
 Captura deterministamente los fallos detectados en la auditoría UI/UX:
   1. High-DPI Awareness en Windows.
   2. Eliminación de canvas.delete("all") en FloatingVoiceCapsule.

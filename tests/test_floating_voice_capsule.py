@@ -1,7 +1,7 @@
 """
 test_floating_voice_capsule.py — Suite de pruebas para la Cápsula Flotante de Activación por Voz
 ================================================================================================
-Protocolo ECC: TDD Red-Green-Refactor.
+Metodología: TDD Red-Green-Refactor.
 Valida:
   1. Constantes y modos de operación de voz (PTT, NOM, AUTO, GEMINI LIVE).
   2. Inicialización del dock flotante FloatingVoiceCapsule y valores predeterminados.

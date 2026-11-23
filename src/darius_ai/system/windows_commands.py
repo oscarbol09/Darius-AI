@@ -1778,23 +1778,21 @@ def run_action(action_entry: dict) -> tuple[bool, str]:
                 from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
 
                 live_engine = get_gemini_live_engine()
-                import asyncio
-                import threading
-
-                threading.Thread(target=lambda: asyncio.run(live_engine.start_async()), daemon=True).start()
-                return (
-                    True,
-                    "Iniciando enlace neuronal bidireccional con Gemini Live, señor. Canal full-duplex en línea.",
-                )
+                res = live_engine.start_live_session()
+                ok, msg = res if isinstance(res, tuple) and len(res) == 2 else (True, "")
+                if ok:
+                    return (
+                        True,
+                        "Iniciando enlace neuronal bidireccional con Gemini Live, señor. Canal full-duplex en línea.",
+                    )
+                return False, msg
             elif workspace_cmd == "gemini_live_stop":
                 from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
 
                 live_engine = get_gemini_live_engine()
-                import asyncio
-                import threading
-
-                threading.Thread(target=lambda: asyncio.run(live_engine.stop_async()), daemon=True).start()
-                return True, "Enlace Gemini Live desconectado, señor. Retornando a canal de síntesis estándar."
+                res = live_engine.stop_live_session()
+                ok, _msg = res if isinstance(res, tuple) and len(res) == 2 else (True, "")
+                return ok, "Enlace Gemini Live desconectado, señor. Retornando a canal de síntesis estándar."
             elif workspace_cmd == "antigravity_agent_status":
                 from src.darius_ai.core.antigravity_bridge import get_antigravity_bridge
 

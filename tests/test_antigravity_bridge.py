@@ -1,6 +1,6 @@
 """Pruebas unitarias para AntigravityAgentBridge.
 
-Protocolo ECC: TDD Red-Green-Refactor.
+Metodología: TDD Red-Green-Refactor.
 Verifica la inicialización del puente, capacidades del agente,
 ejecución de consultas directas, ejecución de tareas de desarrollo
 y formateo con persona butler de Darius.

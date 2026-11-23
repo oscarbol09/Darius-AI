@@ -1,7 +1,7 @@
 """
 test_context_mesh_visualizer.py — Suite de pruebas para el Visualizador de Malla de Ondas de Contexto
 =====================================================================================================
-Protocolo ECC: TDD Red-Green-Refactor.
+Metodología: TDD Red-Green-Refactor.
 Valida:
   1. Constantes geométricas y tokens de color de la malla neón azul.
   2. Función matemática pura y headless compute_wave_mesh_coords.
@@ -162,7 +162,7 @@ class TestContextMeshVisualizerWidget:
         for frame in range(4):
             widget.update_frame(phase=frame * 0.1, energy=10.0)
 
-        # Invariante crítica ECC: NUNCA se invoca canvas.delete('all')
+        # Invariante de rendimiento: NUNCA se invoca canvas.delete('all')
         canvas.delete.assert_not_called()
 
         # canvas.coords debe actualizarse para cada línea y cada partícula por frame

@@ -1,7 +1,7 @@
 """
 test_gui_v85_assembly.py — Pruebas de Integración y Ensamblaje Cybernetic Bento v8.5
 =====================================================================================
-Protocolo ECC: TDD Red-Green-Refactor.
+Metodología: TDD Red-Green-Refactor.
 Verifica:
   1. Integración de CyberTopBar, CyberSidebar y FloatingVoiceCapsule en DariusFinal.
   2. Mapeo bidireccional de navegación en _show_page para los 6 destinos tácticos.

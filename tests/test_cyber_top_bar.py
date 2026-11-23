@@ -1,7 +1,7 @@
 """
 test_cyber_top_bar.py — Suite de pruebas para la Cyber Top Bar de Darius AI
 =============================================================================
-Protocolo ECC: TDD Red-Green-Refactor.
+Metodología: TDD Red-Green-Refactor.
 Valida:
   1. Formateadores puros y headless del estado del sistema y reloj.
   2. Inicialización del componente visual CyberTopBar.

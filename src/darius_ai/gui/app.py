@@ -98,13 +98,19 @@ from src.darius_ai.core.config_loader import cfg, get_user_data_dir  # noqa: E40
 
 _MUTEX_NAME = "Global\\DariusAI_SingleInstance"
 _mutex_handle = None
-if WIN32_AVAILABLE and win32event is not None and win32api is not None and winerror is not None:
-    _mutex_handle = win32event.CreateMutex(None, False, _MUTEX_NAME)
-    if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
-        import tkinter.messagebox as mb
 
-        mb.showerror("DARIUS AI", "Ya hay una instancia de Darius en ejecución.")
-        sys.exit(0)
+
+def _acquire_single_instance_mutex() -> None:
+    """Adquiere el mutex global de instancia única solo al arrancar la aplicación interactiva."""
+    global _mutex_handle
+    if WIN32_AVAILABLE and win32event is not None and win32api is not None and winerror is not None:
+        _mutex_handle = win32event.CreateMutex(None, False, _MUTEX_NAME)
+        if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
+            import tkinter.messagebox as mb
+
+            mb.showerror("DARIUS AI", "Ya hay una instancia de Darius en ejecución.")
+            sys.exit(0)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  CONFIGURACIÓN
@@ -292,6 +298,7 @@ class DariusFinal(ctk.CTk):
         from src.darius_ai.core.task_scheduler import get_task_scheduler
 
         self._scheduler = get_task_scheduler()
+        self._scheduler.executor_callback = lambda task: self.execute_command(task.prompt)
         self._scheduler.start()
 
         self.setup_ui()
@@ -299,6 +306,7 @@ class DariusFinal(ctk.CTk):
         self.scan_apps_async()
         self._start_render_pipeline()
         self._start_audio_level_monitor()
+        self.after(250, self.start_system)
 
     # =========================================================================
     #  TTS / VOZ
@@ -1466,6 +1474,10 @@ class DariusFinal(ctk.CTk):
         return None
 
     def _start_audio_level_monitor(self):
+        if self.__dict__.get("_audio_monitor_started", False):
+            return
+        self._audio_monitor_started = True
+
         def monitor():
             import pyaudio
 
@@ -1640,12 +1652,15 @@ class DariusFinal(ctk.CTk):
     # =========================================================================
 
     def start_system(self):
-        if hasattr(self, "start_btn") and self.start_btn is not None:
-            self.start_btn.configure(
-                state="disabled", text="⚡ NÚCLEO ONLINE", fg_color="#1F2937", text_color="#34D399"
-            )
-        if hasattr(self, "mute_btn") and self.mute_btn is not None:
-            self.mute_btn.configure(state="normal")
+        if self.__dict__.get("_voice_loop_started", False):
+            return
+        self._voice_loop_started = True
+        start_btn = self.__dict__.get("start_btn")
+        mute_btn = self.__dict__.get("mute_btn")
+        if start_btn is not None and start_btn is not mute_btn:
+            start_btn.configure(state="disabled", text="⚡ NÚCLEO ONLINE", fg_color="#1F2937", text_color="#34D399")
+        if mute_btn is not None:
+            mute_btn.configure(state="normal")
         mode_desc = {
             LISTEN_MODE_PTT: f"Modo P.T.T. activo. Mantén presionado {LISTEN_KEY} para hablar.",
             LISTEN_MODE_NAME: f"Modo nombre activo. Dí {ASSISTANT_NAME} para activarme.",
@@ -1685,18 +1700,22 @@ class DariusFinal(ctk.CTk):
                 time.sleep(0.1)
                 continue
             key_down = keyboard.is_pressed(LISTEN_KEY)
-            if key_down and not key_was_down and not self.tts_worker.is_speaking.is_set():
+            if (
+                key_down
+                and not key_was_down
+                and not self.tts_worker.is_speaking.is_set()
+                and not getattr(self, "_ptt_capturing", False)
+            ):
                 key_was_down = True
                 self._ptt_active = True
+                self._ptt_capturing = True
                 self.set_status(f"🎙 HABLANDO… (suelta {LISTEN_KEY} al terminar)", "#00ff88")
                 self.is_listening = True
                 self.after(0, self.animate_logic)
+                threading.Thread(target=self._ptt_capture_and_process, daemon=True, name="ptt-capture").start()
             elif not key_down and key_was_down:
                 key_was_down = False
                 self._ptt_active = False
-                self.is_listening = False
-                self.set_status("PROCESANDO…", "#ffaa00")
-                threading.Thread(target=self._ptt_capture_and_process, daemon=True, name="ptt-capture").start()
             time.sleep(0.02)
 
     def _ptt_capture_and_process(self):
@@ -1721,14 +1740,19 @@ class DariusFinal(ctk.CTk):
             stream.close()
         except Exception as e:
             log.error(f"[PTT] Error de grabación: {e}")
-            pa.terminate()
+            self._ptt_capturing = False
+            self.is_listening = False
             self.set_status("LISTO", "gray")
             return
         finally:
-            pa.terminate()
+            self._ptt_capturing = False
+            self.is_listening = False
+            with contextlib.suppress(Exception):
+                pa.terminate()
         if not frames:
             self.set_status("LISTO", "gray")
             return
+        self.set_status("PROCESANDO…", "#ffaa00")
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wf:
             wf.setnchannels(channels)
@@ -2263,7 +2287,7 @@ class DariusFinal(ctk.CTk):
                 f"Resume brevemente y extrae los puntos clave del siguiente contenido web "
                 f"extraído de '{title}' ({url}):\n\n{content[:4000]}"
             )
-            self.ask_gemini(summary_prompt)
+            self.ask_gemini(summary_prompt, enable_tools=False)
 
         threading.Thread(target=run, daemon=True, name="scrape-web").start()
 
@@ -2548,25 +2572,25 @@ class DariusFinal(ctk.CTk):
 
     def _handle_confirmation(self, text: str):
         t = text.lower().strip()
-        if any(
-            w in t
-            for w in [
-                "confirmar",
-                "confirma",
-                "confirm",
-                "sí",
-                "si",
-                "yes",
-                "adelante",
-                "procede",
-                "proceed",
-                "go ahead",
-                "hazlo",
-                "do it",
-                "ok",
-                "correcto",
-            ]
-        ):
+        deny_re = re.compile(
+            r"\b(cancelar|cancela|cancel|no|nunca|never|never\s+mind|jam[aá]s|abortar|aborta|abort|"
+            r"detener|stop|imposible|rechazar|rechaza|deny|don't|do\s+not)\b"
+        )
+        approve_re = re.compile(
+            r"\b(confirmar|confirma|confirm|s[ií]|yes|adelante|procede|proceed|"
+            r"go\s+ahead|hazlo|do\s+it|ok|correcto)\b"
+        )
+        if deny_re.search(t):
+            with self._pending_lock:
+                entry = self._pending_action
+                self._pending_action = None
+            if not entry:
+                self.talk("No hay ninguna acción pendiente para cancelar.")
+                return
+            desc = entry.get("desc", "desconocida")
+            self.set_status("LISTO", "gray")
+            self.talk(f"Acción cancelada: {desc}.")
+        elif approve_re.search(t):
             with self._pending_lock:
                 entry = self._pending_action
                 self._pending_action = None
@@ -2583,18 +2607,6 @@ class DariusFinal(ctk.CTk):
                 threading.Thread(target=entry["_fn"], daemon=True, name="action-direct").start()
             else:
                 self._execute_action(entry)
-        elif any(
-            w in t for w in ["cancelar", "cancela", "cancel", "no", "abortar", "abort", "detener", "stop", "never mind"]
-        ):
-            with self._pending_lock:
-                entry = self._pending_action
-                self._pending_action = None
-            if not entry:
-                self.talk("No hay ninguna acción pendiente para cancelar.")
-                return
-            desc = entry.get("desc", "desconocida")
-            self.set_status("LISTO", "gray")
-            self.talk(f"Acción cancelada: {desc}.")
         else:
             self.talk("No entendí. Di confirmar o cancelar.")
 
@@ -2666,7 +2678,7 @@ class DariusFinal(ctk.CTk):
     #  IA PRINCIPAL (Gemini + OpenRouter fallback)
     # =========================================================================
 
-    def ask_gemini(self, prompt: str):
+    def ask_gemini(self, prompt: str, *, enable_tools: bool = True):
         """
         Consulta a la IA con lógica de fallback en dos niveles:
           1. Intenta Gemini (modelo principal, alta calidad).
@@ -2683,7 +2695,10 @@ class DariusFinal(ctk.CTk):
             history_snapshot = list(self.conversation_history[:-1])
 
         try:
-            answer_text, provider = get_ai_response(prompt, history_snapshot)
+            try:
+                answer_text, provider = get_ai_response(prompt, history_snapshot, enable_tools=enable_tools)
+            except TypeError:
+                answer_text, provider = get_ai_response(prompt, history_snapshot)
             if answer_text and answer_text.strip():
                 with self._history_lock:
                     self.conversation_history.append({"role": "model", "content": answer_text})
@@ -2713,6 +2728,12 @@ class DariusFinal(ctk.CTk):
             self._clap_detector.stop()
         if hasattr(self, "_scheduler"):
             self._scheduler.stop()
+        with contextlib.suppress(Exception):
+            from src.darius_ai.core.gemini_live_engine import get_gemini_live_engine
+
+            live_engine = get_gemini_live_engine()
+            if getattr(live_engine, "is_running", False):
+                live_engine.stop_live_session()
         self.tts_worker.wait_until_done(timeout=5.0)
         self.tts_worker.stop()
         time.sleep(0.2)
@@ -2735,6 +2756,7 @@ if __name__ == "__main__":
 
         run_test_cli()
 
+    _acquire_single_instance_mutex()
     enable_dpi_awareness()
     app = DariusFinal()
     app.mainloop()

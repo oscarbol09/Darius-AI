@@ -231,7 +231,7 @@ class TestCyberCoreWidgetRendering:
             phase = frame * 0.05
             widget.update_frame(phase=phase, energy=20.0, state="LISTENING")
 
-        # Invariante crítica ECC: NUNCA se invoca canvas.delete('all')
+        # Invariante de rendimiento: NUNCA se invoca canvas.delete('all')
         canvas.delete.assert_not_called()
 
         # canvas.coords debe haber sido llamado para 12 arcos + 36 ticks + 2 núcleos por frame

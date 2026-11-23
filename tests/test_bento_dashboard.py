@@ -1,7 +1,7 @@
 """
 test_bento_dashboard.py — Suite de pruebas para el Dashboard Bento Cybernetic de Darius AI
 ==========================================================================================
-Protocolo ECC: TDD Red-Green-Refactor.
+Metodología: TDD Red-Green-Refactor.
 Valida:
   1. Clases de datos y formateadores métricos (HardwareMetricsData, SituationalMetricsData).
   2. Funciones puras de cálculo y colorimetría (get_metric_color, format_metric_percent).

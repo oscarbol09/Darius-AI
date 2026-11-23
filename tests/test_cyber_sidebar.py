@@ -1,7 +1,7 @@
 """
 test_cyber_sidebar.py — Suite de pruebas para el Cyber Sidebar Navigation Rail (Darius v8.5)
 =============================================================================================
-Protocolo ECC: TDD Red-Green-Refactor.
+Metodología: TDD Red-Green-Refactor.
 Valida:
   1. Constantes y configuración visual del sidebar (ancho 200-220px, dark glass, borde hairline).
   2. Los 6 elementos de navegación requeridos por el diseño Bento del mockup.
