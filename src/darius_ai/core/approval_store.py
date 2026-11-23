@@ -52,27 +52,44 @@ class PendingAction:
     created_at: str = ""
 
 
+_RE_ACTION_ID = re.compile(r"\b(act-[a-zA-Z0-9_-]+|\d+)\b", re.IGNORECASE)
+_RE_ALWAYS = re.compile(r"\b(siempre|always|permanentemente|permanently)\b", re.IGNORECASE)
+_RE_DENY = re.compile(
+    r"\b(no|nunca|never|jam[aá]s|cancelar|cancela|cancel|denegar|deniega|deny|"
+    r"rechazar|rechaza|reject|abortar|aborta|abort|detener|stop|imposible|don't|do\s+not)\b",
+    re.IGNORECASE,
+)
+_RE_APPROVE = re.compile(
+    r"\b(s[ií]|yes|afirmativo|aprobar|aprueba|approve|confirmar|confirma|confirm|"
+    r"adelante|proceder|procede|proceed|autorizar|autoriza|permitir|permite|allow|ok|correcto)\b",
+    re.IGNORECASE,
+)
+
+
 def parse_approval_response(text: str) -> tuple[str | None, Decision | None]:
     """
     Parsea respuestas en lenguaje natural (voz o texto) para extraer la decisión y el ID de acción.
     Soporta español e inglés: 'sí', 'aprobar', 'rechazar', '1 sí', 'siempre permitir git_status', etc.
+    Evalúa negaciones primero con límites de palabra estrictos para evitar falsos positivos
+    ('si' dentro de 'imposible' o 'sesión', o frases como 'no aprobar').
     """
-    clean = text.strip().lower()
+    clean = (text or "").strip().lower()
+    if not clean:
+        return None, None
 
     action_id: str | None = None
-    match_id = re.search(r"\b(act-[a-zA-Z0-9_-]+|\d+)\b", clean)
+    match_id = _RE_ACTION_ID.search(clean)
     if match_id:
         action_id = match_id.group(1)
 
-    always_allow_kw = ("siempre permitir", "siempre sí", "always allow", "always approve", "siempre autorizar")
-    if any(k in clean for k in always_allow_kw):
-        return action_id, Decision.ALWAYS_APPROVE
-    if any(k in clean for k in ("siempre denegar", "siempre rechazar", "always deny")):
-        return action_id, Decision.ALWAYS_DENY
-    if any(k in clean for k in ("sí", "si", "aprobar", "afirmativo", "proceder", "ok", "adelante", "yes", "approve")):
-        return action_id, Decision.APPROVE
-    if any(k in clean for k in ("no", "rechazar", "cancelar", "denegar", "abortar", "deny", "cancel")):
-        return action_id, Decision.DENY
+    is_always = bool(_RE_ALWAYS.search(clean))
+    has_deny = bool(_RE_DENY.search(clean))
+    has_approve = bool(_RE_APPROVE.search(clean))
+
+    if has_deny:
+        return action_id, Decision.ALWAYS_DENY if is_always else Decision.DENY
+    if has_approve:
+        return action_id, Decision.ALWAYS_APPROVE if is_always else Decision.APPROVE
 
     return action_id, None
 
@@ -234,3 +251,27 @@ class ApprovalStore:
                 "UPDATE pending_actions SET status = ? WHERE id = ?",
                 (status_val, action_id),
             )
+
+    def consume_approved_action(self, permission_key: str) -> bool:
+        """
+        Consume atómicamente una autorización puntual ('approved') para `permission_key`
+        (o `action_type` coincidente), cambiando su estado a 'executed' para permitir
+        una única ejecución tras confirmación humana en acciones HIGH/MEDIUM.
+        """
+        with self._connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT id FROM pending_actions
+                WHERE (permission_key = ? OR action_type = ?) AND status = 'approved'
+                ORDER BY created_at ASC LIMIT 1
+                """,
+                (permission_key, permission_key),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            conn.execute(
+                "UPDATE pending_actions SET status = 'executed' WHERE id = ?",
+                (row[0],),
+            )
+            return True

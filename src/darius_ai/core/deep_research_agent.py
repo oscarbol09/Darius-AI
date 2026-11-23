@@ -67,7 +67,7 @@ class DeepResearchAgent:
         )
 
         try:
-            raw_response, _ = get_ai_response(prompt)
+            raw_response, _ = get_ai_response(prompt, enable_tools=False)
             match = re.search(r"\{[\s\S]*\}", raw_response)
             if match:
                 data = json.loads(match.group(0))
@@ -159,7 +159,7 @@ class DeepResearchAgent:
         )
 
         try:
-            llm_text, _ = get_ai_response(synthesis_prompt)
+            llm_text, _ = get_ai_response(synthesis_prompt, enable_tools=False)
         except Exception as e:
             log.warning(f"[DeepResearchAgent] LLM synthesis failed, using heuristic synthesis: {e}")
             llm_text = ""

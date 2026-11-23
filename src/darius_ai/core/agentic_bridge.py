@@ -16,6 +16,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from typing import Any
@@ -30,21 +31,87 @@ DESTRUCTIVE_KEYWORDS = {
     "merge",
     "delete",
     "remove",
+    "remove-item",
+    "ri",
+    "rm",
+    "erase",
+    "rd",
     "drop",
     "destroy",
     "format",
     "reboot",
+    "restart-computer",
+    "stop-computer",
     "shutdown",
     "kill",
+    "taskkill",
     "stop-process",
+    "spps",
     "clear-recyclebin",
+    "clear-content",
+    "clc",
+    "set-content",
+    "sc",
+    "add-content",
+    "ac",
+    "out-file",
+    "new-item",
+    "ni",
+    "rename-item",
+    "rni",
+    "move-item",
+    "mi",
+    "copy-item",
+    "cpi",
+    "invoke-expression",
+    "iex",
+    "invoke-webrequest",
+    "iwr",
+    "invoke-restmethod",
+    "irm",
+    "start-process",
+    "saps",
+    "start-bitstransfer",
+    "certutil",
+    "bitsadmin",
+    "mshta",
+    "rundll32",
+    "regsvr32",
+    "wmic",
+    "netsh",
+    "icacls",
+    "takeown",
+    "-enc",
+    "-encodedcommand",
+    "downloadstring",
+    "downloadfile",
+    "frombase64string",
     "push --force",
+    "push -f",
     "reset --hard",
+    "clean -f",
     "clean -fdx",
+    "checkout -f",
+    "checkout --force",
     "branch -d",
     "branch -D",
+    "git -c",
     "pr merge",
     "pr close",
+    "issue delete",
+    "issue close",
+    "repo delete",
+    "repo archive",
+    "repo rename",
+    "release delete",
+    "auth token",
+    "secret set",
+    "secret delete",
+    "secret remove",
+    "ssh-key add",
+    "ssh-key delete",
+    "gpg-key add",
+    "gpg-key delete",
     "rmdir /s",
     "del /f",
     "del /s",
@@ -59,10 +126,24 @@ DESTRUCTIVE_KEYWORDS = {
     "attrib",
 }
 
+_SHELL_CHAIN_RE = re.compile(r"[;|&`]|>>?|\$\(")
+_GH_API_MUTATION_RE = re.compile(
+    r"\bapi\b.*\s(?:-X|--method|-f|-F|--raw-field|--field|--input)\b",
+    re.IGNORECASE,
+)
+
 
 def is_destructive(action_text: str) -> bool:
-    """Evalúa si una acción o comando propuesto es potencialmente destructivo."""
-    norm = action_text.lower().strip()
+    """Evalúa si una acción o comando propuesto es potencialmente destructivo o peligroso."""
+    norm = (action_text or "").lower().strip()
+    if not norm:
+        return False
+
+    if _SHELL_CHAIN_RE.search(norm):
+        return True
+    if _GH_API_MUTATION_RE.search(norm):
+        return True
+
     for k in DESTRUCTIVE_KEYWORDS:
         if " " in k or "-" in k or "/" in k:
             if k in norm:
@@ -71,6 +152,17 @@ def is_destructive(action_text: str) -> bool:
             if re.search(rf"\b{re.escape(k)}\b", norm):
                 return True
     return False
+
+
+def _split_cli_args(raw: str) -> list[str]:
+    """Divide argumentos de CLI preservando comillas de forma segura sin invocar shell."""
+    text = (raw or "").strip()
+    if not text:
+        return []
+    try:
+        return [tok for tok in shlex.split(text, posix=True) if tok]
+    except ValueError:
+        return [tok.strip("\"'") for tok in text.split() if tok.strip("\"'")]
 
 
 class AgenticBridge:
@@ -143,7 +235,7 @@ class AgenticBridge:
           - 'issue list'
         """
         gh_bin = self._gh_path or "gh"
-        args_list = [a.strip() for a in args.split() if a.strip()] if isinstance(args, str) else list(args)
+        args_list = _split_cli_args(args) if isinstance(args, str) else list(args)
 
         # Prevenir ejecución vacía
         if not args_list:
@@ -176,7 +268,7 @@ class AgenticBridge:
         """Ejecuta un comando de Git localmente."""
         git_bin = self._git_path or "git"
         if isinstance(command, str):
-            cmd_list = [c.strip() for c in command.split() if c.strip()]
+            cmd_list = _split_cli_args(command)
             if cmd_list and cmd_list[0] == "git":
                 cmd_list = cmd_list[1:]
         else:
@@ -338,7 +430,7 @@ class AgenticBridge:
                 store = ApprovalStore()
                 perm_key = f"{tool_clean}:{json.dumps({'tool': tool_clean, 'args': args_clean}, sort_keys=True)}"
                 perm_decision = store.check_permission(perm_key, tier=RiskTier.HIGH)
-                if perm_decision != Decision.ALWAYS_APPROVE:
+                if perm_decision != Decision.ALWAYS_APPROVE and not store.consume_approved_action(perm_key):
                     action = store.propose_action(
                         action_type=tool_clean,
                         description=f"Ejecución de {tool_clean} con argumentos: {args_clean}",
@@ -357,7 +449,17 @@ class AgenticBridge:
                         "action_id": action.id,
                     }
             except Exception as exc:
-                log.warning(f"[AgenticBridge] Error al verificar autorización en ApprovalStore: {exc}")
+                log.error(f"[AgenticBridge] Fallo crítico al verificar autorización en ApprovalStore: {exc}")
+                return {
+                    "success": False,
+                    "tool": tool_name,
+                    "output": (
+                        f"[ERROR DE SEGURIDAD] No se pudo verificar la autorización HITL ({exc}). "
+                        "Ejecución bloqueada por política fail-closed."
+                    ),
+                    "is_destructive": True,
+                    "requires_approval": True,
+                }
 
         if tool_clean in ("flush_dns", "limpiar_dns", "ipconfig_flushdns"):
             ok, out = self.flush_dns()
