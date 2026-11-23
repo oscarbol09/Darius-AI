@@ -117,3 +117,12 @@ class TestObsidianBrainOperations:
         brain = ObsidianBrain(vault_path="")
         resolved = brain.vault_path
         assert resolved == fake_cerebro.resolve()
+
+    def test_w2_04_blocks_configured_folder_path_traversal(self, tmp_path: Path, monkeypatch):
+        """W2-04: Verifica que obsidian_memories_folder con '../' sea bloqueado por _resolve_safe_vault_subdir."""
+        import pytest
+
+        brain = ObsidianBrain(vault_path=tmp_path)
+        monkeypatch.setattr(type(cfg), "obsidian_memories_folder", property(lambda self: "../../escape_outside"))
+        with pytest.raises(ValueError, match="traversal"):
+            brain.save_memory("Secreta", "Contenido")

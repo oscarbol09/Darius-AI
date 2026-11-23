@@ -25,6 +25,7 @@ import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from src.darius_ai.core.ai_client import get_ai_response
@@ -190,7 +191,7 @@ class TargetDossierEngine:
         Consulta la API neural de Exa si hay una clave disponible.
         Retorna una lista de resultados con título, url y fragmentos de texto.
         """
-        key = api_key or os.environ.get("EXA_API_KEY") or cfg.get("exa_api_key", "")
+        key = api_key or os.environ.get("EXA_API_KEY") or cfg.get("exa_api_key", default="")
         if not key:
             return []
 
@@ -249,7 +250,7 @@ class TargetDossierEngine:
         )
 
         try:
-            raw_response, _ = get_ai_response(prompt)
+            raw_response, _ = get_ai_response(prompt, enable_tools=False)
             match = re.search(r"\{[\s\S]*\}", raw_response)
             if match:
                 data = json.loads(match.group(0))
@@ -296,16 +297,37 @@ class TargetDossierEngine:
         Retorna la ruta del archivo generado.
         """
         b = vault_brain or brain
-        safe_name = re.sub(r'[\\/*?:"<>| ]', "_", dossier.target_name).strip("_")
-        relative_path = f"Darius/Dossiers/{dossier.category.capitalize()}/{safe_name}.md"
+        allowed_cats = {"person", "company", "repository", "topic", "project"}
+        raw_cat = re.sub(r"[^a-z]", "", (dossier.category or "").strip().lower())
+        safe_cat = raw_cat.capitalize() if raw_cat in allowed_cats else "Topic"
 
+        safe_name = re.sub(r'[\\/*?:"<>| \x00-\x1f]', "_", dossier.target_name or "")
+        safe_name = re.sub(r"\.+", ".", safe_name).strip("._")
+        if not safe_name:
+            safe_name = "unnamed_target"
+        reserved_dos = {
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            *(f"COM{i}" for i in range(1, 10)),
+            *(f"LPT{i}" for i in range(1, 10)),
+        }
+        if safe_name.split(".")[0].upper() in reserved_dos:
+            safe_name = f"dossier_{safe_name}"
+        safe_name = safe_name[:80]
+
+        relative_path = f"Darius/Dossiers/{safe_cat}/{safe_name}.md"
         content = dossier.to_markdown()
 
         if hasattr(b, "create_note"):
             b.create_note(relative_path, content)
         elif hasattr(b, "vault_path") and b.vault_path:
-            full_path = os.path.join(b.vault_path, relative_path)
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
+            vault_root = Path(b.vault_path).resolve()
+            full_path = (vault_root / relative_path).resolve()
+            if not full_path.is_relative_to(vault_root):
+                raise ValueError(f"Path traversal blocked: {relative_path}")
+            os.makedirs(full_path.parent, exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(content)
 
