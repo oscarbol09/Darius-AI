@@ -123,3 +123,34 @@ def test_scheduler_worker_and_callback(temp_scheduler):
 
     assert len(executed) >= 1
     assert "Tarea con callback" in executed
+
+
+def test_cron_parser_and_utc_normalization(temp_scheduler):
+    """W2-10: Verifica el parser real de 5 campos cron, normalización UTC en ONCE y clamping de intervalo."""
+    from src.darius_ai.core.task_scheduler import _compute_next_cron_run
+
+    base = datetime(2026, 5, 10, 7, 30, 0, tzinfo=UTC)  # Domingo 07:30 UTC
+    next_8am = _compute_next_cron_run("0 8 * * *", base)
+    assert next_8am == datetime(2026, 5, 10, 8, 0, 0, tzinfo=UTC)
+
+    next_step15 = _compute_next_cron_run("*/15 * * * *", base)
+    assert next_step15 == datetime(2026, 5, 10, 7, 45, 0, tzinfo=UTC)
+
+    # Normalización de sufijo Z o offset local en ONCE
+    past_z = (datetime.now(UTC) - timedelta(seconds=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    task_z = temp_scheduler.schedule_task(
+        prompt="Tarea con Z",
+        schedule_type=ScheduleType.ONCE,
+        schedule_value=past_z,
+    )
+    assert task_z.next_run.endswith("+00:00")
+    assert any(t.id == task_z.id for t in temp_scheduler.get_due_tasks())
+
+    # Intervalo negativo o cero se clampea a >= 1.0s en el futuro
+    now_before = datetime.now(UTC)
+    task_neg = temp_scheduler.schedule_task(
+        prompt="Intervalo negativo",
+        schedule_type=ScheduleType.INTERVAL,
+        schedule_value="-10",
+    )
+    assert datetime.fromisoformat(task_neg.next_run) > now_before
